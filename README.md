@@ -90,13 +90,53 @@ W bitwie naciśnij `F8` (lub klawisz z `reloadKey`) — config wczytuje się pon
    - wywołuje na Flashu `as_addDynamicViewRange` / `as_updateDynRange` z (color, alpha, radius)
 5. Sprząta entry i callbacki w `_hideMarkup`, `__onPostMortemSwitched`, `stop`.
 
-## TODO (v3+)
+## Roadmap
 
-- **Pełen UI/UX** — settings panel w `Settings → Mods` zamiast pliku JSON. Wymaga osobnego SWF lub Pythonowego widoku Scaleform; rozważam też integrację z istniejącym frameworkiem [ModsListAPI](https://wgmods.net/) który większość modów używa.
-- **Kara za strzał (firePenalty)** — hak na `Vehicle.shoot` (lub event `onShootEvent`), tymczasowy mnożnik camo `* invisibilityFactorAtShot` przez ~3 s.
-- **Okrąg "ja widzę" obok "ja jestem widzialny"** — drugi okrąg z aktualnym VR gracza (jest już w grze jako VIEW_RANGE, ale może być wyłączony przez ustawienia, więc opcjonalnie zdublujemy).
-- **Per-class presety** dla `enemyViewRangeFallback` (scout 420, heavy 380, arta 350).
-- **Bonus za roślinność (foliage)** — częściowo obliczany serwerowo i wymaga raycastów; pomijamy w v1/v2.
+### v3 — fire penalty + siege modes
+
+- **Kara za strzał (firePenalty)** — hak na event strzału (`Vehicle.shoot` / `VEHICLE_VIEW_STATE.FIRE_LAUNCHED`). Przez ~3 s po strzale aplikujemy `camo *= invisibilityFactorAtShot` (z `descr.miscAttrs`). Po 3 s plynnie wracamy do pełnego camo.
+- **Tryby (CS-63, S-Conqueror, italian heavy, etc.)** — śledzimy `vehicle.siegeState`, czytamy odpowiedni zestaw camo z descriptora dla aktualnego trybu.
+- **EBR / wheeled** — bez specjalnego case'u; XML czołgu ma `invMoving == invStill`, mod automatycznie pokazuje stały okrąg.
+
+### v4 — picker enemy tank
+
+W bitwie wybieramy konkretnego przeciwnika i dostosowujemy okrąg do jego VR. Server publicznie wysyła pełny `strCompactDescr` każdego przeciwnika (potwierdzone w `gui/battle_control/arena_info/arena_vos.py:277`), więc:
+
+```python
+from items.vehicles import VehicleDescr
+descr = VehicleDescr(compactDescr=enemy.vehicleType.strCompactDescr)
+base_vr = descr.turret.circularVisionRadius
+vr_factor = descr.miscAttrs.get('circularVisionRadiusFactor', 1.0)
+estimated_vr = base_vr * vr_factor
+# +/- 5% bo nie znamy skilli załogi i aktywności lorny
+```
+
+Dwa warianty UI:
+- **lekki (v4)**: hotkeye `Shift+F1` / `Shift+F2` cyklują przez przeciwników, aktualny wybór w chacie + lekki overlay; bez Flasha.
+- **ciężki (v5)**: mały panel w rogu z klikalną listą przeciwników; wymaga Scaleform/SWF.
+
+Co serwer wysyła i czego brakuje (dla picker'a):
+| pole | dostępne klientowi | uwagi |
+|---|---|---|
+| model czołgu, hull/turret/gun/engine | ✅ | z `strCompactDescr` |
+| zainstalowany sprzęt (binokle, optyka itd.) | ✅ | z `strCompactDescr` |
+| camouflage skin / styl | ✅ | z `strCompactDescr` |
+| tier, klasa, rola, max HP | ✅ | z `VehicleTypeInfoVO` |
+| skille załogi (Recon, Sit. Awareness, BIA) | ❌ | przybliżamy "100% z popularnymi perkami" |
+| aktywne consumable'y (cola, kawa) | ❌ | pomijamy |
+| czy lorna jest właśnie aktywna (3s standstill) | ❌ | pokazujemy worst-case (lorna aktywna) |
+
+### v5 — UI/UX
+
+- Pełen settings panel w `Settings → Mods` zamiast pliku JSON. Wymaga osobnego SWF / Pythonowego widoku Scaleform; rozważam też integrację z istniejącym frameworkiem [ModsListAPI](https://wgmods.net/).
+- Picker wariantu ciężkiego (z punktu v4).
+- Okrąg "ja widzę" obok "ja jestem widzialny" — drugi okrąg z aktualnym VR gracza (jest już w grze jako VIEW_RANGE, ale może być wyłączony przez ustawienia, więc opcjonalnie zdublujemy).
+- Per-class presety dla `enemyViewRangeFallback` (scout 420, heavy 380, arta 350).
+
+### Nie planujemy
+
+- **Bonus za roślinność (foliage)** — częściowo obliczany serwerowo, wymaga raycastów do każdego krzaka. Złożoność niewspółmierna do zysku.
+- **Pokazywanie czyjegoś camo / VR jako liczby** — to "softcheat" w niektórych interpretacjach. Nasz mod liczy tylko własne wartości i pokazuje wynik geometrycznie.
 
 ## Dev / build
 
