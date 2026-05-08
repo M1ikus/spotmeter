@@ -55,6 +55,16 @@ Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`
 | `movingSpeedThreshold` | `0.5` | prędkość uznawana za ruch (m/s) |
 | `applyFirePenalty` | `true` | po strzale aplikuje `* invisibilityFactorAtShot` |
 | `fireRevealDuration` | `3.0` | czas trwania kary za strzał (s) |
+| `pickerEnabled` | `true` | włącza picker przeciwnika (PgUp/PgDn) |
+| `pickerNextKey` | `KEY_NEXT` | następny przeciwnik (PgDn) |
+| `pickerPrevKey` | `KEY_PRIOR` | poprzedni przeciwnik (PgUp) |
+| `pickerClearKey` | `KEY_HOME` | wyczyść picker |
+| `pickerRationsKey` | `KEY_DELETE` | toggle bonusu racji bojowych |
+| `pickerPerksKey` | `KEY_END` | toggle bonusu perks (BIA/Recon/SitAware) |
+| `pickerVRBonusRations` | `1.10` | mnożnik gdy rations on |
+| `pickerVRBonusPerks` | `1.10` | mnożnik gdy perks on |
+| `pickerMarker` | `"● "` | prefix nazwy wybranego przeciwnika |
+| `pickerIncludeDeadEnemies` | `false` | czy uwzględniać martwych w cyklu |
 | `reloadKey` | `KEY_F8` | hotkey hot-reloadu configu w bitwie |
 | `logCalcDetails` | `false` | wypisuje camo/radius/state do `python.log` |
 
@@ -103,40 +113,60 @@ W bitwie naciśnij `F8` (lub klawisz z `reloadKey`) — config wczytuje się pon
 - **Tryby (CS-63, S-Conqueror, italian heavy, etc.)** — silnik gry obsługuje to automatycznie. `vehicle.typeDescriptor` jest `CompositeVehicleDescriptor`, który dynamicznie deleguje atrybuty do właściwego sub-descriptora (default vs siege) na podstawie aktualnego stanu (`__vehicleMode`). Mod nie wymaga osobnej obsługi — `descr.type.invisibility` zwraca prawidłowe wartości dla bieżącego trybu out of the box.
 - **EBR / wheeled** — bez specjalnego case'u; XML czołgu ma `invMoving == invStill`, mod automatycznie pokazuje stały okrąg.
 
-### v4 — picker enemy tank
+### v4 — picker enemy tank ✅
 
-W bitwie wybieramy konkretnego przeciwnika i dostosowujemy okrąg do jego VR. Server publicznie wysyła pełny `strCompactDescr` każdego przeciwnika (potwierdzone w `gui/battle_control/arena_info/arena_vos.py:277`), więc:
+W bitwie wybierasz konkretnego przeciwnika hotkeyami i okrąg dostosowuje się do jego VR. Server wysyła pełny `strCompactDescr` każdego pojazdu od początku bitwy (potwierdzone w `gui/battle_control/arena_info/arena_vos.py:277`), więc dekodujemy lokalnie:
 
 ```python
 from items.vehicles import VehicleDescr
 descr = VehicleDescr(compactDescr=enemy.vehicleType.strCompactDescr)
 base_vr = descr.turret.circularVisionRadius
-vr_factor = descr.miscAttrs.get('circularVisionRadiusFactor', 1.0)
+vr_factor = descr.miscAttrs.get('circularVisionRadiusFactor', 1.0)  # optyka itd.
 estimated_vr = base_vr * vr_factor
-# +/- 5% bo nie znamy skilli załogi i aktywności lorny
+# opcjonalnie * pickerVRBonusRations (default 1.10) jeśli zakładamy racje bojowe
+# opcjonalnie * pickerVRBonusPerks (default 1.10) jeśli zakładamy BIA + Recon + SitAware
 ```
 
-Dwa warianty UI:
-- **lekki (v4)**: hotkeye `Shift+F1` / `Shift+F2` cyklują przez przeciwników, aktualny wybór w chacie + lekki overlay; bez Flasha.
-- **ciężki (v5)**: mały panel w rogu z klikalną listą przeciwników; wymaga Scaleform/SWF.
+#### Hotkeys (configurable)
+| akcja | klawisz domyślny | config |
+|---|---|---|
+| następny przeciwnik | PageDown | `pickerNextKey` |
+| poprzedni przeciwnik | PageUp | `pickerPrevKey` |
+| wyczyść picker (wraca do useOwnViewRange / fallback) | Home | `pickerClearKey` |
+| toggle racji bojowych | Delete | `pickerRationsKey` |
+| toggle perks (BIA/Recon/SitAware) | End | `pickerPerksKey` |
+| reload configu | F8 | `reloadKey` |
 
-Co serwer wysyła i czego brakuje (dla picker'a):
+#### Założenia w obliczeniach
+Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo serwer tego nie wysyła). Dwa toggleable bonusy:
+- **+rations** (`pickerVRBonusRations`, default `1.10`): aproksymuje racje bojowe / colę / kawę (~+10% do skilli załogi → ~+10% do VR od skill-based perks).
+- **+perks** (`pickerVRBonusPerks`, default `1.10`): aproksymuje połączony bonus BIA (+5% skilli) + Recon (Commander) + Situational Awareness (Radio).
+
+Podczas bitwy widać aktywne flagi w logu (`python.log` → `SpotCircleMod: picker -> Object 268V VR=445m [+rations +perks]`).
+
+#### Wizualny marker
+Hook na `PlayerFullNameFormatter.format` wstrzykuje konfigurowalny prefix (`pickerMarker`, default `'● '`) przed nazwę gracza dla wybranego czołgu. **Caveat:** classic players panel (top-right) nie udostępnia API do natychmiastowej zmiany wyświetlanej nazwy — marker pojawia się przy najbliższym naturalnym redraw'ie wiersza (zmiana HP, śmierć, otwarcie pełnego panelu Tab). Kliknij Tab dla pełnej listy ze świeżą formatą.
+
+Główny feedback: **zmiana rozmiaru okręgu na minimapie** — od razu po cyklu okrąg dostosowuje się do nowego VR-u.
+
+#### Co serwer wysyła i czego brakuje
 | pole | dostępne klientowi | uwagi |
 |---|---|---|
 | model czołgu, hull/turret/gun/engine | ✅ | z `strCompactDescr` |
 | zainstalowany sprzęt (binokle, optyka itd.) | ✅ | z `strCompactDescr` |
 | camouflage skin / styl | ✅ | z `strCompactDescr` |
 | tier, klasa, rola, max HP | ✅ | z `VehicleTypeInfoVO` |
-| skille załogi (Recon, Sit. Awareness, BIA) | ❌ | przybliżamy "100% z popularnymi perkami" |
-| aktywne consumable'y (cola, kawa) | ❌ | pomijamy |
-| czy lorna jest właśnie aktywna (3s standstill) | ❌ | pokazujemy worst-case (lorna aktywna) |
+| skille załogi (Recon, Sit. Awareness, BIA) | ❌ | toggle `pickerVRBonusPerks` |
+| aktywne consumable'y (cola, kawa) | ❌ | toggle `pickerVRBonusRations` |
+| czy lorna jest właśnie aktywna (3s standstill) | ❌ | nie modelujemy w v4 |
 
 ### v5 — UI/UX
 
-- Pełen settings panel w `Settings → Mods` zamiast pliku JSON. Wymaga osobnego SWF / Pythonowego widoku Scaleform; rozważam też integrację z istniejącym frameworkiem [ModsListAPI](https://wgmods.net/).
-- Picker wariantu ciężkiego (z punktu v4).
-- Okrąg "ja widzę" obok "ja jestem widzialny" — drugi okrąg z aktualnym VR gracza (jest już w grze jako VIEW_RANGE, ale może być wyłączony przez ustawienia, więc opcjonalnie zdublujemy).
-- Per-class presety dla `enemyViewRangeFallback` (scout 420, heavy 380, arta 350).
+- **Pełen settings panel** w `Settings → Mods` zamiast pliku JSON. Wymaga osobnego SWF / Pythonowego widoku Scaleform; rozważam też integrację z istniejącym frameworkiem [ModsListAPI](https://wgmods.net/).
+- **Natychmiastowy marker w panelu**: classic players panel nie ma Python-side hooka do nazw, więc trzeba: (a) załadować osobny SWF nakładający marker poza panelem, albo (b) hookować bardziej wewnętrzną AS3 gateway. Do rozważenia.
+- **Okrąg "ja widzę" obok "ja jestem widzialny"** — drugi okrąg z aktualnym VR gracza (jest już w grze jako VIEW_RANGE, ale może być wyłączony przez ustawienia, więc opcjonalnie zdublujemy).
+- **Per-class presety** dla `enemyViewRangeFallback` (scout 420, heavy 380, arta 350).
+- **Lornetka w trybie aktywnym** (3s standstill detection dla pickera) — wymaga utrzymywania `last_speed_change` per enemy, ale działa tylko dla spotted enemies.
 
 ### Nie planujemy
 

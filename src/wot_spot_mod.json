@@ -20,11 +20,23 @@
     "tickInterval": 0.2,
     "movingSpeedThreshold": 0.5,
 
-    "_comment_fire": "After firing, camo is multiplied by gun's invisibilityFactorAtShot for fireRevealDuration seconds. Disable applyFirePenalty if you want to ignore this. The 3.0s default matches WoT's typical reveal window for tank guns; some autocannons / clip guns differ.",
+    "_comment_fire": "After firing, camo is multiplied by gun's invisibilityFactorAtShot for fireRevealDuration seconds. Disable applyFirePenalty if you want to ignore this. The 3.0s default matches WoT's typical reveal window for tank guns.",
     "applyFirePenalty": true,
     "fireRevealDuration": 3.0,
 
-    "_comment_hotkey": "Reload config without restarting battle. Use a Keys.* constant name (KEY_F8, KEY_F7, KEY_HOME, etc.). Set to empty string to disable.",
+    "_comment_picker": "Picker lets you cycle through enemy tanks and adjust the spot circle to that specific enemy's view range (decoded from their vehicle descriptor server-sent at battle start). Hotkeys are Keys.* names. PgDown/PgUp cycle, Home clears, Delete toggles 'rations' bonus (~+10% VR), End toggles 'crew perks' bonus (~+10% VR; BIA + Recon + SitAware combined). Defaults assume enemy has neither - flip toggles to model worst-case spotters. The marker dot ('● ') appears next to the picked enemy's name on natural panel redraws (HP change, death, etc.).",
+    "pickerEnabled": true,
+    "pickerNextKey": "KEY_NEXT",
+    "pickerPrevKey": "KEY_PRIOR",
+    "pickerClearKey": "KEY_HOME",
+    "pickerRationsKey": "KEY_DELETE",
+    "pickerPerksKey": "KEY_END",
+    "pickerVRBonusRations": 1.10,
+    "pickerVRBonusPerks": 1.10,
+    "pickerMarker": "● ",
+    "pickerIncludeDeadEnemies": false,
+
+    "_comment_hotkey": "Reload config without restarting battle. Use a Keys.* constant name (KEY_F8, KEY_F7, etc.). Set to empty string to disable.",
     "reloadKey": "KEY_F8",
 
     "_comment_debug": "Set true to log camo/radius/state each tick to python.log.",

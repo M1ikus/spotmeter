@@ -43,13 +43,28 @@ DEFAULT_CONFIG = {
     'fireRevealDuration': 3.0,
     'logCalcDetails': False,
     'reloadKey': 'KEY_F8',
+    # v4 picker
+    'pickerEnabled': True,
+    'pickerNextKey': 'KEY_NEXT',
+    'pickerPrevKey': 'KEY_PRIOR',
+    'pickerClearKey': 'KEY_HOME',
+    'pickerRationsKey': 'KEY_DELETE',
+    'pickerPerksKey': 'KEY_END',
+    'pickerVRBonusRations': 1.10,
+    'pickerVRBonusPerks': 1.10,
+    'pickerMarker': u'● ',
+    'pickerIncludeDeadEnemies': False,
 }
 
 _CFG = dict(DEFAULT_CONFIG)
 _PATCHED = False
 _AVATAR_PATCHED = False
+_FORMATTER_PATCHED = False
 _STATE = weakref.WeakKeyDictionary()
 _LAST_SHOT_TIME = 0.0
+_PICKED_VID = None
+_PICKER_RATIONS = False
+_PICKER_PERKS = False
 
 
 def _read_config():
@@ -79,9 +94,11 @@ def init():
             return
         _patch_plugin()
         _patch_avatar_shoot()
+        if _CFG.get('pickerEnabled', True):
+            _patch_player_name_formatter()
         _install_reload_hotkey()
-        _logger.info('SpotCircleMod: initialised (useOwnViewRange=%s, fire=%s)',
-                     _CFG['useOwnViewRange'], _CFG['applyFirePenalty'])
+        _logger.info('SpotCircleMod: initialised (useOwnViewRange=%s, fire=%s, picker=%s)',
+                     _CFG['useOwnViewRange'], _CFG['applyFirePenalty'], _CFG['pickerEnabled'])
     except Exception:
         _logger.exception('SpotCircleMod: init failed')
 
@@ -167,6 +184,10 @@ def _resolve_enemy_view_range(plugin):
     # FINAL spot distance, not to the input VR. A tank with 500 m VR and a
     # low-camo target still spots at 445 m (capped output), but the extra
     # VR above 445 m provides buffer against the target's camo.
+    if _PICKED_VID is not None:
+        vr = _picker_vr(plugin)
+        if vr is not None:
+            return vr
     if _CFG.get('useOwnViewRange', True):
         try:
             feedback = plugin.sessionProvider.shared.feedback
@@ -177,6 +198,37 @@ def _resolve_enemy_view_range(plugin):
         except Exception:
             pass
     return float(_CFG.get('enemyViewRangeFallback', VISIBILITY.MAX_RADIUS))
+
+
+def _picker_vr(plugin):
+    try:
+        arenaDP = plugin.sessionProvider.getArenaDP()
+    except Exception:
+        return None
+    vinfo = arenaDP.getVehicleInfo(_PICKED_VID)
+    if vinfo is None or vinfo.vehicleType is None:
+        return None
+    cd = getattr(vinfo.vehicleType, 'strCompactDescr', None)
+    if not cd:
+        return None
+    try:
+        from items.vehicles import VehicleDescr
+        descr = VehicleDescr(compactDescr=cd)
+    except Exception:
+        _logger.exception('SpotCircleMod: failed to decode descriptor for picked vid=%s', _PICKED_VID)
+        return None
+    try:
+        base_vr = float(descr.turret.circularVisionRadius)
+    except Exception:
+        return None
+    misc = getattr(descr, 'miscAttrs', None) or {}
+    factor = float(misc.get('circularVisionRadiusFactor', 1.0)) or 1.0
+    vr = base_vr * factor
+    if _PICKER_RATIONS:
+        vr *= float(_CFG.get('pickerVRBonusRations', 1.10))
+    if _PICKER_PERKS:
+        vr *= float(_CFG.get('pickerVRBonusPerks', 1.10))
+    return vr
 
 
 def _compute_spot_radius(camo, enemy_vr):
@@ -464,11 +516,165 @@ def _patch_avatar_shoot():
 def _hot_reload():
     _logger.info('SpotCircleMod: hot-reloading config')
     _read_config()
+    _force_panel_refresh()
     for plugin in list(_STATE.keys()):
         try:
             _refresh_spot_circle(plugin)
         except Exception:
             _logger.exception('SpotCircleMod: failed to refresh after reload')
+
+
+def _get_picker_plugin():
+    for plugin in _STATE.keys():
+        return plugin
+    return None
+
+
+def _enemy_iterator(plugin):
+    try:
+        arenaDP = plugin.sessionProvider.getArenaDP()
+    except Exception:
+        return []
+    if arenaDP is None:
+        return []
+    my_team = arenaDP.getNumberOfTeam()
+    include_dead = bool(_CFG.get('pickerIncludeDeadEnemies', False))
+    items = []
+    try:
+        for vinfo in arenaDP.getVehiclesInfoIterator():
+            if vinfo.team == my_team:
+                continue
+            if vinfo.vehicleType is None or not vinfo.vehicleType.strCompactDescr:
+                continue
+            if not include_dead and not vinfo.isAlive():
+                continue
+            items.append((vinfo.vehicleID, vinfo))
+    except Exception:
+        _logger.exception('SpotCircleMod: failed to enumerate enemies')
+        return []
+    items.sort(key=lambda kv: (-(kv[1].vehicleType.level or 0), kv[1].vehicleType.shortName, kv[0]))
+    return items
+
+
+def _format_picker_summary(plugin):
+    if _PICKED_VID is None:
+        return None
+    enemies = _enemy_iterator(plugin)
+    for vid, vinfo in enemies:
+        if vid == _PICKED_VID:
+            short = vinfo.vehicleType.shortName if vinfo.vehicleType else '?'
+            vr = _picker_vr(plugin)
+            vr_str = ('%.0fm' % vr) if vr is not None else '?'
+            tags = []
+            if _PICKER_RATIONS:
+                tags.append('+rations')
+            if _PICKER_PERKS:
+                tags.append('+perks')
+            tags_str = (' [' + ' '.join(tags) + ']') if tags else ''
+            return '%s VR=%s%s' % (short, vr_str, tags_str)
+    return None
+
+
+def _cycle_picker(direction):
+    global _PICKED_VID
+    plugin = _get_picker_plugin()
+    if plugin is None:
+        return
+    enemies = _enemy_iterator(plugin)
+    if not enemies:
+        _PICKED_VID = None
+        _on_picker_changed(plugin, set())
+        return
+    vids = [vid for vid, _ in enemies]
+    affected = set()
+    if _PICKED_VID is not None:
+        affected.add(_PICKED_VID)
+    if _PICKED_VID is None or _PICKED_VID not in vids:
+        _PICKED_VID = vids[0] if direction >= 0 else vids[-1]
+    else:
+        idx = vids.index(_PICKED_VID)
+        idx = (idx + (1 if direction > 0 else -1)) % len(vids)
+        _PICKED_VID = vids[idx]
+    affected.add(_PICKED_VID)
+    _on_picker_changed(plugin, affected)
+
+
+def _clear_picker():
+    plugin = _get_picker_plugin()
+    global _PICKED_VID
+    affected = set()
+    if _PICKED_VID is not None:
+        affected.add(_PICKED_VID)
+    _PICKED_VID = None
+    _on_picker_changed(plugin, affected)
+
+
+def _toggle_rations():
+    global _PICKER_RATIONS
+    _PICKER_RATIONS = not _PICKER_RATIONS
+    plugin = _get_picker_plugin()
+    _on_picker_changed(plugin, set())
+
+
+def _toggle_perks():
+    global _PICKER_PERKS
+    _PICKER_PERKS = not _PICKER_PERKS
+    plugin = _get_picker_plugin()
+    _on_picker_changed(plugin, set())
+
+
+def _on_picker_changed(plugin, affected_vids):
+    summary = _format_picker_summary(plugin) if plugin is not None else None
+    _logger.info('SpotCircleMod: picker -> %s | rations=%s perks=%s',
+                 summary or 'none', _PICKER_RATIONS, _PICKER_PERKS)
+    _force_panel_refresh(affected_vids)
+    if plugin is not None:
+        try:
+            _tick(plugin)
+        except Exception:
+            _logger.exception('SpotCircleMod: tick after picker change failed')
+
+
+def _force_panel_refresh(affected_vids=None):
+    # The classic players panel does not expose a Python-side method for
+    # re-rendering individual rows. The hooked PlayerFullNameFormatter is
+    # consulted by the panel only on natural redraws (HP changes, death,
+    # mode switch), so the marker may not appear instantly. Primary visual
+    # feedback comes from the minimap spot circle changing radius.
+    return
+
+
+def _patch_player_name_formatter():
+    global _FORMATTER_PATCHED
+    if _FORMATTER_PATCHED:
+        return
+    try:
+        from gui.battle_control.arena_info import player_format
+    except ImportError:
+        _logger.info('SpotCircleMod: player_format unavailable, skipping picker marker')
+        return
+    Formatter = getattr(player_format, 'PlayerFullNameFormatter', None)
+    if Formatter is None:
+        return
+    orig_format = Formatter.format
+    marker = _CFG.get('pickerMarker', u'● ')
+
+    def patched_format(self, vInfoVO, playerName=None):
+        result = orig_format(self, vInfoVO, playerName=playerName)
+        try:
+            if _PICKED_VID is not None and getattr(vInfoVO, 'vehicleID', None) == _PICKED_VID:
+                from gui.battle_control.arena_info.player_format import PlayerFormatResult
+                return PlayerFormatResult(
+                    marker + result.playerFullName,
+                    result.playerName, result.playerFakeName,
+                    result.clanAbbrev, result.regionCode, result.vehicleName)
+        except Exception:
+            _logger.exception('SpotCircleMod: failed to inject marker')
+        return result
+
+    Formatter.format = patched_format
+    _FORMATTER_PATCHED = True
+    _logger.info('SpotCircleMod: PlayerFullNameFormatter hooked for marker')
 
 
 def _install_reload_hotkey():
@@ -478,18 +684,43 @@ def _install_reload_hotkey():
     except ImportError:
         _logger.info('SpotCircleMod: hotkey support unavailable, edits to config require battle restart')
         return
-    key_name = _CFG.get('reloadKey') or ''
-    key_id = getattr(Keys, key_name, None) if key_name else None
-    if key_id is None:
-        _logger.info('SpotCircleMod: reloadKey %r not recognised, skipping hotkey', key_name)
+
+    bindings = []
+
+    def _bind(cfg_key, action, label):
+        key_name = _CFG.get(cfg_key) or ''
+        key_id = getattr(Keys, key_name, None) if key_name else None
+        if key_id is None:
+            return
+        bindings.append((key_id, action, label, key_name))
+
+    _bind('reloadKey', _hot_reload, 'reload')
+    if _CFG.get('pickerEnabled', True):
+        _bind('pickerNextKey', lambda: _cycle_picker(+1), 'picker-next')
+        _bind('pickerPrevKey', lambda: _cycle_picker(-1), 'picker-prev')
+        _bind('pickerClearKey', _clear_picker, 'picker-clear')
+        _bind('pickerRationsKey', _toggle_rations, 'picker-rations')
+        _bind('pickerPerksKey', _toggle_perks, 'picker-perks')
+
+    if not bindings:
+        _logger.info('SpotCircleMod: no hotkeys registered')
         return
 
     def _on_key(event):
-        if event.isKeyDown() and event.key == key_id:
-            _hot_reload()
+        if not event.isKeyDown():
+            return
+        key = event.key
+        for key_id, action, label, _name in bindings:
+            if key == key_id:
+                try:
+                    action()
+                except Exception:
+                    _logger.exception('SpotCircleMod: hotkey %s failed', label)
+                return
 
     try:
         InputHandler.g_instance.onKeyDown += _on_key
-        _logger.info('SpotCircleMod: hot-reload bound to %s', key_name)
+        names = ', '.join('%s=%s' % (label, name) for _, _, label, name in bindings)
+        _logger.info('SpotCircleMod: hotkeys bound (%s)', names)
     except Exception:
-        _logger.exception('SpotCircleMod: cannot bind hotkey')
+        _logger.exception('SpotCircleMod: cannot bind hotkeys')
