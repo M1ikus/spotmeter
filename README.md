@@ -62,17 +62,29 @@ Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`
 | `camoNetFallbackBonus` | `0.05` | bonus jeśli odczyt z descriptora padnie |
 | `pickerAssumeStereoscope` | `true` | jeśli enemy ma lornetkę, zakłada że jest aktywna |
 | `pickerStereoscopeFallback` | `1.25` | mnożnik VR jeśli odczyt z descriptora padnie |
+| `overlayEnabled` | `true` | włącza overlay tekstu (chat-line nad minimapą) |
+| `overlayShowOnTickChange` | `true` | automatycznie pokazuje przy istotnej zmianie radiusa |
+| `overlayMinRadiusDelta` | `15.0` | próg zmiany w m do auto-display |
 | `pickerEnabled` | `true` | włącza picker przeciwnika (PgUp/PgDn) |
-| `pickerNextKey` | `KEY_PGDN` | następny przeciwnik (PgDn) |
-| `pickerPrevKey` | `KEY_PGUP` | poprzedni przeciwnik (PgUp) |
-| `pickerClearKey` | `KEY_HOME` | wyczyść picker |
-| `pickerRationsKey` | `KEY_DELETE` | toggle bonusu racji bojowych |
-| `pickerPerksKey` | `KEY_END` | toggle bonusu perks (BIA/Recon/SitAware) |
-| `pickerVRBonusRations` | `1.10` | mnożnik gdy rations on |
-| `pickerVRBonusPerks` | `1.10` | mnożnik gdy perks on |
+| `pickerNextKey` | `KEY_NUMPAD2` | następny przeciwnik |
+| `pickerPrevKey` | `KEY_NUMPAD8` | poprzedni przeciwnik |
+| `pickerClearKey` | `KEY_NUMPAD0` | wyczyść picker |
+| `pickerRationsKey` | `KEY_NUMPAD1` | toggle Combat Rations |
+| `pickerVentsKey` | `KEY_NUMPAD3` | toggle Improved Ventilation |
+| `pickerBIAKey` | `KEY_NUMPAD4` | toggle Brothers in Arms |
+| `pickerReconKey` | `KEY_NUMPAD5` | toggle Recon (commander) |
+| `pickerSitAwareKey` | `KEY_NUMPAD6` | toggle Sit. Awareness (radio) |
+| `pickerStereoKey` | `KEY_NUMPAD7` | toggle założenia o lornetce |
+| `overlayToggleKey` | `KEY_NUMPAD9` | toggle overlay tekstu |
+| `overlayPrintNowKey` | `KEY_NUMPADENTER` | pokaż aktualny spot teraz |
+| `reloadKey` | `KEY_NUMPADPERIOD` | reload configu |
+| `pickerVRBonusRations` | `1.10` | mnożnik gdy Rations ON |
+| `pickerVRBonusVents` | `1.05` | mnożnik gdy Vents ON |
+| `pickerVRBonusBIA` | `1.05` | mnożnik gdy BIA ON |
+| `pickerVRBonusRecon` | `1.02` | mnożnik gdy Recon ON |
+| `pickerVRBonusSitAware` | `1.03` | mnożnik gdy SitAware ON |
 | `pickerMarker` | `"● "` | prefix nazwy wybranego przeciwnika |
 | `pickerIncludeDeadEnemies` | `false` | czy uwzględniać martwych w cyklu |
-| `reloadKey` | `KEY_F8` | hotkey hot-reloadu configu w bitwie |
 | `logCalcDetails` | `false` | wypisuje camo/radius/state do `python.log` |
 
 Nazwy klawiszy: nazwy z modułu `Keys` (np. `KEY_F8`, `KEY_F7`, `KEY_HOME`, `KEY_INSERT`). Pusty string = bez hotkeya.
@@ -114,6 +126,14 @@ W bitwie naciśnij `F8` (lub klawisz z `reloadKey`) — config wczytuje się pon
 
 ## Roadmap
 
+### v5 — numpad layout, per-perk toggles, overlay text ✅
+
+- **Numpad-based hotkeys**: cały picker przeniesiony na klawiaturę numeryczną (8/2/0 dla pickera, 4/5/6 dla perków załogi, 1/3 dla rations/vents, 7 dla lornetki, 9 dla overlay, NumpadEnter dla print-now, NumpadPeriod dla reload).
+- **Perki rozdzielone na osobne toggle**: każdy modyfikator (Rations, Vents, BIA, Recon, Sit. Awareness) ma swój klawisz i konfigurowalny mnożnik. Przed v5 było tylko zbiorcze "+perks". Teraz można precyzyjnie odzwierciedlić znany stan przeciwnika (np. tylko Rations jeśli wiemy że jest light z colą ale bez perków).
+- **Overlay tekstu nad minimapą**: chat-line w battle-message-feed (obszar nad minimapą) z formatu `[SpotMod] Spot: 287 m (postoj, vs VR 445 m) | target: RhmPzW VR=587m [+rations +bia]`. Domyślnie pokazuje się przy istotnych zmianach radiusa (>15m delta) lub stanu (still↔moving↔afterShot). NumpadEnter wymusza print teraz, Numpad9 włącza/wyłącza auto-display.
+
+Implementacja overlay'a używa `MessengerEntry.g_instance.gui.addClientMessage(text, isCurrentPlayer=True)` — to wbudowany kanał komunikatów klient-only (nie wysyłany na serwer). Wiadomości pojawiają się w tym samym miejscu co system messages od gry.
+
 ### v4.5 — binoculars in picker + camo net for own tank ✅
 
 Conditional optional devices uwzględnione zgodnie z `scripts/common/items/artefacts.py`:
@@ -143,22 +163,53 @@ estimated_vr = base_vr * vr_factor
 # opcjonalnie * pickerVRBonusPerks (default 1.10) jeśli zakładamy BIA + Recon + SitAware
 ```
 
-#### Hotkeys (configurable)
+#### Hotkeys (numpad layout, configurable)
+
+```
++-----+-----+-----+-----+
+|     |  /  |  *  |  -  |
++-----+-----+-----+-----+
+|  7  |  8  |  9  |  +  |    7=stereo  8=prev   9=overlay-toggle
++-----+-----+-----+-----+
+|  4  |  5  |  6  |     |    4=BIA     5=Recon  6=SitAware
++-----+-----+-----+-----+
+|  1  |  2  |  3  |Enter|    1=rations 2=next   3=vents   Enter=print-now
++-----+-----+-----+-----+
+|  0  | .   |     |     |    0=clear-picker     .=reload-config
++-----+-----+-----+-----+
+```
+
 | akcja | klawisz domyślny | config |
 |---|---|---|
-| następny przeciwnik | PageDown (`KEY_PGDN`) | `pickerNextKey` |
-| poprzedni przeciwnik | PageUp (`KEY_PGUP`) | `pickerPrevKey` |
-| wyczyść picker (wraca do useOwnViewRange / fallback) | Home | `pickerClearKey` |
-| toggle racji bojowych | Delete | `pickerRationsKey` |
-| toggle perks (BIA/Recon/SitAware) | End | `pickerPerksKey` |
-| reload configu | F8 | `reloadKey` |
+| następny przeciwnik | Numpad 2 | `pickerNextKey` |
+| poprzedni przeciwnik | Numpad 8 | `pickerPrevKey` |
+| wyczyść picker | Numpad 0 | `pickerClearKey` |
+| toggle racji (rations / cola / coffee) | Numpad 1 | `pickerRationsKey` |
+| toggle ulepszonej wentylacji (vents) | Numpad 3 | `pickerVentsKey` |
+| toggle Brothers in Arms (BIA) | Numpad 4 | `pickerBIAKey` |
+| toggle perka Recon (commander) | Numpad 5 | `pickerReconKey` |
+| toggle perka Sit. Awareness (radio) | Numpad 6 | `pickerSitAwareKey` |
+| toggle założenia o lornetce | Numpad 7 | `pickerStereoKey` |
+| toggle overlay tekstu nad minimapą | Numpad 9 | `overlayToggleKey` |
+| pokaż aktualny spot dist. teraz | NumpadEnter | `overlayPrintNowKey` |
+| reload configu | NumpadPeriod (`.`) | `reloadKey` |
 
 #### Założenia w obliczeniach
-Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo serwer tego nie wysyła). Dwa toggleable bonusy:
-- **+rations** (`pickerVRBonusRations`, default `1.10`): aproksymuje racje bojowe / colę / kawę (~+10% do skilli załogi → ~+10% do VR od skill-based perks).
-- **+perks** (`pickerVRBonusPerks`, default `1.10`): aproksymuje połączony bonus BIA (+5% skilli) + Recon (Commander) + Situational Awareness (Radio).
+Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo serwer tego nie wysyła). Każdy modyfikator ma własny toggle z osobnym multiplikatorem (multiplikatywne, mnożone razem przy stackowaniu):
 
-Podczas bitwy widać aktywne flagi w logu (`python.log` → `SpotCircleMod: picker -> Object 268V VR=445m [+rations +perks]`).
+| toggle | klawisz | mnożnik (config) | default |
+|---|---|---|---|
+| Combat Rations / cola / coffee | Numpad 1 | `pickerVRBonusRations` | `1.10` |
+| Improved Ventilation | Numpad 3 | `pickerVRBonusVents` | `1.05` |
+| Brothers in Arms | Numpad 4 | `pickerVRBonusBIA` | `1.05` |
+| Recon (commander perk) | Numpad 5 | `pickerVRBonusRecon` | `1.02` |
+| Situational Awareness (radio perk) | Numpad 6 | `pickerVRBonusSitAware` | `1.03` |
+
+Worst-case "tryhard light" stos (rations + vents + BIA + Recon + SitAware): `1.10 × 1.05 × 1.05 × 1.02 × 1.03 ≈ 1.273` (+27% do VR).
+
+Lornetka jest osobnym toggle (Numpad 7, `pickerAssumeStereoscope`) — jeśli **wykryta w descriptorze przeciwnika** i toggle ON, mod aplikuje czynnik z descriptora (`circularVisionRadiusFactor.getActiveValue(level)`, typowo ×1.25 bazowa).
+
+Podczas bitwy widać aktywne flagi w logu (`python.log` → `SpotCircleMod: picker -> RhmPzW VR=587m [+rations +bia +recon] | stereo=on`).
 
 #### Wizualny marker
 Hook na `PlayerFullNameFormatter.format` wstrzykuje konfigurowalny prefix (`pickerMarker`, default `'● '`) przed nazwę gracza dla wybranego czołgu. **Caveat:** classic players panel (top-right) nie udostępnia API do natychmiastowej zmiany wyświetlanej nazwy — marker pojawia się przy najbliższym naturalnym redraw'ie wiersza (zmiana HP, śmierć, otwarcie pełnego panelu Tab). Kliknij Tab dla pełnej listy ze świeżą formatą.

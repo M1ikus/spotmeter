@@ -46,20 +46,35 @@ DEFAULT_CONFIG = {
     'camoNetActivateSec': 3.0,
     'camoNetFallbackBonus': 0.05,
     'logCalcDetails': False,
-    'reloadKey': 'KEY_F8',
-    # v4 picker
+    'reloadKey': 'KEY_NUMPADPERIOD',
+    # v4/v5 picker - numpad layout
     'pickerEnabled': True,
-    'pickerNextKey': 'KEY_PGDN',
-    'pickerPrevKey': 'KEY_PGUP',
-    'pickerClearKey': 'KEY_HOME',
-    'pickerRationsKey': 'KEY_DELETE',
-    'pickerPerksKey': 'KEY_END',
+    'pickerNextKey': 'KEY_NUMPAD2',
+    'pickerPrevKey': 'KEY_NUMPAD8',
+    'pickerClearKey': 'KEY_NUMPAD0',
+    # Per-perk toggle keys
+    'pickerRationsKey': 'KEY_NUMPAD1',
+    'pickerVentsKey': 'KEY_NUMPAD3',
+    'pickerBIAKey': 'KEY_NUMPAD4',
+    'pickerReconKey': 'KEY_NUMPAD5',
+    'pickerSitAwareKey': 'KEY_NUMPAD6',
+    'pickerStereoKey': 'KEY_NUMPAD7',
+    # Per-perk multipliers (independent, multiplied together when stacked)
     'pickerVRBonusRations': 1.10,
-    'pickerVRBonusPerks': 1.10,
+    'pickerVRBonusVents': 1.05,
+    'pickerVRBonusBIA': 1.05,
+    'pickerVRBonusRecon': 1.02,
+    'pickerVRBonusSitAware': 1.03,
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
     'pickerIncludeDeadEnemies': False,
+    # v5 overlay
+    'overlayEnabled': True,
+    'overlayToggleKey': 'KEY_NUMPAD9',
+    'overlayShowOnTickChange': True,
+    'overlayMinRadiusDelta': 15.0,
+    'overlayPrintNowKey': 'KEY_NUMPADENTER',
 }
 
 _CFG = dict(DEFAULT_CONFIG)
@@ -70,8 +85,16 @@ _STATE = weakref.WeakKeyDictionary()
 _LAST_SHOT_TIME = 0.0
 _LAST_MOVEMENT_TIME = 0.0
 _PICKED_VID = None
-_PICKER_RATIONS = False
-_PICKER_PERKS = False
+_PICKER_TOGGLES = {
+    'rations': False,
+    'vents': False,
+    'bia': False,
+    'recon': False,
+    'sitAware': False,
+}
+_OVERLAY_ENABLED_RUNTIME = True
+_LAST_OVERLAY_RADIUS = 0.0
+_LAST_OVERLAY_STATE = None
 
 
 def _read_config():
@@ -320,10 +343,18 @@ def _picker_vr(plugin):
             # Couldn't read the active value (e.g. category mismatch), but
             # the device IS equipped. Fall back to a sensible constant.
             vr *= float(_CFG.get('pickerStereoscopeFallback', 1.25))
-    if _PICKER_RATIONS:
-        vr *= float(_CFG.get('pickerVRBonusRations', 1.10))
-    if _PICKER_PERKS:
-        vr *= float(_CFG.get('pickerVRBonusPerks', 1.10))
+    # Independent multipliers per consumable / perk. Multiplied together
+    # when several toggles are on. Defaults are conservative best-guesses.
+    perk_multiplier_keys = {
+        'rations': 'pickerVRBonusRations',
+        'vents': 'pickerVRBonusVents',
+        'bia': 'pickerVRBonusBIA',
+        'recon': 'pickerVRBonusRecon',
+        'sitAware': 'pickerVRBonusSitAware',
+    }
+    for toggle_name, cfg_key in perk_multiplier_keys.items():
+        if _PICKER_TOGGLES.get(toggle_name, False):
+            vr *= float(_CFG.get(cfg_key, 1.0))
     return vr
 
 
@@ -474,13 +505,16 @@ def _tick(plugin):
             _remove_dyn_circle(plugin, state)
         _add_dyn_circle(plugin, state, color, radius)
         state['lastState'] = new_state
+        _maybe_post_tick_overlay(plugin, radius, new_state)
         return
     if after_shot:
         if abs(radius - state['lastRadius']) > 0.1:
             _update_dyn_circle(plugin, state, radius)
+        _maybe_post_tick_overlay(plugin, radius, new_state)
         return
     if abs(radius - state['lastRadius']) > 0.5:
         _update_dyn_circle(plugin, state, radius)
+    _maybe_post_tick_overlay(plugin, radius, new_state)
 
 
 def _start_ticking(plugin):
@@ -674,6 +708,18 @@ def _enemy_iterator(plugin):
     return items
 
 
+def _active_perk_tags():
+    tag_map = {
+        'rations': 'rations',
+        'vents': 'vents',
+        'bia': 'BIA',
+        'recon': 'recon',
+        'sitAware': 'sitAware',
+    }
+    return [tag_map[k] for k in ('rations', 'vents', 'bia', 'recon', 'sitAware')
+            if _PICKER_TOGGLES.get(k, False)]
+
+
 def _format_picker_summary(plugin):
     if _PICKED_VID is None:
         return None
@@ -683,12 +729,8 @@ def _format_picker_summary(plugin):
             short = vinfo.vehicleType.shortName if vinfo.vehicleType else '?'
             vr = _picker_vr(plugin)
             vr_str = ('%.0fm' % vr) if vr is not None else '?'
-            tags = []
-            if _PICKER_RATIONS:
-                tags.append('+rations')
-            if _PICKER_PERKS:
-                tags.append('+perks')
-            tags_str = (' [' + ' '.join(tags) + ']') if tags else ''
+            tags = _active_perk_tags()
+            tags_str = (' [+' + ' +'.join(tags) + ']') if tags else ''
             return '%s VR=%s%s' % (short, vr_str, tags_str)
     return None
 
@@ -727,30 +769,116 @@ def _clear_picker():
     _on_picker_changed(plugin, affected)
 
 
-def _toggle_rations():
-    global _PICKER_RATIONS
-    _PICKER_RATIONS = not _PICKER_RATIONS
+def _toggle_perk(name):
+    if name not in _PICKER_TOGGLES:
+        return
+    _PICKER_TOGGLES[name] = not _PICKER_TOGGLES[name]
     plugin = _get_picker_plugin()
     _on_picker_changed(plugin, set())
+    _post_chat_overlay(plugin, force=True, prefix='%s: %s' % (name, 'ON' if _PICKER_TOGGLES[name] else 'OFF'))
 
 
-def _toggle_perks():
-    global _PICKER_PERKS
-    _PICKER_PERKS = not _PICKER_PERKS
+def _toggle_stereoscope():
+    _CFG['pickerAssumeStereoscope'] = not _CFG.get('pickerAssumeStereoscope', True)
     plugin = _get_picker_plugin()
     _on_picker_changed(plugin, set())
+    _post_chat_overlay(plugin, force=True,
+                       prefix='stereoscope: %s' % ('ON' if _CFG['pickerAssumeStereoscope'] else 'OFF'))
+
+
+def _toggle_overlay():
+    global _OVERLAY_ENABLED_RUNTIME
+    _OVERLAY_ENABLED_RUNTIME = not _OVERLAY_ENABLED_RUNTIME
+    plugin = _get_picker_plugin()
+    _post_chat_overlay(plugin, force=True,
+                       prefix='overlay: %s' % ('ON' if _OVERLAY_ENABLED_RUNTIME else 'OFF'))
+
+
+def _print_now():
+    plugin = _get_picker_plugin()
+    _post_chat_overlay(plugin, force=True)
 
 
 def _on_picker_changed(plugin, affected_vids):
     summary = _format_picker_summary(plugin) if plugin is not None else None
-    _logger.info('SpotCircleMod: picker -> %s | rations=%s perks=%s',
-                 summary or 'none', _PICKER_RATIONS, _PICKER_PERKS)
+    tags = ' '.join('+' + t for t in _active_perk_tags()) or '-'
+    stereo_flag = 'stereo=%s' % ('on' if _CFG.get('pickerAssumeStereoscope', True) else 'off')
+    _logger.info('SpotCircleMod: picker -> %s | perks=%s | %s',
+                 summary or 'none', tags, stereo_flag)
     _force_panel_refresh(affected_vids)
     if plugin is not None:
         try:
             _tick(plugin)
         except Exception:
             _logger.exception('SpotCircleMod: tick after picker change failed')
+    _post_chat_overlay(plugin, force=True)
+
+
+def _format_overlay_text(plugin, radius, state_name, enemy_vr, prefix=None):
+    parts = []
+    if prefix:
+        parts.append('[SpotMod] ' + prefix)
+    state_label = {
+        'moving': 'ruch',
+        'still': 'postoj',
+        'stillNet': 'siatka',
+        'afterShot': 'po strzale',
+    }.get(state_name, state_name)
+    spot_str = '%.0f m' % radius
+    vr_str = '%.0f m' % enemy_vr
+    body = 'Spot: %s (%s, vs VR %s)' % (spot_str, state_label, vr_str)
+    if _PICKED_VID is not None and plugin is not None:
+        summary = _format_picker_summary(plugin)
+        if summary:
+            body += ' | target: ' + summary
+    parts.append(body)
+    return '\n'.join(parts)
+
+
+def _post_chat_overlay(plugin, force=False, prefix=None):
+    if not _CFG.get('overlayEnabled', True):
+        return
+    if not _OVERLAY_ENABLED_RUNTIME and not force:
+        return
+    if plugin is None:
+        return
+    veh = _get_player_vehicle()
+    if veh is None:
+        return
+    speed = 0.0
+    try:
+        speed = veh.getSpeed()
+    except Exception:
+        pass
+    is_moving = _is_player_vehicle_moving(speed)
+    after_shot = _is_after_shot()
+    camo_net_active = (not is_moving) and _is_camo_net_active(veh, is_moving) and _has_camo_net(veh)
+    state_name = _classify_state(is_moving, after_shot, camo_net_active)
+    camo = _compute_camo(veh, is_moving, after_shot, camo_net_active)
+    enemy_vr = _resolve_enemy_view_range(plugin)
+    radius = _compute_spot_radius(camo, enemy_vr)
+    text = _format_overlay_text(plugin, radius, state_name, enemy_vr, prefix=prefix)
+    try:
+        from messenger.MessengerEntry import g_instance as _messengerEntry
+        _messengerEntry.gui.addClientMessage(text, isCurrentPlayer=True)
+    except Exception:
+        _logger.exception('SpotCircleMod: failed to push overlay message')
+
+
+def _maybe_post_tick_overlay(plugin, radius, state_name):
+    global _LAST_OVERLAY_RADIUS, _LAST_OVERLAY_STATE
+    if not _CFG.get('overlayEnabled', True):
+        return
+    if not _OVERLAY_ENABLED_RUNTIME:
+        return
+    if not _CFG.get('overlayShowOnTickChange', True):
+        return
+    delta = float(_CFG.get('overlayMinRadiusDelta', 15.0))
+    if state_name == _LAST_OVERLAY_STATE and abs(radius - _LAST_OVERLAY_RADIUS) < delta:
+        return
+    _LAST_OVERLAY_RADIUS = radius
+    _LAST_OVERLAY_STATE = state_name
+    _post_chat_overlay(plugin)
 
 
 def _force_panel_refresh(affected_vids=None):
@@ -836,8 +964,15 @@ def _install_reload_hotkey():
         _bind('pickerNextKey', lambda: _cycle_picker(+1), 'picker-next')
         _bind('pickerPrevKey', lambda: _cycle_picker(-1), 'picker-prev')
         _bind('pickerClearKey', _clear_picker, 'picker-clear')
-        _bind('pickerRationsKey', _toggle_rations, 'picker-rations')
-        _bind('pickerPerksKey', _toggle_perks, 'picker-perks')
+        _bind('pickerRationsKey', lambda: _toggle_perk('rations'), 'rations')
+        _bind('pickerVentsKey', lambda: _toggle_perk('vents'), 'vents')
+        _bind('pickerBIAKey', lambda: _toggle_perk('bia'), 'bia')
+        _bind('pickerReconKey', lambda: _toggle_perk('recon'), 'recon')
+        _bind('pickerSitAwareKey', lambda: _toggle_perk('sitAware'), 'sitAware')
+        _bind('pickerStereoKey', _toggle_stereoscope, 'stereoscope')
+    if _CFG.get('overlayEnabled', True):
+        _bind('overlayToggleKey', _toggle_overlay, 'overlay-toggle')
+        _bind('overlayPrintNowKey', _print_now, 'overlay-print')
 
     if not bindings:
         _logger.info('SpotCircleMod: no hotkeys registered')
