@@ -1,0 +1,27 @@
+{
+    "_comment": "Spot Circle minimap mod - configuration. Place this file at one of: mods/configs/wot_spot_mod.json | res_mods/configs/wot_spot_mod.json | mods/wot_spot_mod.json (relative to game root). Press the reloadKey in-battle to hot-reload, or restart battle to apply changes.",
+
+    "enabled": true,
+
+    "_comment_view_mode": "If true, use the player's own view range as the assumed enemy VR (most accurate when you and the enemy run similar tanks). If false, use enemyViewRangeFallback.",
+    "useOwnViewRange": true,
+    "enemyViewRangeFallback": 445.0,
+
+    "_comment_crew": "Approximate crew Camouflage skill multiplicative bonus. 1.05 = ~5% which roughly matches a 100% trained commander+driver+gunner with full Camo skill on a typical TD/light. Set to 1.0 to ignore crew bonus.",
+    "crewCamoBonus": 1.05,
+
+    "_comment_color": "Circle colors as RGB int. 16737095 = 0xFF6347 (tomato), 3329330 = 0x32CD32 (lime).",
+    "colorMoving": 16737095,
+    "colorStill": 3329330,
+    "alpha": 70,
+
+    "_comment_perf": "How often to recompute (seconds), and the speed (m/s) above which counts as moving.",
+    "tickInterval": 0.2,
+    "movingSpeedThreshold": 0.5,
+
+    "_comment_hotkey": "Reload config without restarting battle. Use a Keys.* constant name (KEY_F8, KEY_F7, KEY_HOME, etc.). Set to empty string to disable.",
+    "reloadKey": "KEY_F8",
+
+    "_comment_debug": "Set true to log camo/radius each tick to python.log.",
+    "logCalcDetails": false
+}

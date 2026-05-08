@@ -1,0 +1,17 @@
+# Decompiled WoT scripts (Wargaming IP, not redistributable)
+research/
+
+# Python
+__pycache__/
+*.py[co]
+!build/*.pyc
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Local-only configs
+*.local.json
