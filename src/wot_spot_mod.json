@@ -10,10 +10,11 @@
     "_comment_crew": "Approximate crew Camouflage skill multiplicative bonus. 1.05 = ~5% which roughly matches a 100% trained commander+driver+gunner with full Camo skill on a typical TD/light. Set to 1.0 to ignore crew bonus.",
     "crewCamoBonus": 1.05,
 
-    "_comment_color": "Circle colors as RGB int. 16737095 = 0xFF6347 (tomato), 3329330 = 0x32CD32 (lime), 16753920 = 0xFFA500 (orange).",
+    "_comment_color": "Circle colors as RGB int. 16737095 = 0xFF6347 (tomato), 3329330 = 0x32CD32 (lime), 16753920 = 0xFFA500 (orange), 2263842 = 0x228B22 (forest green for camo-net active).",
     "colorMoving": 16737095,
     "colorStill": 3329330,
     "colorAfterShot": 16753920,
+    "colorCamoNet": 2263842,
     "alpha": 70,
 
     "_comment_perf": "How often to recompute (seconds), and the speed (m/s) above which counts as moving.",
@@ -24,6 +25,11 @@
     "applyFirePenalty": true,
     "fireRevealDuration": 3.0,
 
+    "_comment_camo_net": "Camouflage net (StillVehicleOptionalDevice with activateWhenStillSec=3.0 in artefacts.py) activates after 3s of NOT MOVING and adds a fixed bonus to invisibility. Mod auto-detects the device on the player's tank and reads the bonus from its descriptor; if reading fails, falls back to camoNetFallbackBonus (0.05 = +5%, typical tier I camo net).",
+    "applyCamoNet": true,
+    "camoNetActivateSec": 3.0,
+    "camoNetFallbackBonus": 0.05,
+
     "_comment_picker": "Picker lets you cycle through enemy tanks and adjust the spot circle to that specific enemy's view range (decoded from their vehicle descriptor server-sent at battle start). Hotkeys are Keys.* names. PgDown/PgUp cycle, Home clears, Delete toggles 'rations' bonus (~+10% VR), End toggles 'crew perks' bonus (~+10% VR; BIA + Recon + SitAware combined). Defaults assume enemy has neither - flip toggles to model worst-case spotters. The marker dot ('● ') appears next to the picked enemy's name on natural panel redraws (HP change, death, etc.).",
     "pickerEnabled": true,
     "pickerNextKey": "KEY_NEXT",
@@ -33,6 +39,9 @@
     "pickerPerksKey": "KEY_END",
     "pickerVRBonusRations": 1.10,
     "pickerVRBonusPerks": 1.10,
+    "_comment_picker_stereo": "If the picked enemy has Stereoscope (binoculars) equipped, mod auto-applies its VR factor (read from descriptor; in-game ~1.25x). Conservative worst-case assumption - assume binos always active. pickerStereoscopeFallback used only when descriptor read fails despite the device being equipped.",
+    "pickerAssumeStereoscope": true,
+    "pickerStereoscopeFallback": 1.25,
     "pickerMarker": "● ",
     "pickerIncludeDeadEnemies": false,
 

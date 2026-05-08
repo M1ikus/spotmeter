@@ -4,6 +4,7 @@ Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój cz
 
 - **Czerwony** w ruchu (camo `invMoving`)
 - **Zielony** w postoju (camo `invStill`)
+- **Ciemnozielony** w postoju 3s+ z aktywną siatką maskującą (camo `invStill + camoNetBonus`)
 - **Pomarańczowy** ~3s po strzale (camo `* invisibilityFactorAtShot`)
 - Czołgi lekkie / niektóre kołowe — w XML mają `invMoving == invStill`, więc okrąg po prostu nie zmienia rozmiaru. Bez specjalnego case'u.
 - Czołgi z trybem siege (CS-63, S-Conqueror, italian heavies) — silnik gry sam podmienia descriptor (`CompositeVehicleDescriptor`) na właściwy tryb, więc mod automatycznie używa odpowiedniego camo dla obecnego trybu.
@@ -50,11 +51,17 @@ Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`
 | `colorMoving` | `0xFF6347` | kolor okręgu w ruchu |
 | `colorStill` | `0x32CD32` | kolor okręgu w postoju |
 | `colorAfterShot` | `0xFFA500` | kolor okręgu po strzale (przez `fireRevealDuration`) |
+| `colorCamoNet` | `0x228B22` | kolor okręgu gdy siatka aktywna (postój 3s+) |
 | `alpha` | `70` | przezroczystość 0–100 |
 | `tickInterval` | `0.2` | jak często aktualizować (s) |
 | `movingSpeedThreshold` | `0.5` | prędkość uznawana za ruch (m/s) |
 | `applyFirePenalty` | `true` | po strzale aplikuje `* invisibilityFactorAtShot` |
 | `fireRevealDuration` | `3.0` | czas trwania kary za strzał (s) |
+| `applyCamoNet` | `true` | uwzględnia siatkę maskującą po `camoNetActivateSec` w postoju |
+| `camoNetActivateSec` | `3.0` | czas postoju do aktywacji siatki (s) |
+| `camoNetFallbackBonus` | `0.05` | bonus jeśli odczyt z descriptora padnie |
+| `pickerAssumeStereoscope` | `true` | jeśli enemy ma lornetkę, zakłada że jest aktywna |
+| `pickerStereoscopeFallback` | `1.25` | mnożnik VR jeśli odczyt z descriptora padnie |
 | `pickerEnabled` | `true` | włącza picker przeciwnika (PgUp/PgDn) |
 | `pickerNextKey` | `KEY_NEXT` | następny przeciwnik (PgDn) |
 | `pickerPrevKey` | `KEY_PRIOR` | poprzedni przeciwnik (PgUp) |
@@ -106,6 +113,15 @@ W bitwie naciśnij `F8` (lub klawisz z `reloadKey`) — config wczytuje się pon
 5. Sprząta entry i callbacki w `_hideMarkup`, `__onPostMortemSwitched`, `stop`.
 
 ## Roadmap
+
+### v4.5 — binoculars in picker + camo net for own tank ✅
+
+Conditional optional devices uwzględnione zgodnie z `scripts/common/items/artefacts.py`:
+
+- **Stereoscope (lornetka)** w pickerze — gdy wykryta w `descr.optionalDevices`, automatycznie aplikuje czynnik `circularVisionRadiusFactor.getActiveValue(level)` (typowo `1.25` dla tier I, więcej dla improved/bond). Worst-case assumption: lorna jest zawsze aktywna (3s standstill check pomijamy bo nie wiemy kiedy enemy zaczął stać). Toggle przez `pickerAssumeStereoscope`.
+- **CamouflageNet (siatka)** dla własnego czołgu — silnik gry trackuje `_LAST_MOVEMENT_TIME`. Po `camoNetActivateSec` (default `3.0` s) bez ruchu siatka się aktywuje i bonus `invisibilityBonus` jest dodawany do `additive` w wzorze. Zgodnie z grą: strzał nie resetuje timera ruchu, tylko sam ruch resetuje. Kolor okręgu zmienia się na **ciemnozielony** w tym stanie.
+
+Kod sczytuje wartości z descriptora przez `device.defineActiveValueForSpecFactor(descr, 'invisibilityBonus', level)` / `device.circularVisionRadiusFactor.getActiveValue(level)` — czyli używamy DOKŁADNIE tych wartości, których używa gra. Fallback constants (`camoNetFallbackBonus=0.05`, `pickerStereoscopeFallback=1.25`) tylko jeśli odczyt descriptora padnie z jakiegoś powodu.
 
 ### v3 — fire penalty + siege modes ✅
 

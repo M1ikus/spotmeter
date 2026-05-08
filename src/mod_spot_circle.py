@@ -36,11 +36,15 @@ DEFAULT_CONFIG = {
     'colorMoving': 0xFF6347,
     'colorStill': 0x32CD32,
     'colorAfterShot': 0xFFA500,
+    'colorCamoNet': 0x228B22,
     'alpha': 70,
     'tickInterval': 0.2,
     'movingSpeedThreshold': 0.5,
     'applyFirePenalty': True,
     'fireRevealDuration': 3.0,
+    'applyCamoNet': True,
+    'camoNetActivateSec': 3.0,
+    'camoNetFallbackBonus': 0.05,
     'logCalcDetails': False,
     'reloadKey': 'KEY_F8',
     # v4 picker
@@ -52,6 +56,8 @@ DEFAULT_CONFIG = {
     'pickerPerksKey': 'KEY_END',
     'pickerVRBonusRations': 1.10,
     'pickerVRBonusPerks': 1.10,
+    'pickerAssumeStereoscope': True,
+    'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
     'pickerIncludeDeadEnemies': False,
 }
@@ -62,6 +68,7 @@ _AVATAR_PATCHED = False
 _FORMATTER_PATCHED = False
 _STATE = weakref.WeakKeyDictionary()
 _LAST_SHOT_TIME = 0.0
+_LAST_MOVEMENT_TIME = 0.0
 _PICKED_VID = None
 _PICKER_RATIONS = False
 _PICKER_PERKS = False
@@ -140,6 +147,57 @@ def _get_player_vehicle():
     return veh
 
 
+def _scan_optional_devices(descr):
+    """Inspect descriptor's optionalDevices for CamouflageNet and Stereoscope.
+
+    Returns (camo_net_bonus, stereoscope_factor) where:
+        camo_net_bonus  - additive bonus to invisibility[0] when net is active
+                          (effectively the camo net's contribution after the
+                          'competesBy' max() rule). 0.0 if no net equipped or
+                          its bonus is dominated by static modifiers.
+        stereoscope_factor - multiplicative factor for circularVisionRadius
+                          when binoculars are active; this is what the game
+                          would multiply the existing factor by (e.g. 1.0
+                          if no binos, ~ activeValue / current_factor when
+                          equipped).
+    """
+    camo_net_bonus = 0.0
+    stereo_factor = 1.0
+    devices = getattr(descr, 'optionalDevices', None) or ()
+    try:
+        from items.artefacts import CamouflageNet, Stereoscope
+    except ImportError:
+        return camo_net_bonus, stereo_factor
+    for device in devices:
+        if device is None:
+            continue
+        try:
+            if isinstance(device, CamouflageNet):
+                level = device.defineActiveLevel(descr)
+                if level is None:
+                    bonus_value = 0.0
+                else:
+                    bonus_value = device.defineActiveValueForSpecFactor(
+                        descr, device.invisibilityBonusName, level) or 0.0
+                static_value = float((descr.miscAttrs or {}).get('invisibilityAdditiveTerm', 0.0))
+                # Mirrors CamouflageNet.transformFactors: only the part above
+                # the static term contributes once 'still 3s' triggers.
+                contribution = max(bonus_value, static_value) - static_value
+                if contribution > camo_net_bonus:
+                    camo_net_bonus = contribution
+            elif isinstance(device, Stereoscope):
+                level = device.defineActiveLevel(descr)
+                active_value = None
+                if level is not None and getattr(device, 'circularVisionRadiusFactor', None) is not None:
+                    active_value = device.circularVisionRadiusFactor.getActiveValue(level)
+                if active_value is not None:
+                    current_factor = float((descr.miscAttrs or {}).get('circularVisionRadiusFactor', 1.0)) or 1.0
+                    stereo_factor = float(active_value) / current_factor
+        except Exception:
+            _logger.exception('SpotCircleMod: failed to read optional device %r', device)
+    return camo_net_bonus, stereo_factor
+
+
 def _is_after_shot():
     if not _CFG.get('applyFirePenalty', True):
         return False
@@ -152,7 +210,7 @@ def _is_after_shot():
     return 0.0 <= elapsed < duration
 
 
-def _compute_camo(vehicle, is_moving, after_shot):
+def _compute_camo(vehicle, is_moving, after_shot, camo_net_active):
     # Mirrors scripts/common/items/utils.py:getInvisibility. The
     # CompositeVehicleDescriptor wrapper handles siege mode automatically:
     # vehicle.typeDescriptor.type.invisibility and miscAttrs already reflect
@@ -167,16 +225,46 @@ def _compute_camo(vehicle, is_moving, after_shot):
     crew_bonus = float(_CFG.get('crewCamoBonus', 1.0))
     base = inv_moving if is_moving else inv_still
     base = base * veh_factor * crew_bonus
-    camo = max(0.0, (base + base_additive + additive_term) * mult_factor)
+    additive = base_additive + additive_term
+    if camo_net_active:
+        # CamouflageNet contributes to factors['invisibility'][0], summed into
+        # the additiveTerm in getInvisibility(). Activates after
+        # activateWhenStillSec of NOT MOVING (firing doesn't reset it).
+        net_bonus, _ = _scan_optional_devices(descr)
+        if net_bonus <= 0.0:
+            net_bonus = float(_CFG.get('camoNetFallbackBonus', 0.0))
+        additive += net_bonus
+    camo = max(0.0, (base + additive) * mult_factor)
     if after_shot:
-        # invisibilityFactorAtShot comes from the gun (e.g. ~0.75 for tank guns,
-        # ~0.25-0.5 for big TD guns). Mirrors params.py: moving * factorAtShot.
         factor = misc.get('invisibilityFactorAtShot', 1.0)
         if factor < 1.0:
             camo *= factor
     if camo > 0.99:
         camo = 0.99
     return camo
+
+
+def _is_camo_net_active(vehicle, is_moving):
+    if not _CFG.get('applyCamoNet', True):
+        return False
+    if is_moving:
+        return False
+    if _LAST_MOVEMENT_TIME <= 0.0:
+        return False
+    threshold = float(_CFG.get('camoNetActivateSec', 3.0))
+    return (BigWorld.time() - _LAST_MOVEMENT_TIME) >= threshold
+
+
+def _has_camo_net(vehicle):
+    try:
+        from items.artefacts import CamouflageNet
+    except ImportError:
+        return False
+    devices = getattr(vehicle.typeDescriptor, 'optionalDevices', None) or ()
+    for device in devices:
+        if isinstance(device, CamouflageNet):
+            return True
+    return False
 
 
 def _resolve_enemy_view_range(plugin):
@@ -224,11 +312,31 @@ def _picker_vr(plugin):
     misc = getattr(descr, 'miscAttrs', None) or {}
     factor = float(misc.get('circularVisionRadiusFactor', 1.0)) or 1.0
     vr = base_vr * factor
+    if _CFG.get('pickerAssumeStereoscope', True):
+        _, stereo_factor = _scan_optional_devices(descr)
+        if stereo_factor > 1.001:
+            vr *= stereo_factor
+        elif _has_stereoscope_fallback(descr):
+            # Couldn't read the active value (e.g. category mismatch), but
+            # the device IS equipped. Fall back to a sensible constant.
+            vr *= float(_CFG.get('pickerStereoscopeFallback', 1.25))
     if _PICKER_RATIONS:
         vr *= float(_CFG.get('pickerVRBonusRations', 1.10))
     if _PICKER_PERKS:
         vr *= float(_CFG.get('pickerVRBonusPerks', 1.10))
     return vr
+
+
+def _has_stereoscope_fallback(descr):
+    try:
+        from items.artefacts import Stereoscope
+    except ImportError:
+        return False
+    devices = getattr(descr, 'optionalDevices', None) or ()
+    for device in devices:
+        if isinstance(device, Stereoscope):
+            return True
+    return False
 
 
 def _compute_spot_radius(camo, enemy_vr):
@@ -311,10 +419,14 @@ def _refresh_spot_circle(plugin):
     _start_ticking(plugin)
 
 
-def _classify_state(is_moving, after_shot):
+def _classify_state(is_moving, after_shot, camo_net_active):
     if after_shot:
         return 'afterShot'
-    return 'moving' if is_moving else 'still'
+    if is_moving:
+        return 'moving'
+    if camo_net_active:
+        return 'stillNet'
+    return 'still'
 
 
 def _color_for_state(state_name):
@@ -322,10 +434,13 @@ def _color_for_state(state_name):
         return _CFG['colorAfterShot']
     if state_name == 'moving':
         return _CFG['colorMoving']
+    if state_name == 'stillNet':
+        return _CFG.get('colorCamoNet', _CFG['colorStill'])
     return _CFG['colorStill']
 
 
 def _tick(plugin):
+    global _LAST_MOVEMENT_TIME
     state = _STATE.get(plugin)
     if state is None:
         return
@@ -338,15 +453,21 @@ def _tick(plugin):
     except Exception:
         pass
     is_moving = _is_player_vehicle_moving(speed)
+    if is_moving:
+        _LAST_MOVEMENT_TIME = BigWorld.time()
+    elif _LAST_MOVEMENT_TIME <= 0.0:
+        # First tick while already still: timestamp anchors here.
+        _LAST_MOVEMENT_TIME = BigWorld.time()
     after_shot = _is_after_shot()
-    new_state = _classify_state(is_moving, after_shot)
-    camo = _compute_camo(veh, is_moving, after_shot)
+    camo_net_active = (not is_moving) and _is_camo_net_active(veh, is_moving) and _has_camo_net(veh)
+    new_state = _classify_state(is_moving, after_shot, camo_net_active)
+    camo = _compute_camo(veh, is_moving, after_shot, camo_net_active)
     enemy_vr = _resolve_enemy_view_range(plugin)
     radius = _compute_spot_radius(camo, enemy_vr)
     color = _color_for_state(new_state)
     if _CFG.get('logCalcDetails'):
-        _logger.info('SpotCircleMod: state=%s camo=%.3f vr=%.1fm radius=%.1fm',
-                     new_state, camo, enemy_vr, radius)
+        _logger.info('SpotCircleMod: state=%s camo=%.3f vr=%.1fm radius=%.1fm net=%s shot=%s',
+                     new_state, camo, enemy_vr, radius, camo_net_active, after_shot)
     state_changed = new_state != state['lastState']
     if state_changed:
         if state['attached']:
@@ -355,9 +476,6 @@ def _tick(plugin):
         state['lastState'] = new_state
         return
     if after_shot:
-        # During the fire-reveal window the radius shrinks/grows quickly as
-        # the penalty applies — keep updating every tick rather than waiting
-        # for the next state transition.
         if abs(radius - state['lastRadius']) > 0.1:
             _update_dyn_circle(plugin, state, radius)
         return
