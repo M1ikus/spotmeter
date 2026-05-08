@@ -49,8 +49,8 @@ DEFAULT_CONFIG = {
     'reloadKey': 'KEY_F8',
     # v4 picker
     'pickerEnabled': True,
-    'pickerNextKey': 'KEY_NEXT',
-    'pickerPrevKey': 'KEY_PRIOR',
+    'pickerNextKey': 'KEY_PGDN',
+    'pickerPrevKey': 'KEY_PGUP',
     'pickerClearKey': 'KEY_HOME',
     'pickerRationsKey': 'KEY_DELETE',
     'pickerPerksKey': 'KEY_END',
@@ -804,11 +804,30 @@ def _install_reload_hotkey():
         return
 
     bindings = []
+    # Backwards-compat aliases for users who copied the v4 config that shipped
+    # with the wrong constant names. WoT's Keys module uses KEY_PGUP / KEY_PGDN
+    # rather than the Windows VK_PRIOR / VK_NEXT spelling.
+    _key_aliases = {
+        'KEY_PRIOR': 'KEY_PGUP',
+        'KEY_NEXT': 'KEY_PGDN',
+        'KEY_PAGEUP': 'KEY_PGUP',
+        'KEY_PAGEDOWN': 'KEY_PGDN',
+    }
 
     def _bind(cfg_key, action, label):
         key_name = _CFG.get(cfg_key) or ''
-        key_id = getattr(Keys, key_name, None) if key_name else None
+        if not key_name:
+            return
+        if key_name in _key_aliases:
+            alias = _key_aliases[key_name]
+            if hasattr(Keys, alias):
+                key_name = alias
+        key_id = getattr(Keys, key_name, None)
         if key_id is None:
+            _logger.warning(
+                'SpotCircleMod: hotkey for %s = %r not found in Keys module. '
+                'Common names: KEY_F1..F12, KEY_PGUP, KEY_PGDN, KEY_HOME, '
+                'KEY_END, KEY_INSERT, KEY_DELETE.', cfg_key, _CFG.get(cfg_key))
             return
         bindings.append((key_id, action, label, key_name))
 

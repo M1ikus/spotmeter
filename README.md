@@ -63,8 +63,8 @@ Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`
 | `pickerAssumeStereoscope` | `true` | jeśli enemy ma lornetkę, zakłada że jest aktywna |
 | `pickerStereoscopeFallback` | `1.25` | mnożnik VR jeśli odczyt z descriptora padnie |
 | `pickerEnabled` | `true` | włącza picker przeciwnika (PgUp/PgDn) |
-| `pickerNextKey` | `KEY_NEXT` | następny przeciwnik (PgDn) |
-| `pickerPrevKey` | `KEY_PRIOR` | poprzedni przeciwnik (PgUp) |
+| `pickerNextKey` | `KEY_PGDN` | następny przeciwnik (PgDn) |
+| `pickerPrevKey` | `KEY_PGUP` | poprzedni przeciwnik (PgUp) |
 | `pickerClearKey` | `KEY_HOME` | wyczyść picker |
 | `pickerRationsKey` | `KEY_DELETE` | toggle bonusu racji bojowych |
 | `pickerPerksKey` | `KEY_END` | toggle bonusu perks (BIA/Recon/SitAware) |
@@ -146,8 +146,8 @@ estimated_vr = base_vr * vr_factor
 #### Hotkeys (configurable)
 | akcja | klawisz domyślny | config |
 |---|---|---|
-| następny przeciwnik | PageDown | `pickerNextKey` |
-| poprzedni przeciwnik | PageUp | `pickerPrevKey` |
+| następny przeciwnik | PageDown (`KEY_PGDN`) | `pickerNextKey` |
+| poprzedni przeciwnik | PageUp (`KEY_PGUP`) | `pickerPrevKey` |
 | wyczyść picker (wraca do useOwnViewRange / fallback) | Home | `pickerClearKey` |
 | toggle racji bojowych | Delete | `pickerRationsKey` |
 | toggle perks (BIA/Recon/SitAware) | End | `pickerPerksKey` |
