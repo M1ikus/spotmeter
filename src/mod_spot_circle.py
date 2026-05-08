@@ -35,16 +35,21 @@ DEFAULT_CONFIG = {
     'crewCamoBonus': 1.05,
     'colorMoving': 0xFF6347,
     'colorStill': 0x32CD32,
+    'colorAfterShot': 0xFFA500,
     'alpha': 70,
     'tickInterval': 0.2,
     'movingSpeedThreshold': 0.5,
+    'applyFirePenalty': True,
+    'fireRevealDuration': 3.0,
     'logCalcDetails': False,
     'reloadKey': 'KEY_F8',
 }
 
 _CFG = dict(DEFAULT_CONFIG)
 _PATCHED = False
+_AVATAR_PATCHED = False
 _STATE = weakref.WeakKeyDictionary()
+_LAST_SHOT_TIME = 0.0
 
 
 def _read_config():
@@ -73,9 +78,10 @@ def init():
             _logger.info('SpotCircleMod: disabled by config')
             return
         _patch_plugin()
+        _patch_avatar_shoot()
         _install_reload_hotkey()
-        _logger.info('SpotCircleMod: initialised (useOwnViewRange=%s)',
-                     _CFG['useOwnViewRange'])
+        _logger.info('SpotCircleMod: initialised (useOwnViewRange=%s, fire=%s)',
+                     _CFG['useOwnViewRange'], _CFG['applyFirePenalty'])
     except Exception:
         _logger.exception('SpotCircleMod: init failed')
 
@@ -117,7 +123,23 @@ def _get_player_vehicle():
     return veh
 
 
-def _compute_camo(vehicle, is_moving):
+def _is_after_shot():
+    if not _CFG.get('applyFirePenalty', True):
+        return False
+    if _LAST_SHOT_TIME <= 0.0:
+        return False
+    duration = float(_CFG.get('fireRevealDuration', 3.0))
+    if duration <= 0.0:
+        return False
+    elapsed = BigWorld.time() - _LAST_SHOT_TIME
+    return 0.0 <= elapsed < duration
+
+
+def _compute_camo(vehicle, is_moving, after_shot):
+    # Mirrors scripts/common/items/utils.py:getInvisibility. The
+    # CompositeVehicleDescriptor wrapper handles siege mode automatically:
+    # vehicle.typeDescriptor.type.invisibility and miscAttrs already reflect
+    # the current siege state (CS-63, S-Conqueror, italian heavies, etc.).
     descr = vehicle.typeDescriptor
     inv_moving, inv_still = descr.type.invisibility
     misc = getattr(descr, 'miscAttrs', None) or {}
@@ -129,6 +151,12 @@ def _compute_camo(vehicle, is_moving):
     base = inv_moving if is_moving else inv_still
     base = base * veh_factor * crew_bonus
     camo = max(0.0, (base + base_additive + additive_term) * mult_factor)
+    if after_shot:
+        # invisibilityFactorAtShot comes from the gun (e.g. ~0.75 for tank guns,
+        # ~0.25-0.5 for big TD guns). Mirrors params.py: moving * factorAtShot.
+        factor = misc.get('invisibilityFactorAtShot', 1.0)
+        if factor < 1.0:
+            camo *= factor
     if camo > 0.99:
         camo = 0.99
     return camo
@@ -231,6 +259,20 @@ def _refresh_spot_circle(plugin):
     _start_ticking(plugin)
 
 
+def _classify_state(is_moving, after_shot):
+    if after_shot:
+        return 'afterShot'
+    return 'moving' if is_moving else 'still'
+
+
+def _color_for_state(state_name):
+    if state_name == 'afterShot':
+        return _CFG['colorAfterShot']
+    if state_name == 'moving':
+        return _CFG['colorMoving']
+    return _CFG['colorStill']
+
+
 def _tick(plugin):
     state = _STATE.get(plugin)
     if state is None:
@@ -244,19 +286,28 @@ def _tick(plugin):
     except Exception:
         pass
     is_moving = _is_player_vehicle_moving(speed)
-    new_state = 'moving' if is_moving else 'still'
-    camo = _compute_camo(veh, is_moving)
+    after_shot = _is_after_shot()
+    new_state = _classify_state(is_moving, after_shot)
+    camo = _compute_camo(veh, is_moving, after_shot)
     enemy_vr = _resolve_enemy_view_range(plugin)
     radius = _compute_spot_radius(camo, enemy_vr)
-    color = _CFG['colorMoving'] if is_moving else _CFG['colorStill']
+    color = _color_for_state(new_state)
     if _CFG.get('logCalcDetails'):
         _logger.info('SpotCircleMod: state=%s camo=%.3f vr=%.1fm radius=%.1fm',
                      new_state, camo, enemy_vr, radius)
-    if new_state != state['lastState']:
+    state_changed = new_state != state['lastState']
+    if state_changed:
         if state['attached']:
             _remove_dyn_circle(plugin, state)
         _add_dyn_circle(plugin, state, color, radius)
         state['lastState'] = new_state
+        return
+    if after_shot:
+        # During the fire-reveal window the radius shrinks/grows quickly as
+        # the penalty applies — keep updating every tick rather than waiting
+        # for the next state transition.
+        if abs(radius - state['lastRadius']) > 0.1:
+            _update_dyn_circle(plugin, state, radius)
         return
     if abs(radius - state['lastRadius']) > 0.5:
         _update_dyn_circle(plugin, state, radius)
@@ -357,6 +408,57 @@ def _patch_plugin():
         setattr(Plugin, pm_attr, patched_onPostMortem)
 
     _PATCHED = True
+
+
+def _record_shot():
+    global _LAST_SHOT_TIME
+    _LAST_SHOT_TIME = BigWorld.time()
+
+
+def _patch_avatar_shoot():
+    global _AVATAR_PATCHED
+    if _AVATAR_PATCHED:
+        return
+    if not _CFG.get('applyFirePenalty', True):
+        return
+    try:
+        import Avatar as _avatar_module
+    except ImportError:
+        _logger.info('SpotCircleMod: Avatar module unavailable, fire penalty disabled')
+        return
+    AvatarCls = getattr(_avatar_module, 'PlayerAvatar', None) or getattr(_avatar_module, 'Avatar', None)
+    if AvatarCls is None:
+        _logger.info('SpotCircleMod: Avatar class not found, fire penalty disabled')
+        return
+
+    orig_shoot = getattr(AvatarCls, 'shoot', None)
+    orig_shootDualGun = getattr(AvatarCls, 'shootDualGun', None)
+
+    if orig_shoot is not None:
+        def patched_shoot(self, isRepeat=False):
+            try:
+                result = orig_shoot(self, isRepeat=isRepeat)
+            except TypeError:
+                result = orig_shoot(self, isRepeat)
+            try:
+                _record_shot()
+            except Exception:
+                _logger.exception('SpotCircleMod: failed to record shot')
+            return result
+        AvatarCls.shoot = patched_shoot
+
+    if orig_shootDualGun is not None:
+        def patched_shootDualGun(self, chargeActionType, isPrepared=False, isRepeat=False):
+            result = orig_shootDualGun(self, chargeActionType, isPrepared=isPrepared, isRepeat=isRepeat)
+            try:
+                _record_shot()
+            except Exception:
+                _logger.exception('SpotCircleMod: failed to record dual-gun shot')
+            return result
+        AvatarCls.shootDualGun = patched_shootDualGun
+
+    _AVATAR_PATCHED = True
+    _logger.info('SpotCircleMod: Avatar.shoot hooked for fire penalty')
 
 
 def _hot_reload():

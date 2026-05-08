@@ -4,7 +4,9 @@ Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój cz
 
 - **Czerwony** w ruchu (camo `invMoving`)
 - **Zielony** w postoju (camo `invStill`)
+- **Pomarańczowy** ~3s po strzale (camo `* invisibilityFactorAtShot`)
 - Czołgi lekkie / niektóre kołowe — w XML mają `invMoving == invStill`, więc okrąg po prostu nie zmienia rozmiaru. Bez specjalnego case'u.
+- Czołgi z trybem siege (CS-63, S-Conqueror, italian heavies) — silnik gry sam podmienia descriptor (`CompositeVehicleDescriptor`) na właściwy tryb, więc mod automatycznie używa odpowiedniego camo dla obecnego trybu.
 
 ## Wzór (zgodny z `scripts/common/items/utils.py:getInvisibility`)
 
@@ -47,11 +49,14 @@ Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`
 | `crewCamoBonus` | `1.05` | przybliżenie bonusu skilla Camouflage |
 | `colorMoving` | `0xFF6347` | kolor okręgu w ruchu |
 | `colorStill` | `0x32CD32` | kolor okręgu w postoju |
+| `colorAfterShot` | `0xFFA500` | kolor okręgu po strzale (przez `fireRevealDuration`) |
 | `alpha` | `70` | przezroczystość 0–100 |
 | `tickInterval` | `0.2` | jak często aktualizować (s) |
 | `movingSpeedThreshold` | `0.5` | prędkość uznawana za ruch (m/s) |
+| `applyFirePenalty` | `true` | po strzale aplikuje `* invisibilityFactorAtShot` |
+| `fireRevealDuration` | `3.0` | czas trwania kary za strzał (s) |
 | `reloadKey` | `KEY_F8` | hotkey hot-reloadu configu w bitwie |
-| `logCalcDetails` | `false` | wypisuje camo/radius do `python.log` |
+| `logCalcDetails` | `false` | wypisuje camo/radius/state do `python.log` |
 
 Nazwy klawiszy: nazwy z modułu `Keys` (np. `KEY_F8`, `KEY_F7`, `KEY_HOME`, `KEY_INSERT`). Pusty string = bez hotkeya.
 
@@ -92,10 +97,10 @@ W bitwie naciśnij `F8` (lub klawisz z `reloadKey`) — config wczytuje się pon
 
 ## Roadmap
 
-### v3 — fire penalty + siege modes
+### v3 — fire penalty + siege modes ✅
 
-- **Kara za strzał (firePenalty)** — hak na event strzału (`Vehicle.shoot` / `VEHICLE_VIEW_STATE.FIRE_LAUNCHED`). Przez ~3 s po strzale aplikujemy `camo *= invisibilityFactorAtShot` (z `descr.miscAttrs`). Po 3 s plynnie wracamy do pełnego camo.
-- **Tryby (CS-63, S-Conqueror, italian heavy, etc.)** — śledzimy `vehicle.siegeState`, czytamy odpowiedni zestaw camo z descriptora dla aktualnego trybu.
+- **Kara za strzał (firePenalty)** — hook na `PlayerAvatar.shoot()` i `shootDualGun()`. Przez `fireRevealDuration` (domyślnie 3 s) po strzale aplikujemy `camo *= invisibilityFactorAtShot` z descryptora działa. Okrąg w tym czasie świeci pomarańczowo (`colorAfterShot`).
+- **Tryby (CS-63, S-Conqueror, italian heavy, etc.)** — silnik gry obsługuje to automatycznie. `vehicle.typeDescriptor` jest `CompositeVehicleDescriptor`, który dynamicznie deleguje atrybuty do właściwego sub-descriptora (default vs siege) na podstawie aktualnego stanu (`__vehicleMode`). Mod nie wymaga osobnej obsługi — `descr.type.invisibility` zwraca prawidłowe wartości dla bieżącego trybu out of the box.
 - **EBR / wheeled** — bez specjalnego case'u; XML czołgu ma `invMoving == invStill`, mod automatycznie pokazuje stały okrąg.
 
 ### v4 — picker enemy tank
