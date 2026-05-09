@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.3.2'
+MOD_VERSION = '5.3.3'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -71,23 +71,18 @@ DEFAULT_CONFIG = {
     'pickerReconKey': 'KEY_NUMPAD5',
     'pickerSitAwareKey': 'KEY_NUMPAD6',
     'pickerStereoKey': 'KEY_NUMPAD7',
-    # Picker VR multipliers - empirical defaults calibrated against
-    # observed in-game values on a base-340m tank with 100% trained
-    # crew. Theoretical model from VehicleDescrCrew.py + perks.xml
-    # under-counts the actual factors (the game has interactions
-    # we don't fully replicate without running through the full
-    # _processSkills loop). User-reported values:
-    #   BIA alone:        +2.53% -> 1.0253
-    #   Vents alone:      ~+2.53% (assumed, +5 levels like BIA)
-    #   Rations alone:    +4.30% -> 1.0430
-    #   Recon alone:      +2.88% -> 1.0288
-    #   SitAware alone:   +4.51% -> 1.0451
-    # Tanks with non-default crewRolesFactor may be ~0.5% off either way.
-    'pickerVRBonusRecon': 1.0288,
-    'pickerVRBonusSitAware': 1.0451,
-    'pickerVRBonusBIA': 1.0253,
-    'pickerVRBonusVents': 1.0253,
-    'pickerVRBonusRations': 1.0430,
+    # Two-stage VR model: commander main role + Recon/SitAware perks.
+    # Values from scripts/item_defs/perks/perks.xml + VehicleDescrCrew.py.
+    # Verified: full stack (BIA+Rations+Recon+SitAware+deluxe optics)
+    # on a 340m base tank gives 435.83 m, matching in-game 436 m.
+    'pickerLevelBonusBIA': 5.0,             # brotherhood: +5 effective levels
+    'pickerLevelBonusVents': 5.0,           # basic vents: +5 effective levels
+    'pickerLevelBonusRations': 10.0,        # combat rations: +10 effective levels
+    'pickerCommanderBaseFactor': 0.57,
+    'pickerCommanderPerLevelFactor': 0.43,
+    'pickerReconPerLevel': 0.0002,          # commander_eagleEye perk: +2% at level 100
+    'pickerSitAwarePerLevel': 0.0003,       # radioman_finder perk: +3% at level 100
+    'pickerCommanderAdditionRatio': 10.0,   # COMMANDER_ADDITION_RATIO from tankmen.py
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
@@ -370,21 +365,52 @@ def _picker_vr(plugin):
             # Couldn't read the active value (e.g. category mismatch), but
             # the device IS equipped. Fall back to a sensible constant.
             vr *= float(_CFG.get('pickerStereoscopeFallback', 1.25))
-    # Independent multipliers, multiplied together when stacked. Each
-    # value reflects the per-toggle factor the game produces in
-    # isolation on a 100% crew tank (calibrated empirically against
-    # in-game observations). Combined stacks then multiply, e.g.
-    # Recon + SitAware ~= 1.0288 * 1.0451 = 1.0752 (+7.5%).
-    perk_multiplier_keys = {
-        'rations': 'pickerVRBonusRations',
-        'vents': 'pickerVRBonusVents',
-        'bia': 'pickerVRBonusBIA',
-        'recon': 'pickerVRBonusRecon',
-        'sitAware': 'pickerVRBonusSitAware',
-    }
-    for toggle_name, cfg_key in perk_multiplier_keys.items():
-        if _PICKER_TOGGLES.get(toggle_name, False):
-            vr *= float(_CFG.get(cfg_key, 1.0))
+    # Two-stage model that mirrors VehicleDescrCrew.py + perks.xml
+    # exactly, with proper handling of commander vs non-commander
+    # crew efficiency:
+    #
+    #   stage 1 - commander main role
+    #     extra_levels = 5*BIA + 5*Vents + 10*Rations
+    #     commander_eff = (100 + extra_levels) / 100
+    #     commander_factor = 0.57 + 0.43 * commander_eff
+    #
+    #   stage 2 - VR perks contribute to cvrB
+    #     Recon (commander_eagleEye, commander perk):
+    #       cvrB += (100 + extra_levels) * 0.0002
+    #     SitAware (radioman_finder, NON-commander):
+    #       non_cmd_eff_level = 100 + extra + (100 + extra) / 10
+    #       cvrB += non_cmd_eff_level * 0.0003
+    #
+    #   final: VR_factor *= commander_factor * (1 + cvrB)
+    #
+    # Verified to give 435.83 m for 340m base + BIA + Rations + Recon
+    # + SitAware + deluxe optics (1.135), matching the user's reported
+    # in-game value of 436 m. Individual 'alone' tests produce slightly
+    # lower bonuses than the game shows (BIA -1.3m, Recon -3m,
+    # SitAware -4m on a 340m base) - the game has interactions during
+    # solo testing that the formula doesn't capture, but stacked
+    # accuracy is more important for the picker.
+    extra_levels = 0.0
+    if _PICKER_TOGGLES.get('bia', False):
+        extra_levels += float(_CFG.get('pickerLevelBonusBIA', 5.0))
+    if _PICKER_TOGGLES.get('vents', False):
+        extra_levels += float(_CFG.get('pickerLevelBonusVents', 5.0))
+    if _PICKER_TOGGLES.get('rations', False):
+        extra_levels += float(_CFG.get('pickerLevelBonusRations', 10.0))
+    base_level = 100.0 + extra_levels
+    commander_eff = base_level / 100.0
+    commander_factor = float(_CFG.get('pickerCommanderBaseFactor', 0.57)) \
+        + float(_CFG.get('pickerCommanderPerLevelFactor', 0.43)) * commander_eff
+    cvr_b = 0.0
+    if _PICKER_TOGGLES.get('recon', False):
+        cvr_b += base_level * float(_CFG.get('pickerReconPerLevel', 0.0002))
+    if _PICKER_TOGGLES.get('sitAware', False):
+        # Radioman receives commander/10 bonus on top of common increase
+        # (see VehicleDescrCrew.py:_calcLeverIncreaseForNonCommander).
+        non_cmd_eff_level = base_level + base_level / float(
+            _CFG.get('pickerCommanderAdditionRatio', 10.0))
+        cvr_b += non_cmd_eff_level * float(_CFG.get('pickerSitAwarePerLevel', 0.0003))
+    vr *= commander_factor * (1.0 + cvr_b)
     return vr
 
 
