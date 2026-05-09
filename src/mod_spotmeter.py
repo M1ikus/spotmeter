@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.4.1'
+MOD_VERSION = '5.5.0'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -90,12 +90,20 @@ DEFAULT_CONFIG = {
     'pickerMarker': u'● ',
     'pickerIncludeDeadEnemies': False,
     'pickerDiagDumpKey': 'KEY_NUMPADSTAR',
-    # v5 overlay
+    # v5.5 overlay - rewritten as a multi-line "status block" that shows
+    # spot distance for all 4 states at once (still/moving/net/afterShot).
+    # Auto-spam on tick changes is GONE. Two ways to see the block:
+    #   1) NumpadEnter (overlayPrintNowKey) - one-shot snapshot
+    #   2) live mode (overlayToggleKey, default OFF) - re-posts every
+    #      liveModeIntervalSec seconds while enabled. The chat will show
+    #      a refreshing block; older blocks scroll out.
+    # User-action chat lines (toggle confirmations, picker change, diag
+    # dump) remain as short one-line responses since they're triggered
+    # by user input, not background events.
     'overlayEnabled': True,
-    'overlayToggleKey': 'KEY_NUMPAD9',
-    'overlayShowOnTickChange': True,
-    'overlayMinRadiusDelta': 15.0,
-    'overlayPrintNowKey': 'KEY_NUMPADENTER',
+    'overlayToggleKey': 'KEY_NUMPAD9',  # toggles live mode
+    'overlayPrintNowKey': 'KEY_NUMPADENTER',  # one-shot snapshot
+    'liveModeIntervalSec': 3.0,  # only used when live mode is enabled
 }
 
 _CFG = dict(DEFAULT_CONFIG)
@@ -112,9 +120,8 @@ _PICKER_TOGGLES = {
     'directives': False,     # default OFF: assume no directives on equipment slots
     'fieldUpgrades': False,  # default OFF: assume no VR field upgrades
 }
-_OVERLAY_ENABLED_RUNTIME = True
-_LAST_OVERLAY_RADIUS = 0.0
-_LAST_OVERLAY_STATE = None
+_LIVE_MODE_ENABLED = False  # default OFF - user enables via Numpad9 if they want auto-refreshing block
+_LIVE_MODE_CALLBACK_ID = None  # BigWorld.callback handle for the periodic poster
 
 
 def _read_config():
@@ -580,16 +587,13 @@ def _tick(plugin):
             _remove_dyn_circle(plugin, state)
         _add_dyn_circle(plugin, state, color, radius)
         state['lastState'] = new_state
-        _maybe_post_tick_overlay(plugin, radius, new_state)
         return
     if after_shot:
         if abs(radius - state['lastRadius']) > 0.1:
             _update_dyn_circle(plugin, state, radius)
-        _maybe_post_tick_overlay(plugin, radius, new_state)
         return
     if abs(radius - state['lastRadius']) > 0.5:
         _update_dyn_circle(plugin, state, radius)
-    _maybe_post_tick_overlay(plugin, radius, new_state)
 
 
 def _start_ticking(plugin):
@@ -802,7 +806,7 @@ def _dump_picker_descriptor(plugin):
     """
     if _PICKED_VID is None:
         _logger.warning('SpotMeter: dump requested but no target picked')
-        _post_chat_overlay(plugin, force=True, prefix='diag: no picker target')
+        _post_chat_line('diag: no picker target')
         return
     try:
         arenaDP = plugin.sessionProvider.getArenaDP()
@@ -853,8 +857,7 @@ def _dump_picker_descriptor(plugin):
         misc.get('invisibilityAdditiveTerm'),
         len(devices), ', '.join(devices) or '(none)',
         len(enhancements), ' | '.join(enhancements) or '(none)')
-    _post_chat_overlay(plugin, force=True,
-                       prefix='diag: dumped %s descriptor to python.log' % short)
+    _post_chat_line('diag: dumped %s descriptor to python.log' % short)
 
 
 def _format_picker_summary(plugin):
@@ -912,87 +915,51 @@ def _toggle_perk(name):
     _PICKER_TOGGLES[name] = not _PICKER_TOGGLES[name]
     plugin = _get_picker_plugin()
     _on_picker_changed(plugin, set())
-    _post_chat_overlay(plugin, force=True, prefix='%s: %s' % (name, 'ON' if _PICKER_TOGGLES[name] else 'OFF'))
+    _post_chat_line('%s: %s' % (name, 'ON' if _PICKER_TOGGLES[name] else 'OFF'))
 
 
-def _toggle_overlay():
-    global _OVERLAY_ENABLED_RUNTIME
-    _OVERLAY_ENABLED_RUNTIME = not _OVERLAY_ENABLED_RUNTIME
+def _toggle_live_mode():
+    """Toggle the auto-refreshing status block. Default OFF; when ON, the
+    block is re-posted every liveModeIntervalSec seconds. The chat will
+    show a refreshing block; older blocks scroll out naturally.
+    """
+    global _LIVE_MODE_ENABLED, _LIVE_MODE_CALLBACK_ID
+    _LIVE_MODE_ENABLED = not _LIVE_MODE_ENABLED
     plugin = _get_picker_plugin()
-    _post_chat_overlay(plugin, force=True,
-                       prefix='overlay: %s' % ('ON' if _OVERLAY_ENABLED_RUNTIME else 'OFF'))
+    if _LIVE_MODE_ENABLED:
+        _post_chat_line('live mode: ON (refresh co %.1fs - Numpad9 zeby wylaczyc)'
+                        % float(_CFG.get('liveModeIntervalSec', 3.0)))
+        # Post immediately, then schedule the loop.
+        if plugin is not None:
+            _post_status_block(plugin)
+        try:
+            import BigWorld
+            interval = float(_CFG.get('liveModeIntervalSec', 3.0))
+            if interval < 0.5:
+                interval = 0.5
+            _LIVE_MODE_CALLBACK_ID = BigWorld.callback(interval, _live_mode_tick)
+        except Exception:
+            _logger.exception('SpotMeter: failed to start live-mode loop')
+    else:
+        _post_chat_line('live mode: OFF')
+        # The callback will self-terminate when it fires and sees
+        # _LIVE_MODE_ENABLED is False; we don't bother trying to cancel
+        # it explicitly because BigWorld.cancelCallback is not always
+        # exposed and the next tick will just no-op out.
+        _LIVE_MODE_CALLBACK_ID = None
 
 
 def _print_now():
-    """Show a full status snapshot - all toggles, picker target, computed values."""
+    """One-shot snapshot of the status block (NumpadEnter hotkey).
+
+    Same content as live-mode posts, but on demand. The block shows spot
+    distance for all four states (ruch / postoj / siatka 3s / po strzale)
+    plus picker / toggle / own-tank context. See _format_status_block.
+    """
     plugin = _get_picker_plugin()
     if plugin is None:
         return
-    veh = _get_player_vehicle()
-    if veh is None:
-        return
-    speed = 0.0
-    try:
-        speed = veh.getSpeed()
-    except Exception:
-        pass
-    is_moving = _is_player_vehicle_moving(speed)
-    after_shot = _is_after_shot()
-    camo_net_active = (not is_moving) and _is_camo_net_active(veh, is_moving) and _has_camo_net(veh)
-    state_name = _classify_state(is_moving, after_shot, camo_net_active)
-    camo = _compute_camo(veh, is_moving, after_shot, camo_net_active)
-    enemy_vr = _resolve_enemy_view_range(plugin)
-    radius = _compute_spot_radius(camo, enemy_vr)
-
-    lines = ['[SpotMeter] STATUS:']
-    state_label = {
-        'moving': 'ruch',
-        'still': 'postoj',
-        'stillNet': 'siatka aktywna',
-        'afterShot': 'po strzale',
-    }.get(state_name, state_name)
-    lines.append('  state=%s, camo=%.3f, vr=%.0fm -> spot=%.0fm'
-                 % (state_label, camo, enemy_vr, radius))
-    # Own-tank descriptor breakdown - shows whether crew skills, equipment
-    # and field upgrades (vehPostProgression) are baked into miscAttrs.
-    # If invisibilityBaseAdditive > 0 or invisibilityMultFactor != 1 you
-    # have field-upgrade modifiers active; descr is being built with extData.
-    descr = veh.typeDescriptor
-    invMov, invStill = descr.type.invisibility
-    misc = getattr(descr, 'miscAttrs', None) or {}
-    lines.append(
-        '  myCamo: base(mov=%.3f,still=%.3f) * turret=%.2f * crew=%.2f + add=%.3f'
-        % (invMov, invStill,
-           misc.get('invisibilityFactor', 1.0),
-           float(_CFG.get('crewCamoBonus', 1.0)),
-           misc.get('invisibilityBaseAdditive', 0.0) + misc.get('invisibilityAdditiveTerm', 0.0)))
-    own_vr_factor = misc.get('circularVisionRadiusFactor', 1.0)
-    own_base_vr = getattr(descr.turret, 'circularVisionRadius', 0.0)
-    lines.append(
-        '  myVR: base=%.0fm * factor=%.3f (factor>1 = optyka/lorna/ulepsz. polowe naliczone)'
-        % (own_base_vr, own_vr_factor))
-    lines.append('  kara-strzal=%s, overlay-tekstu=%s'
-                 % ('ON' if after_shot else 'off',
-                    'ON' if _OVERLAY_ENABLED_RUNTIME else 'off'))
-    if _PICKED_VID is None:
-        if _CFG.get('useOwnViewRange', True):
-            lines.append('  picker: NONE (using own VR)')
-        else:
-            lines.append('  picker: NONE (using fallback VR=%.0fm)'
-                         % _CFG.get('enemyViewRangeFallback', 445.0))
-    else:
-        summary = _format_picker_summary(plugin) or '?'
-        lines.append('  picker: %s' % summary)
-        tags = _active_perk_tags()
-        lines.append('  perki=%s, lornetka-enemy(zal.)=%s'
-                     % ('+'.join(tags) if tags else 'brak',
-                        'ON' if _CFG.get('pickerAssumeStereoscope', True) else 'off'))
-    text = '\n'.join(lines)
-    try:
-        from messenger.MessengerEntry import g_instance as _messengerEntry
-        _messengerEntry.gui.addClientMessage(text, isCurrentPlayer=True)
-    except Exception:
-        _logger.exception('SpotMeter: failed to push status overlay')
+    _post_status_block(plugin)
 
 
 def _on_picker_changed(plugin, affected_vids):
@@ -1007,74 +974,146 @@ def _on_picker_changed(plugin, affected_vids):
             _tick(plugin)
         except Exception:
             _logger.exception('SpotMeter: tick after picker change failed')
-    _post_chat_overlay(plugin, force=True)
+    # User-action confirmation: short one-line message, not the full block.
+    # The picker/toggle change is fully reflected in the next status block
+    # snapshot (NumpadEnter) or live-mode tick.
+    if summary:
+        _post_chat_line('picker -> %s [%s]' % (summary, tags))
+    elif _PICKED_VID is None:
+        _post_chat_line('picker cleared')
 
 
-def _format_overlay_text(plugin, radius, state_name, enemy_vr, prefix=None):
-    parts = []
-    if prefix:
-        parts.append('[SpotMeter] ' + prefix)
-    state_label = {
-        'moving': 'ruch',
-        'still': 'postoj',
-        'stillNet': 'siatka',
-        'afterShot': 'po strzale',
-    }.get(state_name, state_name)
-    spot_str = '%.0f m' % radius
-    vr_str = '%.0f m' % enemy_vr
-    body = '[SpotMeter] Spot: %s (%s, vs VR %s)' % (spot_str, state_label, vr_str)
-    if _PICKED_VID is not None and plugin is not None:
-        summary = _format_picker_summary(plugin)
-        if summary:
-            body += ' | target: ' + summary
-    parts.append(body)
-    return '\n'.join(parts)
-
-
-def _post_chat_overlay(plugin, force=False, prefix=None):
+def _post_chat_line(text):
+    """Single short chat-line message - used for one-time confirmations on
+    user actions (toggle change, picker change, diag dump confirmation).
+    Does NOT loop or auto-fire; only called from user-triggered code paths.
+    """
     if not _CFG.get('overlayEnabled', True):
         return
-    if not _OVERLAY_ENABLED_RUNTIME and not force:
-        return
+    try:
+        from messenger.MessengerEntry import g_instance as _messengerEntry
+        _messengerEntry.gui.addClientMessage('[SpotMeter] ' + text, isCurrentPlayer=True)
+    except Exception:
+        _logger.exception('SpotMeter: failed to push chat line')
+
+
+def _format_status_block(plugin):
+    """Multi-line block showing spot distance for ALL four states at once
+    (ruch / postoj / siatka 3s / po strzale), plus picker/toggle context.
+    This is what the user sees on NumpadEnter and what live-mode refreshes.
+
+    The same enemy_vr is used for all four computations (only state varies),
+    so the user can compare how much each state buys them. Current state
+    is marked with an arrow.
+    """
     if plugin is None:
-        return
+        return None
     veh = _get_player_vehicle()
     if veh is None:
-        return
+        return None
+
     speed = 0.0
     try:
         speed = veh.getSpeed()
     except Exception:
         pass
-    is_moving = _is_player_vehicle_moving(speed)
-    after_shot = _is_after_shot()
-    camo_net_active = (not is_moving) and _is_camo_net_active(veh, is_moving) and _has_camo_net(veh)
-    state_name = _classify_state(is_moving, after_shot, camo_net_active)
-    camo = _compute_camo(veh, is_moving, after_shot, camo_net_active)
+    is_moving_now = _is_player_vehicle_moving(speed)
+    after_shot_now = _is_after_shot()
+    camo_net_active_now = (not is_moving_now) and _is_camo_net_active(veh, is_moving_now) and _has_camo_net(veh)
+    current = _classify_state(is_moving_now, after_shot_now, camo_net_active_now)
+
     enemy_vr = _resolve_enemy_view_range(plugin)
-    radius = _compute_spot_radius(camo, enemy_vr)
-    text = _format_overlay_text(plugin, radius, state_name, enemy_vr, prefix=prefix)
+
+    # Compute spot distance for each hypothetical state. _compute_camo's
+    # signature is (veh, is_moving, after_shot, camo_net_active), so we
+    # pass the four canonical combinations.
+    def _spot_for(is_moving, after_shot, net):
+        camo = _compute_camo(veh, is_moving, after_shot, net)
+        return _compute_spot_radius(camo, enemy_vr)
+
+    spot_moving = _spot_for(True,  False, False)
+    spot_still  = _spot_for(False, False, False)
+    spot_net    = _spot_for(False, False, True)
+    spot_shot   = _spot_for(True,  True,  False)
+
+    def _mark(state_key):
+        return '  <-- AKTUALNY' if state_key == current else ''
+
+    vr_source = 'own' if (_PICKED_VID is None and _CFG.get('useOwnViewRange', True)) \
+                else ('picker' if _PICKED_VID is not None else 'fallback')
+
+    lines = []
+    lines.append('[SpotMeter v%s] vs VR=%.0fm (%s)' % (MOD_VERSION, enemy_vr, vr_source))
+    lines.append('  ruch:        %4.0fm%s' % (spot_moving, _mark('moving')))
+    lines.append('  postoj:      %4.0fm%s' % (spot_still,  _mark('still')))
+    lines.append('  siatka 3s+:  %4.0fm%s' % (spot_net,    _mark('stillNet')))
+    lines.append('  po strzale:  %4.0fm%s' % (spot_shot,   _mark('afterShot')))
+
+    # Picker / toggle context
+    if _PICKED_VID is None:
+        if _CFG.get('useOwnViewRange', True):
+            lines.append('picker: -- (using own VR)')
+        else:
+            lines.append('picker: -- (fallback VR=%.0fm)' % _CFG.get('enemyViewRangeFallback', 445.0))
+    else:
+        summary = _format_picker_summary(plugin) or '?'
+        lines.append('picker: %s' % summary)
+
+    # Toggle status - show all four with +/- prefix
+    def _tag(name, on):
+        return ('+' if on else '-') + name
+    lines.append('toggle: %s' % '  '.join([
+        _tag('rations',    _PICKER_TOGGLES.get('rations', True)),
+        _tag('crewPerks',  _PICKER_TOGGLES.get('crewPerks', True)),
+        _tag('directives', _PICKER_TOGGLES.get('directives', False)),
+        _tag('fieldUpgr',  _PICKER_TOGGLES.get('fieldUpgrades', False)),
+    ]))
+
+    # Own-tank breakdown - useful to verify field upgrades are baked in
+    descr = veh.typeDescriptor
+    misc = getattr(descr, 'miscAttrs', None) or {}
+    own_vr_factor = misc.get('circularVisionRadiusFactor', 1.0)
+    own_base_vr = getattr(descr.turret, 'circularVisionRadius', 0.0)
+    add_term = misc.get('invisibilityBaseAdditive', 0.0) + misc.get('invisibilityAdditiveTerm', 0.0)
+    lines.append('own:    base_vr=%.0fm * factor=%.3f, camo_add=%.3f, live=%s'
+                 % (own_base_vr, own_vr_factor, add_term,
+                    'ON' if _LIVE_MODE_ENABLED else 'off'))
+
+    return '\n'.join(lines)
+
+
+def _post_status_block(plugin):
+    """Format and post a status block to the chat. No-op on failure."""
+    text = _format_status_block(plugin)
+    if not text:
+        return
     try:
         from messenger.MessengerEntry import g_instance as _messengerEntry
         _messengerEntry.gui.addClientMessage(text, isCurrentPlayer=True)
     except Exception:
-        _logger.exception('SpotMeter: failed to push overlay message')
+        _logger.exception('SpotMeter: failed to push status block')
 
 
-def _maybe_post_tick_overlay(plugin, radius, state_name):
-    global _LAST_OVERLAY_RADIUS, _LAST_OVERLAY_STATE
-    if not _CFG.get('overlayEnabled', True):
+def _live_mode_tick():
+    """Periodic re-poster for live mode. Reschedules itself while
+    _LIVE_MODE_ENABLED is True; otherwise terminates the loop.
+    """
+    global _LIVE_MODE_CALLBACK_ID
+    _LIVE_MODE_CALLBACK_ID = None
+    if not _LIVE_MODE_ENABLED:
         return
-    if not _OVERLAY_ENABLED_RUNTIME:
-        return
-    if not _CFG.get('overlayShowOnTickChange', True):
-        return
-    delta = float(_CFG.get('overlayMinRadiusDelta', 15.0))
-    if state_name == _LAST_OVERLAY_STATE and abs(radius - _LAST_OVERLAY_RADIUS) < delta:
-        return
-    _LAST_OVERLAY_RADIUS = radius
-    _LAST_OVERLAY_STATE = state_name
-    _post_chat_overlay(plugin)
+    plugin = _get_picker_plugin()
+    if plugin is not None:
+        _post_status_block(plugin)
+    # Reschedule even if plugin was None - we'll retry next tick.
+    try:
+        import BigWorld
+        interval = float(_CFG.get('liveModeIntervalSec', 3.0))
+        if interval < 0.5:
+            interval = 0.5  # safety floor
+        _LIVE_MODE_CALLBACK_ID = BigWorld.callback(interval, _live_mode_tick)
+    except Exception:
+        _logger.exception('SpotMeter: failed to reschedule live-mode tick')
 
 
 def _force_panel_refresh(affected_vids=None):
@@ -1193,8 +1232,8 @@ def _install_reload_hotkey():
               lambda: _dump_picker_descriptor(_get_picker_plugin()),
               'diag-dump')
     if _CFG.get('overlayEnabled', True):
-        _bind('overlayToggleKey', _toggle_overlay, 'overlay-toggle')
-        _bind('overlayPrintNowKey', _print_now, 'status')
+        _bind('overlayToggleKey', _toggle_live_mode, 'live-mode-toggle')
+        _bind('overlayPrintNowKey', _print_now, 'status-snapshot')
 
     if not bindings:
         _logger.warning('SpotMeter: no hotkeys registered (check Keys names in config)')

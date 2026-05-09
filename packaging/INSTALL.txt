@@ -56,11 +56,26 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     1      - dyrektywy na wyposazenie  (default OFF - 1.025 boost na auto-wykryte sprzety)
     0      - ulepszenia polowe na VR   (default OFF - BETA, per-czolg tabelka w configu)
 
-  OVERLAY / DIAG:
-    9      - toggle overlay tekstu (auto-update na zmiany)
-    Enter  - pokaz pelen status SpotMetera (state + picker + toggles)
+  OVERLAY / DIAG (v5.5 - bez spamu na zmiany!):
+    9      - toggle LIVE MODE (default OFF). Gdy ON, bloczek z 4 wartosciami
+             (ruch/postoj/siatka/po-strzale) odswieza sie co 3s w czacie.
+    Enter  - jednorazowy snapshot blocka (zawsze, niezaleznie od live mode)
     *      - dump descriptora wybranego enemy do python.log (diagnostyka)
     .      - reload configu
+
+  CO POKAZUJE BLOK STATUSU:
+    [SpotMeter v5.5.0] vs VR=445m (own)
+      ruch:         287m
+      postoj:       295m  <-- AKTUALNY
+      siatka 3s+:   275m
+      po strzale:   320m
+    picker: -- (using own VR)
+    toggle: +rations  +crewPerks  -directives  -fieldUpgr
+    own:    base_vr=410m * factor=1.103, camo_add=0.025, live=off
+
+    Wszystkie 4 wartosci VR-spot widzisz na raz. Strzalka pokazuje
+    aktualny stan. Nie ma spamu na kazdy state change ani delta - albo
+    wlaczasz live mode (Numpad9), albo cisniesz Enter zeby raz zobaczyc.
 
 
 CO JEST AUTOMATYCZNE (auto-czytane z descriptora wroga)

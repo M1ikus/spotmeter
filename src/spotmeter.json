@@ -58,12 +58,11 @@
     "pickerMarker": "● ",
     "pickerIncludeDeadEnemies": false,
 
-    "_comment_overlay": "Overlay posts a chat-line with the current spot to the in-battle message feed (above minimap). NumpadEnter shows full status snapshot (all toggles + computed values). Numpad * (pickerDiagDumpKey) dumps the picked enemy's full descriptor to python.log for diagnostics.",
+    "_comment_overlay": "v5.5: status-block model. Block shows spot distance for ALL 4 states at once (ruch/postoj/siatka 3s/po strzale) plus picker+toggle+own-tank context. Two ways to see it: (1) NumpadEnter = on-demand snapshot; (2) Numpad9 = toggle live mode (default OFF) which re-posts the block every liveModeIntervalSec seconds. NO auto-spam on state changes / radius deltas. User-action confirmations (toggle/picker/diag) are short one-line responses, not the full block.",
     "overlayEnabled": true,
     "overlayToggleKey": "KEY_NUMPAD9",
-    "overlayShowOnTickChange": true,
-    "overlayMinRadiusDelta": 15.0,
     "overlayPrintNowKey": "KEY_NUMPADENTER",
+    "liveModeIntervalSec": 3.0,
     "reloadKey": "KEY_NUMPADPERIOD",
 
     "_comment_debug": "logCalcDetails=true logs camo/radius/state each tick to python.log.",
