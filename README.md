@@ -17,7 +17,6 @@ Granica jest prosta: wszystko co jest w **descriptorze pojazdu** (transmitowanym
 | Kara za strzał | ✅ auto | hook na `Avatar.shoot` + `miscAttrs.invisibilityFactorAtShot` |
 | Skille załogi (BIA/Recon/SitAware) | ❌ manual toggle | serwer nie wysyła |
 | Consumablesy (rations/vents) | ❌ manual toggle | serwer nie wysyła aktywnego stanu |
-| Dyrektywa "Naturalne maskowanie" (siatka) | ❌ manual toggle | nie wykrywamy stanu |
 
 W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + Stereoscope (jeśli są na tym czołgu). Toggle perków / consumables nakładasz tylko gdy zakładasz że enemy je faktycznie ma.
 
@@ -93,7 +92,6 @@ Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`
 | `applyCamoNet` | `true` | uwzględnia siatkę maskującą po `camoNetActivateSec` w postoju |
 | `camoNetActivateSec` | `3.0` | czas postoju do aktywacji siatki (s) |
 | `camoNetFallbackBonus` | `0.05` | bonus jeśli odczyt z descriptora padnie |
-| `ownCamoNetDirectiveBonus` | `0.025` | bonus dyrektywy "naturalne maskowanie" (additive do siatki) |
 | `pickerAssumeStereoscope` | `true` | jeśli enemy ma lornetkę, zakłada że jest aktywna |
 | `pickerStereoscopeFallback` | `1.25` | mnożnik VR jeśli odczyt z descriptora padnie |
 | `overlayEnabled` | `true` | włącza overlay tekstu (chat-line nad minimapą) |
@@ -234,11 +232,6 @@ estimated_vr = base_vr * vr_factor
 | toggle racji bojowych | Numpad 1 | `pickerRationsKey` |
 | toggle ulepszonej wentylacji | Numpad 3 | `pickerVentsKey` |
 
-**Własny czołg**
-| akcja | klawisz | config |
-|---|---|---|
-| dyrektywa "naturalne maskowanie" (siatka) | Numpad **/** | `ownCamoNetDirectiveKey` |
-
 **Overlay / diag / reload**
 | akcja | klawisz | config |
 |---|---|---|
@@ -260,7 +253,11 @@ Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo 
 
 Worst-case "full tryhard manual" stos (rations + vents + BIA + Recon + SitAware): `1.10 × 1.05 × 1.05 × 1.02 × 1.03 ≈ 1.27` (+27% do VR). Plus auto-detekcja Coated Optics i Stereoscope dochodzi z descriptora (już naliczone).
 
-> **v5.2 cleanup:** wcześniejsze `pickerOpticsDirective` / `pickerVentsDirective` / `pickerStereoDirective` zostały usunięte. Były redundantne — descriptor już zawiera ich efekt w `miscAttrs.circularVisionRadiusFactor`, więc manualny mnożnik double-counted. Dyrektywy w slotach equipment są więc obsługiwane automatycznie przez auto-detekcję. Jedynie "Naturalne maskowanie" (dyrektywa siatki dla **własnego** czołgu) zostaje jako toggle — bo nie umiemy odczytać aktywności tej dyrektywy klientowo.
+> **v5.2 cleanup:** w wersjach v5.0–v5.1 były dodatkowe toggle dla dyrektyw enemy (`pickerOpticsDirective`, `pickerVentsDirective`, `pickerStereoDirective`) oraz dla dyrektywy siatki własnego czołgu (`ownCamoNetDirective`, "Naturalne maskowanie"). **Wszystkie usunięte:**
+> - Dyrektywy w slotach equipment (optics / vents / stereoscope) są już naliczone w `descr.miscAttrs.circularVisionRadiusFactor` przy budowie descriptora — manualny mnożnik podwójnie liczył.
+> - "Naturalne maskowanie" sprawdziłem w `battle_boosters.xml` — taka dyrektywa po prostu nie istnieje w WoT 2.x. Wymyślona z głowy w v3 na podstawie starych źródeł WoT 1.x. Wycofana.
+> 
+> Wszystkie pozostałe toggle (BIA, Recon, SitAware, rations, vents) są ściśle dla **VR przeciwnika** (w pickerze) — nasz własny camo bierze się z descriptora bez interakcji.
 
 Podczas bitwy widać aktywne flagi w logu (`python.log` → `SpotMeter: picker -> RhmPzW VR=587m [+rations +bia +recon] | stereo=on`).
 

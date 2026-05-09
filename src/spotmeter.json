@@ -25,12 +25,10 @@
     "applyFirePenalty": true,
     "fireRevealDuration": 3.0,
 
-    "_comment_camo_net": "Camo net activates after camoNetActivateSec of NOT MOVING and adds the descriptor's invisibilityBonus. ownCamoNetDirective ('Naturalne maskowanie' directive on Numpad / by default) adds an extra additive when on.",
+    "_comment_camo_net": "Camo net on the player's own tank activates after camoNetActivateSec of NOT MOVING and adds the descriptor's invisibilityBonus. Auto-detected from optionalDevices.",
     "applyCamoNet": true,
     "camoNetActivateSec": 3.0,
     "camoNetFallbackBonus": 0.05,
-    "ownCamoNetDirectiveKey": "KEY_NUMPADSLASH",
-    "ownCamoNetDirectiveBonus": 0.025,
 
     "_comment_picker_layout": "Picker hotkeys (numpad, NumLock either way). Picker reads the enemy's full vehicle descriptor from server, including hull/turret/gun/optics/stereoscope. Crew skills, consumables and vents are NOT transmitted - manual toggles for those.",
     "pickerEnabled": true,

@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.2.0'
+MOD_VERSION = '5.2.1'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -57,9 +57,6 @@ DEFAULT_CONFIG = {
     'applyCamoNet': True,
     'camoNetActivateSec': 3.0,
     'camoNetFallbackBonus': 0.05,
-    # 'Naturalne maskowanie' directive on the player's own camo net
-    'ownCamoNetDirectiveKey': 'KEY_NUMPADSLASH',
-    'ownCamoNetDirectiveBonus': 0.025,
     'logCalcDetails': False,
     'reloadKey': 'KEY_NUMPADPERIOD',
     # v4/v5 picker - numpad layout
@@ -114,7 +111,6 @@ _PICKER_TOGGLES = {
     'recon': False,
     'sitAware': False,
 }
-_OWN_CAMO_NET_DIRECTIVE = False
 _OVERLAY_ENABLED_RUNTIME = True
 _LAST_OVERLAY_RADIUS = 0.0
 _LAST_OVERLAY_STATE = None
@@ -282,10 +278,6 @@ def _compute_camo(vehicle, is_moving, after_shot, camo_net_active):
         net_bonus, _ = _scan_optional_devices(descr)
         if net_bonus <= 0.0:
             net_bonus = float(_CFG.get('camoNetFallbackBonus', 0.0))
-        # 'Naturalne maskowanie' directive boosts the camo net bonus.
-        # Modeled as an extra additive on top of the device's own value.
-        if _OWN_CAMO_NET_DIRECTIVE:
-            net_bonus += float(_CFG.get('ownCamoNetDirectiveBonus', 0.0))
         additive += net_bonus
     camo = max(0.0, (base + additive) * mult_factor)
     if after_shot:
@@ -879,19 +871,6 @@ def _toggle_stereoscope():
                        prefix='stereoscope: %s' % ('ON' if _CFG['pickerAssumeStereoscope'] else 'OFF'))
 
 
-def _toggle_own_camo_net_directive():
-    global _OWN_CAMO_NET_DIRECTIVE
-    _OWN_CAMO_NET_DIRECTIVE = not _OWN_CAMO_NET_DIRECTIVE
-    plugin = _get_picker_plugin()
-    if plugin is not None:
-        try:
-            _tick(plugin)
-        except Exception:
-            _logger.exception('SpotMeter: tick after camo-net directive toggle failed')
-    _post_chat_overlay(plugin, force=True,
-                       prefix='naturalne maskowanie (siatka): %s' % ('ON' if _OWN_CAMO_NET_DIRECTIVE else 'OFF'))
-
-
 def _toggle_overlay():
     global _OVERLAY_ENABLED_RUNTIME
     _OVERLAY_ENABLED_RUNTIME = not _OVERLAY_ENABLED_RUNTIME
@@ -930,9 +909,8 @@ def _print_now():
     }.get(state_name, state_name)
     lines.append('  state=%s, camo=%.3f, vr=%.0fm -> spot=%.0fm'
                  % (state_label, camo, enemy_vr, radius))
-    lines.append('  fire-penalty=%s, camo-net-dir=%s, overlay=%s'
+    lines.append('  kara-strzal=%s, overlay-tekstu=%s'
                  % ('ON' if after_shot else 'off',
-                    'ON' if _OWN_CAMO_NET_DIRECTIVE else 'off',
                     'ON' if _OVERLAY_ENABLED_RUNTIME else 'off'))
     if _PICKED_VID is None:
         if _CFG.get('useOwnViewRange', True):
@@ -944,8 +922,8 @@ def _print_now():
         summary = _format_picker_summary(plugin) or '?'
         lines.append('  picker: %s' % summary)
         tags = _active_perk_tags()
-        lines.append('  perks=%s, stereoAssumed=%s'
-                     % ('+'.join(tags) if tags else 'none',
+        lines.append('  perki=%s, lornetka-enemy(zal.)=%s'
+                     % ('+'.join(tags) if tags else 'brak',
                         'ON' if _CFG.get('pickerAssumeStereoscope', True) else 'off'))
     text = '\n'.join(lines)
     try:
@@ -1150,7 +1128,6 @@ def _install_reload_hotkey():
         _bind('pickerDiagDumpKey',
               lambda: _dump_picker_descriptor(_get_picker_plugin()),
               'diag-dump')
-    _bind('ownCamoNetDirectiveKey', _toggle_own_camo_net_directive, 'dir-camo-net')
     if _CFG.get('overlayEnabled', True):
         _bind('overlayToggleKey', _toggle_overlay, 'overlay-toggle')
         _bind('overlayPrintNowKey', _print_now, 'status')

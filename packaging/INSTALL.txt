@@ -60,9 +60,6 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     1      - toggle Combat Rations / cola / kawa (+10%)
     3      - toggle Improved Ventilation        (+5%)
 
-  WLASNY CZOLG:
-    /      - toggle dyrektywy "Naturalne maskowanie" (boost siatki kiedy aktywna)
-
   OVERLAY / DIAG:
     9      - toggle overlay tekstu (auto-update na zmiany)
     Enter  - poka pelen status SpotMetera (state + picker + perki)
@@ -82,8 +79,7 @@ CO JEST MANUALNE (toggles na numpadzie)
 ----------------------------------------
 - Skille zalogi (BIA/Recon/SitAware) - bo serwer nie wysyla skilli enemy
 - Consumablesy (rations/vents) - bo serwer nie wysyla aktywnego stanu
-- Dyrektywy w slotach equipment - mocno mieszaja sie z auto-detekcja, pomijamy
-- Naturalne maskowanie (twoja dyrektywa siatki) - bo nie umiemy wyliczyc po stronie klienta
+- Dyrektywy w slotach equipment - juz w descriptor.miscAttrs, auto-detected (zero toggles)
 
 
 WERYFIKACJA / DEBUG
