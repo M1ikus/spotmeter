@@ -12,13 +12,17 @@ Granica jest prosta: wszystko co jest w **descriptorze pojazdu** (transmitowanym
 | Coated Optics przeciwnika | ✅ auto | `descr.miscAttrs.circularVisionRadiusFactor` (już z optyką) |
 | Stereoscope przeciwnika | ✅ auto + toggle Numpad 7 | `descr.optionalDevices` (Stereoscope class) |
 | Enhancements / dyrektywy w slotach equipment | ✅ auto | `descr.miscAttrs` jest rebuildowany po `installEnhancements` |
+| **Ulepszenia polowe (post-progression) WŁASNE** | ✅ auto | `Vehicle.getDescr` woła `VehicleDescr(..., extData=self)` → `__applyExternalData` woła `installModifications` |
+| **Ulepszenia polowe ENEMY** | ❌ manual toggle (proxy via BIA/Recon/Vents) | `Vehicle.def` ma `vehPostProgression` jako `MY_VEHICLE` — server transmituje tylko właścicielowi |
 | Camo net na **własnym** czołgu | ✅ auto, aktywne po 3s | `descr.optionalDevices` (CamouflageNet class) |
 | Tryby siege (CS-63 itp.) | ✅ auto | `CompositeVehicleDescriptor` w silniku |
 | Kara za strzał | ✅ auto | hook na `Avatar.shoot` + `miscAttrs.invisibilityFactorAtShot` |
 | Skille załogi (BIA/Recon/SitAware) | ❌ manual toggle | serwer nie wysyła |
 | Consumablesy (rations/vents) | ❌ manual toggle | serwer nie wysyła aktywnego stanu |
 
-W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + Stereoscope (jeśli są na tym czołgu). Toggle perków / consumables nakładasz tylko gdy zakładasz że enemy je faktycznie ma.
+W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + Stereoscope + dyrektywy w slotach (jeśli są na tym czołgu). Toggle perków / consumables nakładasz tylko gdy zakładasz że enemy je faktycznie ma. Ulepszenia polowe (field upgrades, post-progression) enemy są niewidoczne dla klienta — pokrywasz je przez stack BIA + Recon + SitAware + Vents (typowo +5–10% łącznie).
+
+> **Weryfikacja własnych field upgrades:** naciśnij **NumpadEnter** (status snapshot) — w chacie pojawi się m.in. linia `myVR: base=410m * factor=1.103` i `myCamo: base(...) + add=0.025`. Jeśli `factor>1.0` lub `add>0.0`, ulepszenia polowe są naliczone w descriptorze.
 
 
 

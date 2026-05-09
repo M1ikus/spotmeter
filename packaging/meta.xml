@@ -1,6 +1,6 @@
 <root>
     <id>com.M1ikus.spotmeter</id>
-    <version>5.2.1</version>
+    <version>5.2.2</version>
     <name>SpotMeter</name>
     <description>Adds a dynamic minimap circle showing the distance from which your tank can be spotted. Includes a battle-time picker that adjusts the circle to a specific enemy tank's view range, with toggleable consumable / perk / directive multipliers.</description>
 </root>

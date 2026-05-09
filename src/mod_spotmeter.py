@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.2.1'
+MOD_VERSION = '5.2.2'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -909,6 +909,24 @@ def _print_now():
     }.get(state_name, state_name)
     lines.append('  state=%s, camo=%.3f, vr=%.0fm -> spot=%.0fm'
                  % (state_label, camo, enemy_vr, radius))
+    # Own-tank descriptor breakdown - shows whether crew skills, equipment
+    # and field upgrades (vehPostProgression) are baked into miscAttrs.
+    # If invisibilityBaseAdditive > 0 or invisibilityMultFactor != 1 you
+    # have field-upgrade modifiers active; descr is being built with extData.
+    descr = veh.typeDescriptor
+    invMov, invStill = descr.type.invisibility
+    misc = getattr(descr, 'miscAttrs', None) or {}
+    lines.append(
+        '  myCamo: base(mov=%.3f,still=%.3f) * turret=%.2f * crew=%.2f + add=%.3f'
+        % (invMov, invStill,
+           misc.get('invisibilityFactor', 1.0),
+           float(_CFG.get('crewCamoBonus', 1.0)),
+           misc.get('invisibilityBaseAdditive', 0.0) + misc.get('invisibilityAdditiveTerm', 0.0)))
+    own_vr_factor = misc.get('circularVisionRadiusFactor', 1.0)
+    own_base_vr = getattr(descr.turret, 'circularVisionRadius', 0.0)
+    lines.append(
+        '  myVR: base=%.0fm * factor=%.3f (factor>1 = optyka/lorna/ulepsz. polowe naliczone)'
+        % (own_base_vr, own_vr_factor))
     lines.append('  kara-strzal=%s, overlay-tekstu=%s'
                  % ('ON' if after_shot else 'off',
                     'ON' if _OVERLAY_ENABLED_RUNTIME else 'off'))
