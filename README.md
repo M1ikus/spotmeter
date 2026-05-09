@@ -249,13 +249,30 @@ Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo 
 
 | toggle | klawisz | mnożnik (config) | default |
 |---|---|---|---|
-| Combat Rations / cola / coffee | Numpad 1 | `pickerVRBonusRations` | `1.10` |
-| Improved Ventilation | Numpad 3 | `pickerVRBonusVents` | `1.05` |
-| Brothers in Arms | Numpad 4 | `pickerVRBonusBIA` | `1.05` |
 | Recon (commander perk) | Numpad 5 | `pickerVRBonusRecon` | `1.02` |
 | Situational Awareness (radio perk) | Numpad 6 | `pickerVRBonusSitAware` | `1.03` |
+| Combat Rations / cola / coffee | Numpad 1 | `pickerVRBonusRations` | `1.01` |
+| Improved Ventilation | Numpad 3 | `pickerVRBonusVents` | `1.005` |
+| Brothers in Arms | Numpad 4 | `pickerVRBonusBIA` | `1.005` |
 
-Worst-case "full tryhard manual" stos (rations + vents + BIA + Recon + SitAware): `1.10 × 1.05 × 1.05 × 1.02 × 1.03 ≈ 1.27` (+27% do VR). Plus auto-detekcja Coated Optics i Stereoscope dochodzi z descriptora (już naliczone).
+#### Skąd te liczby się biorą
+
+Z `VehicleDescrCrew.py:_process_perk` i `perks.xml`:
+- **Recon** (`commander_eagleEye`): `factor_per_level = 0.0002` → +2% przy 100% skilla
+- **SitAware** (`radioman_finder`): `factor_per_level = 0.0003` → +3% przy 100% skilla
+- **Końcowe**: `VR_factor = cvrA × (1 + cvrB)`, gdzie `cvrB = Recon + SitAware`
+
+Brotherhood, Vents i Rations **NIE** mnożą VR bezpośrednio — boostują tylko *efektywny poziom skilli załogi* (`crewLevelIncrease`):
+- BIA: `+5` poziomów (`brotherhood.crewLevelIncrease = 0.05` przy max)
+- Vents (basic): `+5` poziomów (`miscAttrs/crewLevelIncrease += 5`)
+- Rations: `+10` poziomów (`crewLevelIncrease = 10`)
+
+Te +20 poziomów łącznie skaluje Recon (`120 × 0.0002 = 0.024` zamiast `100 × 0.0002 = 0.02`) i SitAware (`120 × 0.0003 = 0.036` zamiast `0.030`). Cały stack BIA + Vents + Rations dorzuca do cvrB tylko `0.0085` (+0.85% do VR).
+
+**Tryhard stack realny:** `1.02 × 1.03 × 1.005 × 1.005 × 1.01 ≈ 1.07` (+7% do VR z manualnych toggle).
+**Plus** auto-detekcja Coated Optics (×1.10) i Stereoscope (×1.25) z descriptora — czyli totalny tryhard (full perki + lornetka aktywna): `1.07 × 1.10 × 1.25 ≈ 1.47` (+47% do VR).
+
+> **v5.2.3 fix:** Wcześniejsze defaulty `BIA=1.05, Vents=1.05, Rations=1.10` traktowały te toggle jak bezpośrednie multiplikatory VR. To było ZA WYSOKO ~20 punktów procentowych przy stacku. Sprawdziłem mechanikę w grze i obniżyłem do realistycznych wartości.
 
 > **v5.2 cleanup:** w wersjach v5.0–v5.1 były dodatkowe toggle dla dyrektyw enemy (`pickerOpticsDirective`, `pickerVentsDirective`, `pickerStereoDirective`) oraz dla dyrektywy siatki własnego czołgu (`ownCamoNetDirective`, "Naturalne maskowanie"). **Wszystkie usunięte:**
 > - Dyrektywy w slotach equipment (optics / vents / stereoscope) są już naliczone w `descr.miscAttrs.circularVisionRadiusFactor` przy budowie descriptora — manualny mnożnik podwójnie liczył.

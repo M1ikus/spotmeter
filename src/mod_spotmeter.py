@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.2.2'
+MOD_VERSION = '5.2.3'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -72,15 +72,28 @@ DEFAULT_CONFIG = {
     'pickerSitAwareKey': 'KEY_NUMPAD6',
     'pickerStereoKey': 'KEY_NUMPAD7',
     # Per-perk multipliers (independent, multiplied together when stacked).
-    # All five represent things the server does NOT transmit for enemies
-    # (crew skill levels, active consumables, vents) so they're manual
-    # toggles. Optics, optics-directive, stereoscope-directive and the
-    # stereoscope's own factor are all already baked into the descriptor
-    # via miscAttrs.circularVisionRadiusFactor + optionalDevices, so we
-    # don't expose toggles for them - they're auto-applied.
-    'pickerVRBonusRations': 1.10,
-    'pickerVRBonusVents': 1.05,
-    'pickerVRBonusBIA': 1.05,
+    # Calibrated to match WoT 2.x's actual mechanic from VehicleDescrCrew.py
+    # and perks.xml:
+    #
+    #   Recon (commander_eagleEye):  factor_per_level = 0.0002 -> +2% at L100
+    #   SitAware (radioman_finder):  factor_per_level = 0.0003 -> +3% at L100
+    #   Final VR factor = cvrA * (1 + cvrB)  where cvrB sums the two perks.
+    #
+    # Brotherhood / Vents / Rations don't directly modify VR - they only
+    # add to the *effective* crew skill level used by Recon / SitAware:
+    #
+    #   BIA:      crewLevelIncrease = 0.05 -> +5 levels (when at max)
+    #   Vents:    crewLevelIncrease = 5    -> +5 levels
+    #   Rations:  crewLevelIncrease = 10   -> +10 levels
+    #
+    # So enabling BIA on top of an already 100% crew with Recon+SitAware
+    # boosts cvrB by ~+0.25% (5 * 0.0002 + 5 * 0.0003 = 0.0025) - a tiny
+    # multiplier of 1.0025, NOT 1.05. Earlier defaults treated all five
+    # toggles as independent direct multipliers and overshot the realistic
+    # 'tryhard stack' VR by ~20 percentage points.
+    'pickerVRBonusRations': 1.01,
+    'pickerVRBonusVents': 1.005,
+    'pickerVRBonusBIA': 1.005,
     'pickerVRBonusRecon': 1.02,
     'pickerVRBonusSitAware': 1.03,
     'pickerAssumeStereoscope': True,
