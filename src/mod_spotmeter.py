@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-# WoT mod: Spot Circle on minimap
-# Adds an extra dynamic circle to the player's minimap showing the distance from
-# which the player's tank can be spotted by an enemy with the configured view range.
+# SpotMeter — World of Tanks minimap mod.
+# Adds an extra dynamic circle to the player's minimap showing the distance
+# from which the tank can be spotted, plus an in-battle picker for sizing
+# the circle to a specific enemy's view range.
 # Works alongside the game's existing view-range circles (does not replace them).
 #
-# Loader entry: scripts/client/gui/mods/mod_spot_circle.pyc
+# Loader entry: scripts/client/gui/mods/mod_spotmeter.pyc
 # Game version: World of Tanks 2.2.1.2 (Python 2.7 bytecode)
 import json
 import logging
@@ -16,13 +17,18 @@ from gui.Scaleform.daapi.view.battle.shared.minimap import plugins as _mm_plugin
 from gui.Scaleform.daapi.view.battle.shared.minimap import settings as _mm_settings
 from gui.battle_control import matrix_factory
 
-_logger = logging.getLogger('SpotCircleMod')
+_logger = logging.getLogger('SpotMeter')
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
 _C_NAME = _mm_settings.CONTAINER_NAME
 _AS3 = _mm_settings.VIEW_RANGE_CIRCLES_AS3_DESCR
 
+# Tried in order. The legacy 'wot_spot_mod.json' names are kept so users with
+# a config from before the rename keep working without manual migration.
 _CONFIG_CANDIDATES = (
+    './mods/configs/spotmeter.json',
+    './res_mods/configs/spotmeter.json',
+    './mods/spotmeter.json',
     './mods/configs/wot_spot_mod.json',
     './res_mods/configs/wot_spot_mod.json',
     './mods/wot_spot_mod.json',
@@ -106,31 +112,31 @@ def _read_config():
                 for k, v in payload.iteritems():
                     if k in DEFAULT_CONFIG:
                         _CFG[k] = v
-                _logger.info('SpotCircleMod: config loaded from %s', path)
+                _logger.info('SpotMeter: config loaded from %s', path)
                 return
         except IOError:
             continue
         except (ValueError, KeyError) as exc:
-            _logger.warning('SpotCircleMod: bad config at %s: %s', path, exc)
+            _logger.warning('SpotMeter: bad config at %s: %s', path, exc)
             return
-    _logger.info('SpotCircleMod: no config file found, using defaults')
+    _logger.info('SpotMeter: no config file found, using defaults')
 
 
 def init():
     try:
         _read_config()
         if not _CFG.get('enabled', True):
-            _logger.info('SpotCircleMod: disabled by config')
+            _logger.info('SpotMeter: disabled by config')
             return
         _patch_plugin()
         _patch_avatar_shoot()
         if _CFG.get('pickerEnabled', True):
             _patch_player_name_formatter()
         _install_reload_hotkey()
-        _logger.info('SpotCircleMod: initialised (useOwnViewRange=%s, fire=%s, picker=%s)',
+        _logger.info('SpotMeter: initialised (useOwnViewRange=%s, fire=%s, picker=%s)',
                      _CFG['useOwnViewRange'], _CFG['applyFirePenalty'], _CFG['pickerEnabled'])
     except Exception:
-        _logger.exception('SpotCircleMod: init failed')
+        _logger.exception('SpotMeter: init failed')
 
 
 def fini():
@@ -217,7 +223,7 @@ def _scan_optional_devices(descr):
                     current_factor = float((descr.miscAttrs or {}).get('circularVisionRadiusFactor', 1.0)) or 1.0
                     stereo_factor = float(active_value) / current_factor
         except Exception:
-            _logger.exception('SpotCircleMod: failed to read optional device %r', device)
+            _logger.exception('SpotMeter: failed to read optional device %r', device)
     return camo_net_bonus, stereo_factor
 
 
@@ -326,7 +332,7 @@ def _picker_vr(plugin):
         from items.vehicles import VehicleDescr
         descr = VehicleDescr(compactDescr=cd)
     except Exception:
-        _logger.exception('SpotCircleMod: failed to decode descriptor for picked vid=%s', _PICKED_VID)
+        _logger.exception('SpotMeter: failed to decode descriptor for picked vid=%s', _PICKED_VID)
         return None
     try:
         base_vr = float(descr.turret.circularVisionRadius)
@@ -497,7 +503,7 @@ def _tick(plugin):
     radius = _compute_spot_radius(camo, enemy_vr)
     color = _color_for_state(new_state)
     if _CFG.get('logCalcDetails'):
-        _logger.info('SpotCircleMod: state=%s camo=%.3f vr=%.1fm radius=%.1fm net=%s shot=%s',
+        _logger.info('SpotMeter: state=%s camo=%.3f vr=%.1fm radius=%.1fm net=%s shot=%s',
                      new_state, camo, enemy_vr, radius, camo_net_active, after_shot)
     state_changed = new_state != state['lastState']
     if state_changed:
@@ -534,7 +540,7 @@ def _start_ticking(plugin):
         try:
             _tick(p)
         except Exception:
-            _logger.exception('SpotCircleMod: tick failed')
+            _logger.exception('SpotMeter: tick failed')
         st['callbackId'] = BigWorld.callback(_CFG['tickInterval'], _cb)
 
     state['callbackId'] = BigWorld.callback(_CFG['tickInterval'], _cb)
@@ -570,7 +576,7 @@ def _patch_plugin():
         try:
             _refresh_spot_circle(self)
         except Exception:
-            _logger.exception('SpotCircleMod: failed to refresh spot circle')
+            _logger.exception('SpotMeter: failed to refresh spot circle')
 
     def patched_hideMarkup(self):
         try:
@@ -580,7 +586,7 @@ def _patch_plugin():
                 _remove_dyn_circle(self, state)
                 _set_active(self, state, False)
         except Exception:
-            _logger.exception('SpotCircleMod: failed to hide spot circle')
+            _logger.exception('SpotMeter: failed to hide spot circle')
         orig_hideMarkup(self)
 
     def patched_stop(self):
@@ -591,7 +597,7 @@ def _patch_plugin():
                 state['circleId'] = None
                 state['attached'] = False
         except Exception:
-            _logger.exception('SpotCircleMod: failed to clean up on stop')
+            _logger.exception('SpotMeter: failed to clean up on stop')
         orig_stop(self)
 
     Plugin._invalidateMarkup = patched_invalidateMarkup
@@ -608,7 +614,7 @@ def _patch_plugin():
                     _remove_dyn_circle(self, state)
                     _set_active(self, state, False)
             except Exception:
-                _logger.exception('SpotCircleMod: postmortem cleanup failed')
+                _logger.exception('SpotMeter: postmortem cleanup failed')
         setattr(Plugin, pm_attr, patched_onPostMortem)
 
     _PATCHED = True
@@ -628,11 +634,11 @@ def _patch_avatar_shoot():
     try:
         import Avatar as _avatar_module
     except ImportError:
-        _logger.info('SpotCircleMod: Avatar module unavailable, fire penalty disabled')
+        _logger.info('SpotMeter: Avatar module unavailable, fire penalty disabled')
         return
     AvatarCls = getattr(_avatar_module, 'PlayerAvatar', None) or getattr(_avatar_module, 'Avatar', None)
     if AvatarCls is None:
-        _logger.info('SpotCircleMod: Avatar class not found, fire penalty disabled')
+        _logger.info('SpotMeter: Avatar class not found, fire penalty disabled')
         return
 
     orig_shoot = getattr(AvatarCls, 'shoot', None)
@@ -647,7 +653,7 @@ def _patch_avatar_shoot():
             try:
                 _record_shot()
             except Exception:
-                _logger.exception('SpotCircleMod: failed to record shot')
+                _logger.exception('SpotMeter: failed to record shot')
             return result
         AvatarCls.shoot = patched_shoot
 
@@ -657,23 +663,23 @@ def _patch_avatar_shoot():
             try:
                 _record_shot()
             except Exception:
-                _logger.exception('SpotCircleMod: failed to record dual-gun shot')
+                _logger.exception('SpotMeter: failed to record dual-gun shot')
             return result
         AvatarCls.shootDualGun = patched_shootDualGun
 
     _AVATAR_PATCHED = True
-    _logger.info('SpotCircleMod: Avatar.shoot hooked for fire penalty')
+    _logger.info('SpotMeter: Avatar.shoot hooked for fire penalty')
 
 
 def _hot_reload():
-    _logger.info('SpotCircleMod: hot-reloading config')
+    _logger.info('SpotMeter: hot-reloading config')
     _read_config()
     _force_panel_refresh()
     for plugin in list(_STATE.keys()):
         try:
             _refresh_spot_circle(plugin)
         except Exception:
-            _logger.exception('SpotCircleMod: failed to refresh after reload')
+            _logger.exception('SpotMeter: failed to refresh after reload')
 
 
 def _get_picker_plugin():
@@ -702,7 +708,7 @@ def _enemy_iterator(plugin):
                 continue
             items.append((vinfo.vehicleID, vinfo))
     except Exception:
-        _logger.exception('SpotCircleMod: failed to enumerate enemies')
+        _logger.exception('SpotMeter: failed to enumerate enemies')
         return []
     items.sort(key=lambda kv: (-(kv[1].vehicleType.level or 0), kv[1].vehicleType.shortName, kv[0]))
     return items
@@ -803,21 +809,21 @@ def _on_picker_changed(plugin, affected_vids):
     summary = _format_picker_summary(plugin) if plugin is not None else None
     tags = ' '.join('+' + t for t in _active_perk_tags()) or '-'
     stereo_flag = 'stereo=%s' % ('on' if _CFG.get('pickerAssumeStereoscope', True) else 'off')
-    _logger.info('SpotCircleMod: picker -> %s | perks=%s | %s',
+    _logger.info('SpotMeter: picker -> %s | perks=%s | %s',
                  summary or 'none', tags, stereo_flag)
     _force_panel_refresh(affected_vids)
     if plugin is not None:
         try:
             _tick(plugin)
         except Exception:
-            _logger.exception('SpotCircleMod: tick after picker change failed')
+            _logger.exception('SpotMeter: tick after picker change failed')
     _post_chat_overlay(plugin, force=True)
 
 
 def _format_overlay_text(plugin, radius, state_name, enemy_vr, prefix=None):
     parts = []
     if prefix:
-        parts.append('[SpotMod] ' + prefix)
+        parts.append('[SpotMeter] ' + prefix)
     state_label = {
         'moving': 'ruch',
         'still': 'postoj',
@@ -826,7 +832,7 @@ def _format_overlay_text(plugin, radius, state_name, enemy_vr, prefix=None):
     }.get(state_name, state_name)
     spot_str = '%.0f m' % radius
     vr_str = '%.0f m' % enemy_vr
-    body = 'Spot: %s (%s, vs VR %s)' % (spot_str, state_label, vr_str)
+    body = '[SpotMeter] Spot: %s (%s, vs VR %s)' % (spot_str, state_label, vr_str)
     if _PICKED_VID is not None and plugin is not None:
         summary = _format_picker_summary(plugin)
         if summary:
@@ -862,7 +868,7 @@ def _post_chat_overlay(plugin, force=False, prefix=None):
         from messenger.MessengerEntry import g_instance as _messengerEntry
         _messengerEntry.gui.addClientMessage(text, isCurrentPlayer=True)
     except Exception:
-        _logger.exception('SpotCircleMod: failed to push overlay message')
+        _logger.exception('SpotMeter: failed to push overlay message')
 
 
 def _maybe_post_tick_overlay(plugin, radius, state_name):
@@ -897,7 +903,7 @@ def _patch_player_name_formatter():
     try:
         from gui.battle_control.arena_info import player_format
     except ImportError:
-        _logger.info('SpotCircleMod: player_format unavailable, skipping picker marker')
+        _logger.info('SpotMeter: player_format unavailable, skipping picker marker')
         return
     Formatter = getattr(player_format, 'PlayerFullNameFormatter', None)
     if Formatter is None:
@@ -915,12 +921,12 @@ def _patch_player_name_formatter():
                     result.playerName, result.playerFakeName,
                     result.clanAbbrev, result.regionCode, result.vehicleName)
         except Exception:
-            _logger.exception('SpotCircleMod: failed to inject marker')
+            _logger.exception('SpotMeter: failed to inject marker')
         return result
 
     Formatter.format = patched_format
     _FORMATTER_PATCHED = True
-    _logger.info('SpotCircleMod: PlayerFullNameFormatter hooked for marker')
+    _logger.info('SpotMeter: PlayerFullNameFormatter hooked for marker')
 
 
 def _install_reload_hotkey():
@@ -928,7 +934,7 @@ def _install_reload_hotkey():
         import Keys
         from gui import InputHandler
     except ImportError:
-        _logger.info('SpotCircleMod: hotkey support unavailable, edits to config require battle restart')
+        _logger.info('SpotMeter: hotkey support unavailable, edits to config require battle restart')
         return
 
     bindings = []
@@ -953,7 +959,7 @@ def _install_reload_hotkey():
         key_id = getattr(Keys, key_name, None)
         if key_id is None:
             _logger.warning(
-                'SpotCircleMod: hotkey for %s = %r not found in Keys module. '
+                'SpotMeter: hotkey for %s = %r not found in Keys module. '
                 'Common names: KEY_F1..F12, KEY_PGUP, KEY_PGDN, KEY_HOME, '
                 'KEY_END, KEY_INSERT, KEY_DELETE.', cfg_key, _CFG.get(cfg_key))
             return
@@ -975,7 +981,7 @@ def _install_reload_hotkey():
         _bind('overlayPrintNowKey', _print_now, 'overlay-print')
 
     if not bindings:
-        _logger.info('SpotCircleMod: no hotkeys registered')
+        _logger.info('SpotMeter: no hotkeys registered')
         return
 
     def _on_key(event):
@@ -987,12 +993,12 @@ def _install_reload_hotkey():
                 try:
                     action()
                 except Exception:
-                    _logger.exception('SpotCircleMod: hotkey %s failed', label)
+                    _logger.exception('SpotMeter: hotkey %s failed', label)
                 return
 
     try:
         InputHandler.g_instance.onKeyDown += _on_key
         names = ', '.join('%s=%s' % (label, name) for _, _, label, name in bindings)
-        _logger.info('SpotCircleMod: hotkeys bound (%s)', names)
+        _logger.info('SpotMeter: hotkeys bound (%s)', names)
     except Exception:
-        _logger.exception('SpotCircleMod: cannot bind hotkeys')
+        _logger.exception('SpotMeter: cannot bind hotkeys')

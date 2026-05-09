@@ -1,4 +1,4 @@
-# WoT Spot Circle Mod
+# SpotMeter — WoT minimap mod
 
 Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój czołg może zostać zauważony przez przeciwnika.
 
@@ -33,14 +33,16 @@ spot_distance ∈ [50 m, 445 m]
 
 ## Instalacja
 
-1. `build/mod_spot_circle.pyc` →  
-   `<WoT>/res_mods/2.2.1.2/scripts/client/gui/mods/mod_spot_circle.pyc`
-2. `src/wot_spot_mod.json` →  
-   `<WoT>/mods/configs/wot_spot_mod.json`
+1. `build/mod_spotmeter.pyc` →  
+   `<WoT>/res_mods/2.2.1.2/scripts/client/gui/mods/mod_spotmeter.pyc`
+2. `src/spotmeter.json` →  
+   `<WoT>/mods/configs/spotmeter.json`
 
 Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`). Po patchu gry trzeba zwykle przekompilować i wrzucić do nowej wersji `res_mods/<wersja>/...`.
 
-## Konfiguracja (`wot_spot_mod.json`)
+> **Migracja z `wot_spot_mod`:** loader nadal akceptuje stare ścieżki configu (`wot_spot_mod.json` itp.) jako fallback, ale plik moda przy nowej nazwie to `mod_spotmeter.pyc` — usuń stary `mod_spot_circle.pyc` żeby nie ładowały się obie kopie naraz.
+
+## Konfiguracja (`spotmeter.json`)
 
 | pole | default | opis |
 |---|---|---|
@@ -113,7 +115,7 @@ W bitwie naciśnij `F8` (lub klawisz z `reloadKey`) — config wczytuje się pon
 
 ## Co technicznie robi mod
 
-1. Loader gry (`scripts/client/gui/mods/__init__.py`) ładuje moduł `mod_spot_circle`.
+1. Loader gry (`scripts/client/gui/mods/__init__.py`) ładuje moduł `mod_spotmeter`.
 2. Monkey-patchuje `PersonalEntriesPlugin._invalidateMarkup` z `gui/Scaleform/daapi/view/battle/shared/minimap/plugins.py`.
 3. Tworzy **drugi** entry typu `VIEW_RANGE_CIRCLES` (silnik nie limituje liczby; każdy ma własny ID) i steruje nim niezależnie od Twoich istniejących okręgów.
 4. Co `tickInterval` sekund:
@@ -209,7 +211,7 @@ Worst-case "tryhard light" stos (rations + vents + BIA + Recon + SitAware): `1.1
 
 Lornetka jest osobnym toggle (Numpad 7, `pickerAssumeStereoscope`) — jeśli **wykryta w descriptorze przeciwnika** i toggle ON, mod aplikuje czynnik z descriptora (`circularVisionRadiusFactor.getActiveValue(level)`, typowo ×1.25 bazowa).
 
-Podczas bitwy widać aktywne flagi w logu (`python.log` → `SpotCircleMod: picker -> RhmPzW VR=587m [+rations +bia +recon] | stereo=on`).
+Podczas bitwy widać aktywne flagi w logu (`python.log` → `SpotMeter: picker -> RhmPzW VR=587m [+rations +bia +recon] | stereo=on`).
 
 #### Wizualny marker
 Hook na `PlayerFullNameFormatter.format` wstrzykuje konfigurowalny prefix (`pickerMarker`, default `'● '`) przed nazwę gracza dla wybranego czołgu. **Caveat:** classic players panel (top-right) nie udostępnia API do natychmiastowej zmiany wyświetlanej nazwy — marker pojawia się przy najbliższym naturalnym redraw'ie wiersza (zmiana HP, śmierć, otwarcie pełnego panelu Tab). Kliknij Tab dla pełnej listy ze świeżą formatą.
@@ -246,7 +248,7 @@ Wymaga Python 2.7 (zainstalowany w conda env `py27`).
 
 ```sh
 cd src
-"C:/Users/23120/miniforge3/envs/py27/python.exe" -c "import py_compile; py_compile.compile('mod_spot_circle.py', cfile='../build/mod_spot_circle.pyc', doraise=True)"
-cp ../build/mod_spot_circle.pyc "D:/Gry/World_of_Tanks_EU/res_mods/2.2.1.2/scripts/client/gui/mods/"
-cp ./wot_spot_mod.json "D:/Gry/World_of_Tanks_EU/mods/configs/"
+"C:/Users/23120/miniforge3/envs/py27/python.exe" -c "import py_compile; py_compile.compile('mod_spotmeter.py', cfile='../build/mod_spotmeter.pyc', doraise=True)"
+cp ../build/mod_spotmeter.pyc "D:/Gry/World_of_Tanks_EU/res_mods/2.2.1.2/scripts/client/gui/mods/"
+cp ./spotmeter.json "D:/Gry/World_of_Tanks_EU/mods/configs/"
 ```

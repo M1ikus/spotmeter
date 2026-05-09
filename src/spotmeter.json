@@ -1,5 +1,5 @@
 {
-    "_comment": "Spot Circle minimap mod - configuration. Place this file at one of: mods/configs/wot_spot_mod.json | res_mods/configs/wot_spot_mod.json | mods/wot_spot_mod.json (relative to game root). Press the reloadKey in-battle to hot-reload, or restart battle to apply changes.",
+    "_comment": "SpotMeter mod - configuration. Place this file at one of: mods/configs/spotmeter.json | res_mods/configs/spotmeter.json | mods/spotmeter.json (relative to game root). Legacy paths (mods/configs/wot_spot_mod.json etc.) are still tried as a fallback after rename. Press the reloadKey in-battle to hot-reload, or restart battle to apply changes.",
 
     "enabled": true,
 
