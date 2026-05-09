@@ -1,0 +1,88 @@
+SpotMeter — instalacja
+=======================
+
+Wersja: 5.1.0
+Wersja gry WoT: 2.2.1.2  (sprawdz w ~/version.xml jesli inna)
+Pythona w grze: 2.7  (Wargaming nadal trzyma sie tej wersji)
+
+Co potrzeba:
+- spotmeter-v5.1.0.wotmod  (sam mod)
+- spotmeter.json           (opcjonalny config z domyslnymi ustawieniami)
+
+
+KROK 1: Wrzuc .wotmod do gry
+-----------------------------
+Skopiuj  spotmeter-v5.1.0.wotmod
+Do       <katalog gry>\mods\2.2.1.2\
+
+Przyklad sciezki:
+   D:\Gry\World_of_Tanks_EU\mods\2.2.1.2\spotmeter-v5.1.0.wotmod
+
+Jesli folder mods\2.2.1.2 nie istnieje, gra go zrobi po pierwszym uruchomieniu.
+
+Game auto-laduje wszystkie .wotmod z tego katalogu po starcie.
+
+
+KROK 2 (opcjonalny): Wrzuc config
+----------------------------------
+Domyslne ustawienia sa wbudowane w mod, ale jesli chcesz tweakowac kolory
+/ multiplikatory / klawisze:
+
+Skopiuj  spotmeter.json
+Do       <katalog gry>\mods\configs\spotmeter.json
+
+(folder mods\configs\ moze trzeba stworzyc recznie)
+
+Bez tego pliku mod uzyje sensownych domyslnych wartosci.
+
+
+KROK 3: Uruchom gre i wejdz w bitwe
+------------------------------------
+Po wejsciu w bitwe na minimapie pojawi sie dodatkowy okrag:
+- czerwony   = w ruchu
+- zielony    = w postoju
+- ciemnozielony = w postoju 3s+ (siatka maskujaca aktywna)
+- pomaranczowy  = przez ~3s po strzale (penalty za strzal)
+
+Hotkeys (numpad, NumLock musi byc WLACZONY):
+- 8 / 2     = poprzedni / nastepny przeciwnik (picker)
+- 0         = wyczysc picker
+- 1         = toggle racji bojowych
+- 3         = toggle wentylacji
+- 4 / 5 / 6 = toggle BIA / Recon / SitAware (perki zalogi)
+- 7         = toggle zalozenia o lornetce wroga
+- + / - / * = dyrektywy: optyka / wentylacja / lornetka
+- /         = dyrektywa "naturalne maskowanie" (twoja siatka)
+- 9         = toggle overlay tekstu nad minimapa
+- Enter     = pokaz aktualny spot teraz
+- .         = reload configu
+
+
+WERYFIKACJA / DEBUG
+-------------------
+Logi: <katalog gry>\python.log
+
+Po starcie gry powinien byc tam wpis:
+   SpotMeter: initialised (useOwnViewRange=True, fire=True, picker=True)
+
+Jesli nie ma — mod sie nie zaladowal. Najczestsze przyczyny:
+- zla wersja gry (sprawdz numer w sciezce mods\<wersja>\)
+- mod_spotmeter.pyc skompilowany pod inna wersje Pythona
+- konflikt z innym modem nadpisujacym ten sam plugin
+
+Wlacz "logCalcDetails": true w spotmeter.json zeby zobaczyc co liczy mod
+co tick — w logu beda linie:
+   SpotMeter: state=still camo=0.412 vr=445.0m radius=261.7m net=False shot=False
+
+
+JAK ODINSTALOWAC
+-----------------
+Usun spotmeter-v5.1.0.wotmod z mods\2.2.1.2\.
+(Plik configu w mods\configs\spotmeter.json mozna zostawic albo skasowac.)
+
+
+WSPARCIE / PROBLEMY
+-------------------
+GitHub: https://github.com/M1ikus/spotmeter
+- README: pelna dokumentacja, wzor obliczen, lista znanych ograniczen.
+- Issues: zglos blad albo prosbe o feature.

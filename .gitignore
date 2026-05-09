@@ -15,3 +15,6 @@ Thumbs.db
 
 # Local-only configs
 *.local.json
+
+# Built distribution artefacts (regenerated from src/ + packaging/)
+dist/

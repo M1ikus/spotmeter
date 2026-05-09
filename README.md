@@ -31,7 +31,17 @@ spot_distance ∈ [50 m, 445 m]
 - **Domyślnie (`useOwnViewRange: true`)** — bierzemy własny VR z `feedback.getVehicleAttrs()['circularVisionRadius']`. Serwer go syncuje (potwierdzone w `constants.py`: `VEHICLE_ATTRS_TO_SYNC = frozenset(['circularVisionRadius', ...])`). Ten VR ma już naliczoną załogę, optykę, lornę itd.
 - **`useOwnViewRange: false`** — używamy `enemyViewRangeFallback` (domyślnie 445 m = max w grze).
 
-## Instalacja
+## Instalacja (release / dla kolegi)
+
+Pobierz `spotmeter-v<wersja>.zip` z [GitHub Releases](https://github.com/M1ikus/spotmeter/releases). W środku:
+
+- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.2.1.2/`
+- `spotmeter.json` (opcjonalny) → wrzuć do `<WoT>/mods/configs/`
+- `INSTALL.txt` — szczegółowa instrukcja krok po kroku
+
+Gra automatycznie ładuje wszystkie `.wotmod` z `mods/<wersja>/` po starcie. Bez configu mod używa sensownych domyślnych wartości.
+
+## Instalacja (dev / własny build)
 
 1. `build/mod_spotmeter.pyc` →  
    `<WoT>/res_mods/2.2.1.2/scripts/client/gui/mods/mod_spotmeter.pyc`
@@ -269,11 +279,33 @@ Główny feedback: **zmiana rozmiaru okręgu na minimapie** — od razu po cyklu
 
 ## Dev / build
 
-Wymaga Python 2.7 (zainstalowany w conda env `py27`).
+Wymaga Python 2.7 (do kompilacji `.pyc` zgodnego z silnikiem WoT-a) i Python 3.x (do uruchomienia build skryptu).
+
+### Kompilacja .pyc
 
 ```sh
-cd src
-"C:/Users/23120/miniforge3/envs/py27/python.exe" -c "import py_compile; py_compile.compile('mod_spotmeter.py', cfile='../build/mod_spotmeter.pyc', doraise=True)"
-cp ../build/mod_spotmeter.pyc "D:/Gry/World_of_Tanks_EU/res_mods/2.2.1.2/scripts/client/gui/mods/"
-cp ./spotmeter.json "D:/Gry/World_of_Tanks_EU/mods/configs/"
+"C:/Users/23120/miniforge3/envs/py27/python.exe" -c "import py_compile; py_compile.compile('src/mod_spotmeter.py', cfile='build/mod_spotmeter.pyc', doraise=True)"
 ```
+
+### Pakowanie .wotmod (release)
+
+```sh
+py -3 packaging/build_wotmod.py
+```
+
+Output do `dist/`:
+- `spotmeter-v<wersja>.wotmod` — sam mod (do `mods/<wersja>/`)
+- `spotmeter.json` — domyślny config (do `mods/configs/`)
+- `INSTALL.txt` — instrukcja
+- `spotmeter-v<wersja>.zip` — wszystko w jednym do dystrybucji
+
+Wersja jest czytana z `packaging/meta.xml` — zaktualizuj tam przed kolejnym buildem.
+
+### Hot-test podczas devu
+
+```sh
+cp build/mod_spotmeter.pyc "D:/Gry/World_of_Tanks_EU/res_mods/2.2.1.2/scripts/client/gui/mods/"
+cp src/spotmeter.json "D:/Gry/World_of_Tanks_EU/mods/configs/"
+```
+
+`res_mods/` ma priorytet nad `mods/<wersja>/*.wotmod` więc lokalna zmiana w `res_mods/` wygrywa nad zainstalowaną wersją release'ową.
