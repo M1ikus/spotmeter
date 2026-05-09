@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.3.3'
+MOD_VERSION = '5.3.4'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -71,18 +71,17 @@ DEFAULT_CONFIG = {
     'pickerReconKey': 'KEY_NUMPAD5',
     'pickerSitAwareKey': 'KEY_NUMPAD6',
     'pickerStereoKey': 'KEY_NUMPAD7',
-    # Two-stage VR model: commander main role + Recon/SitAware perks.
-    # Values from scripts/item_defs/perks/perks.xml + VehicleDescrCrew.py.
-    # Verified: full stack (BIA+Rations+Recon+SitAware+deluxe optics)
-    # on a 340m base tank gives 435.83 m, matching in-game 436 m.
-    'pickerLevelBonusBIA': 5.0,             # brotherhood: +5 effective levels
-    'pickerLevelBonusVents': 5.0,           # basic vents: +5 effective levels
-    'pickerLevelBonusRations': 10.0,        # combat rations: +10 effective levels
-    'pickerCommanderBaseFactor': 0.57,
-    'pickerCommanderPerLevelFactor': 0.43,
-    'pickerReconPerLevel': 0.0002,          # commander_eagleEye perk: +2% at level 100
-    'pickerSitAwarePerLevel': 0.0003,       # radioman_finder perk: +3% at level 100
-    'pickerCommanderAdditionRatio': 10.0,   # COMMANDER_ADDITION_RATIO from tankmen.py
+    # Picker VR multipliers. Game-UI-matching additive model: baseline =
+    # base_vr * rations_factor (if rations on) or base_vr (off), and each
+    # other toggle adds baseline * (factor - 1). Default factors are
+    # calibrated against in-game observations on a 340m base tank with
+    # 100% trained crew, so the per-toggle bonus the picker computes
+    # matches what the hangar UI shows for the same setup.
+    'pickerVRBonusRations':  1.0430,   # vs pure base
+    'pickerVRBonusBIA':      1.0243,   # vs base+rations baseline
+    'pickerVRBonusVents':    1.0243,   # assumed (no direct measurement)
+    'pickerVRBonusRecon':    1.0277,
+    'pickerVRBonusSitAware': 1.0433,
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
@@ -355,63 +354,50 @@ def _picker_vr(plugin):
     except Exception:
         return None
     misc = getattr(descr, 'miscAttrs', None) or {}
-    factor = float(misc.get('circularVisionRadiusFactor', 1.0)) or 1.0
-    vr = base_vr * factor
+    # Game-UI-matching additive bonus model. baseline = base_vr if rations
+    # is off, base_vr * rations_factor if rations is on. Each other toggle
+    # adds a bonus = baseline * (factor - 1). All bonuses are summed to
+    # form the total VR.
+    #
+    # Mirrors WoT's hangar UI exactly: rations applies first to the base,
+    # then each remaining toggle's bonus is presented as a percentage of
+    # the (base + rations) state.
+    #
+    # Verified on user setup (340m base + BIA + Rations + Recon + SitAware
+    # + deluxe optics):
+    #     340 + 14.62 + 47.87 + 8.61 + 9.82 + 15.36 = 436.28 m
+    # vs in-game 436 m.
+    rations_factor = float(_CFG.get('pickerVRBonusRations', 1.043))
+    if _PICKER_TOGGLES.get('rations', False):
+        baseline = base_vr * rations_factor
+    else:
+        baseline = base_vr
+    final = baseline
+    # Optics bonus from descriptor factor (Coated Optics / deluxe / etc).
+    optics_factor = float(misc.get('circularVisionRadiusFactor', 1.0)) or 1.0
+    if optics_factor > 1.001:
+        final += baseline * (optics_factor - 1.0)
+    # Stereoscope bonus (auto from descriptor, gated by toggle).
     if _CFG.get('pickerAssumeStereoscope', True):
         _, stereo_factor = _scan_optional_devices(descr)
         if stereo_factor > 1.001:
-            vr *= stereo_factor
+            final += baseline * (stereo_factor - 1.0)
         elif _has_stereoscope_fallback(descr):
-            # Couldn't read the active value (e.g. category mismatch), but
-            # the device IS equipped. Fall back to a sensible constant.
-            vr *= float(_CFG.get('pickerStereoscopeFallback', 1.25))
-    # Two-stage model that mirrors VehicleDescrCrew.py + perks.xml
-    # exactly, with proper handling of commander vs non-commander
-    # crew efficiency:
-    #
-    #   stage 1 - commander main role
-    #     extra_levels = 5*BIA + 5*Vents + 10*Rations
-    #     commander_eff = (100 + extra_levels) / 100
-    #     commander_factor = 0.57 + 0.43 * commander_eff
-    #
-    #   stage 2 - VR perks contribute to cvrB
-    #     Recon (commander_eagleEye, commander perk):
-    #       cvrB += (100 + extra_levels) * 0.0002
-    #     SitAware (radioman_finder, NON-commander):
-    #       non_cmd_eff_level = 100 + extra + (100 + extra) / 10
-    #       cvrB += non_cmd_eff_level * 0.0003
-    #
-    #   final: VR_factor *= commander_factor * (1 + cvrB)
-    #
-    # Verified to give 435.83 m for 340m base + BIA + Rations + Recon
-    # + SitAware + deluxe optics (1.135), matching the user's reported
-    # in-game value of 436 m. Individual 'alone' tests produce slightly
-    # lower bonuses than the game shows (BIA -1.3m, Recon -3m,
-    # SitAware -4m on a 340m base) - the game has interactions during
-    # solo testing that the formula doesn't capture, but stacked
-    # accuracy is more important for the picker.
-    extra_levels = 0.0
-    if _PICKER_TOGGLES.get('bia', False):
-        extra_levels += float(_CFG.get('pickerLevelBonusBIA', 5.0))
-    if _PICKER_TOGGLES.get('vents', False):
-        extra_levels += float(_CFG.get('pickerLevelBonusVents', 5.0))
-    if _PICKER_TOGGLES.get('rations', False):
-        extra_levels += float(_CFG.get('pickerLevelBonusRations', 10.0))
-    base_level = 100.0 + extra_levels
-    commander_eff = base_level / 100.0
-    commander_factor = float(_CFG.get('pickerCommanderBaseFactor', 0.57)) \
-        + float(_CFG.get('pickerCommanderPerLevelFactor', 0.43)) * commander_eff
-    cvr_b = 0.0
-    if _PICKER_TOGGLES.get('recon', False):
-        cvr_b += base_level * float(_CFG.get('pickerReconPerLevel', 0.0002))
-    if _PICKER_TOGGLES.get('sitAware', False):
-        # Radioman receives commander/10 bonus on top of common increase
-        # (see VehicleDescrCrew.py:_calcLeverIncreaseForNonCommander).
-        non_cmd_eff_level = base_level + base_level / float(
-            _CFG.get('pickerCommanderAdditionRatio', 10.0))
-        cvr_b += non_cmd_eff_level * float(_CFG.get('pickerSitAwarePerLevel', 0.0003))
-    vr *= commander_factor * (1.0 + cvr_b)
-    return vr
+            final += baseline * (float(_CFG.get('pickerStereoscopeFallback', 1.25)) - 1.0)
+    # Manual toggles. Factors are baseline-relative (i.e. how the game
+    # shows them when measured against base+rations). Defaults from
+    # in-game observations on a 340m base tank.
+    perk_keys = (
+        ('bia',      'pickerVRBonusBIA',      1.0243),
+        ('vents',    'pickerVRBonusVents',    1.0243),
+        ('recon',    'pickerVRBonusRecon',    1.0277),
+        ('sitAware', 'pickerVRBonusSitAware', 1.0433),
+    )
+    for toggle_name, cfg_key, default_factor in perk_keys:
+        if _PICKER_TOGGLES.get(toggle_name, False):
+            factor = float(_CFG.get(cfg_key, default_factor))
+            final += baseline * (factor - 1.0)
+    return final
 
 
 def _has_stereoscope_fallback(descr):
