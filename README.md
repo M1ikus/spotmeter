@@ -62,6 +62,7 @@ Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`
 | `applyCamoNet` | `true` | uwzględnia siatkę maskującą po `camoNetActivateSec` w postoju |
 | `camoNetActivateSec` | `3.0` | czas postoju do aktywacji siatki (s) |
 | `camoNetFallbackBonus` | `0.05` | bonus jeśli odczyt z descriptora padnie |
+| `ownCamoNetDirectiveBonus` | `0.025` | bonus dyrektywy "naturalne maskowanie" (additive do siatki) |
 | `pickerAssumeStereoscope` | `true` | jeśli enemy ma lornetkę, zakłada że jest aktywna |
 | `pickerStereoscopeFallback` | `1.25` | mnożnik VR jeśli odczyt z descriptora padnie |
 | `overlayEnabled` | `true` | włącza overlay tekstu (chat-line nad minimapą) |
@@ -169,32 +170,53 @@ estimated_vr = base_vr * vr_factor
 
 ```
 +-----+-----+-----+-----+
-|     |  /  |  *  |  -  |
+|     |  /  |  *  |  -  |    /=dir-camo-net (own)  *=dir-stereo  -=dir-vents
 +-----+-----+-----+-----+
-|  7  |  8  |  9  |  +  |    7=stereo  8=prev   9=overlay-toggle
+|  7  |  8  |  9  |  +  |    7=stereo   8=prev    9=overlay-toggle  +=dir-optics
 +-----+-----+-----+-----+
-|  4  |  5  |  6  |     |    4=BIA     5=Recon  6=SitAware
+|  4  |  5  |  6  |     |    4=BIA      5=Recon   6=SitAware
 +-----+-----+-----+-----+
-|  1  |  2  |  3  |Enter|    1=rations 2=next   3=vents   Enter=print-now
+|  1  |  2  |  3  |Enter|    1=rations  2=next    3=vents   Enter=print-now
 +-----+-----+-----+-----+
-|  0  | .   |     |     |    0=clear-picker     .=reload-config
+|     0     |  .  |          0=clear-picker   .=reload-config
 +-----+-----+-----+-----+
 ```
 
-| akcja | klawisz domyślny | config |
+**Picker — wybór przeciwnika**
+| akcja | klawisz | config |
 |---|---|---|
 | następny przeciwnik | Numpad 2 | `pickerNextKey` |
 | poprzedni przeciwnik | Numpad 8 | `pickerPrevKey` |
 | wyczyść picker | Numpad 0 | `pickerClearKey` |
-| toggle racji (rations / cola / coffee) | Numpad 1 | `pickerRationsKey` |
-| toggle ulepszonej wentylacji (vents) | Numpad 3 | `pickerVentsKey` |
+
+**Załoga (perki)**
+| akcja | klawisz | config |
+|---|---|---|
 | toggle Brothers in Arms (BIA) | Numpad 4 | `pickerBIAKey` |
-| toggle perka Recon (commander) | Numpad 5 | `pickerReconKey` |
-| toggle perka Sit. Awareness (radio) | Numpad 6 | `pickerSitAwareKey` |
+| toggle Recon (commander) | Numpad 5 | `pickerReconKey` |
+| toggle Sit. Awareness (radio) | Numpad 6 | `pickerSitAwareKey` |
+
+**Equipment (sprzęt)**
+| akcja | klawisz | config |
+|---|---|---|
+| toggle racji (rations / cola / coffee) | Numpad 1 | `pickerRationsKey` |
+| toggle ulepszonej wentylacji | Numpad 3 | `pickerVentsKey` |
 | toggle założenia o lornetce | Numpad 7 | `pickerStereoKey` |
-| toggle overlay tekstu nad minimapą | Numpad 9 | `overlayToggleKey` |
-| pokaż aktualny spot dist. teraz | NumpadEnter | `overlayPrintNowKey` |
-| reload configu | NumpadPeriod (`.`) | `reloadKey` |
+
+**Dyrektywy** (każda jako osobny toggle)
+| akcja | klawisz | config |
+|---|---|---|
+| dyrektywa na optykę (enemy VR) | Numpad **+** | `pickerOpticsDirectiveKey` |
+| dyrektywa na wentylację (enemy VR) | Numpad **-** | `pickerVentsDirectiveKey` |
+| dyrektywa na lornetkę (enemy VR) | Numpad **\*** | `pickerStereoDirectiveKey` |
+| naturalne maskowanie / siatka (własne camo) | Numpad **/** | `ownCamoNetDirectiveKey` |
+
+**Overlay & reload**
+| akcja | klawisz | config |
+|---|---|---|
+| toggle overlay tekstu | Numpad 9 | `overlayToggleKey` |
+| print teraz | NumpadEnter | `overlayPrintNowKey` |
+| reload configu | NumpadPeriod | `reloadKey` |
 
 #### Założenia w obliczeniach
 Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo serwer tego nie wysyła). Każdy modyfikator ma własny toggle z osobnym multiplikatorem (multiplikatywne, mnożone razem przy stackowaniu):
@@ -206,8 +228,11 @@ Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo 
 | Brothers in Arms | Numpad 4 | `pickerVRBonusBIA` | `1.05` |
 | Recon (commander perk) | Numpad 5 | `pickerVRBonusRecon` | `1.02` |
 | Situational Awareness (radio perk) | Numpad 6 | `pickerVRBonusSitAware` | `1.03` |
+| Dyrektywa na optykę | Numpad **+** | `pickerVRBonusOpticsDirective` | `1.05` |
+| Dyrektywa na wentylację | Numpad **-** | `pickerVRBonusVentsDirective` | `1.025` |
+| Dyrektywa na lornetkę (tylko gdy enemy ma binos) | Numpad **\*** | `pickerVRBonusStereoDirective` | `1.05` |
 
-Worst-case "tryhard light" stos (rations + vents + BIA + Recon + SitAware): `1.10 × 1.05 × 1.05 × 1.02 × 1.03 ≈ 1.273` (+27% do VR).
+Worst-case "full tryhard" stos (rations + vents + BIA + Recon + SitAware + 3 dyrektywy + lornetka detected): `1.10 × 1.05 × 1.05 × 1.02 × 1.03 × 1.05 × 1.025 × 1.05 × 1.25 ≈ 1.84` (+84% do VR).
 
 Lornetka jest osobnym toggle (Numpad 7, `pickerAssumeStereoscope`) — jeśli **wykryta w descriptorze przeciwnika** i toggle ON, mod aplikuje czynnik z descriptora (`circularVisionRadiusFactor.getActiveValue(level)`, typowo ×1.25 bazowa).
 

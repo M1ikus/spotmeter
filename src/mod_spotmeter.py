@@ -51,6 +51,9 @@ DEFAULT_CONFIG = {
     'applyCamoNet': True,
     'camoNetActivateSec': 3.0,
     'camoNetFallbackBonus': 0.05,
+    # 'Naturalne maskowanie' directive on the player's own camo net
+    'ownCamoNetDirectiveKey': 'KEY_NUMPADSLASH',
+    'ownCamoNetDirectiveBonus': 0.025,
     'logCalcDetails': False,
     'reloadKey': 'KEY_NUMPADPERIOD',
     # v4/v5 picker - numpad layout
@@ -71,6 +74,15 @@ DEFAULT_CONFIG = {
     'pickerVRBonusBIA': 1.05,
     'pickerVRBonusRecon': 1.02,
     'pickerVRBonusSitAware': 1.03,
+    # Directive toggles for enemy VR (picker-only). Each is an extra
+    # multiplier on top of the matching equipment / perk if that toggle
+    # is also on. Defaults are conservative ~5% per directive.
+    'pickerOpticsDirectiveKey': 'KEY_ADD',
+    'pickerVentsDirectiveKey': 'KEY_NUMPADMINUS',
+    'pickerStereoDirectiveKey': 'KEY_NUMPADSTAR',
+    'pickerVRBonusOpticsDirective': 1.05,
+    'pickerVRBonusVentsDirective': 1.025,
+    'pickerVRBonusStereoDirective': 1.05,
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
@@ -97,7 +109,11 @@ _PICKER_TOGGLES = {
     'bia': False,
     'recon': False,
     'sitAware': False,
+    'opticsDirective': False,
+    'ventsDirective': False,
+    'stereoDirective': False,
 }
+_OWN_CAMO_NET_DIRECTIVE = False
 _OVERLAY_ENABLED_RUNTIME = True
 _LAST_OVERLAY_RADIUS = 0.0
 _LAST_OVERLAY_STATE = None
@@ -262,6 +278,10 @@ def _compute_camo(vehicle, is_moving, after_shot, camo_net_active):
         net_bonus, _ = _scan_optional_devices(descr)
         if net_bonus <= 0.0:
             net_bonus = float(_CFG.get('camoNetFallbackBonus', 0.0))
+        # 'Naturalne maskowanie' directive boosts the camo net bonus.
+        # Modeled as an extra additive on top of the device's own value.
+        if _OWN_CAMO_NET_DIRECTIVE:
+            net_bonus += float(_CFG.get('ownCamoNetDirectiveBonus', 0.0))
         additive += net_bonus
     camo = max(0.0, (base + additive) * mult_factor)
     if after_shot:
@@ -341,14 +361,17 @@ def _picker_vr(plugin):
     misc = getattr(descr, 'miscAttrs', None) or {}
     factor = float(misc.get('circularVisionRadiusFactor', 1.0)) or 1.0
     vr = base_vr * factor
+    has_stereo = False
     if _CFG.get('pickerAssumeStereoscope', True):
         _, stereo_factor = _scan_optional_devices(descr)
         if stereo_factor > 1.001:
             vr *= stereo_factor
+            has_stereo = True
         elif _has_stereoscope_fallback(descr):
             # Couldn't read the active value (e.g. category mismatch), but
             # the device IS equipped. Fall back to a sensible constant.
             vr *= float(_CFG.get('pickerStereoscopeFallback', 1.25))
+            has_stereo = True
     # Independent multipliers per consumable / perk. Multiplied together
     # when several toggles are on. Defaults are conservative best-guesses.
     perk_multiplier_keys = {
@@ -361,6 +384,17 @@ def _picker_vr(plugin):
     for toggle_name, cfg_key in perk_multiplier_keys.items():
         if _PICKER_TOGGLES.get(toggle_name, False):
             vr *= float(_CFG.get(cfg_key, 1.0))
+    # Directives are extra multiplicative bonuses on top of the matching
+    # equipment / perk. Optics & vents directives apply unconditionally
+    # (we cannot detect optics from the descriptor reliably and vents are
+    # a common assumption). Stereo directive only applies when stereoscope
+    # is detected on the enemy.
+    if _PICKER_TOGGLES.get('opticsDirective', False):
+        vr *= float(_CFG.get('pickerVRBonusOpticsDirective', 1.0))
+    if _PICKER_TOGGLES.get('ventsDirective', False):
+        vr *= float(_CFG.get('pickerVRBonusVentsDirective', 1.0))
+    if _PICKER_TOGGLES.get('stereoDirective', False) and has_stereo:
+        vr *= float(_CFG.get('pickerVRBonusStereoDirective', 1.0))
     return vr
 
 
@@ -721,9 +755,13 @@ def _active_perk_tags():
         'bia': 'BIA',
         'recon': 'recon',
         'sitAware': 'sitAware',
+        'opticsDirective': 'dir-optics',
+        'ventsDirective': 'dir-vents',
+        'stereoDirective': 'dir-stereo',
     }
-    return [tag_map[k] for k in ('rations', 'vents', 'bia', 'recon', 'sitAware')
-            if _PICKER_TOGGLES.get(k, False)]
+    order = ('rations', 'vents', 'bia', 'recon', 'sitAware',
+             'opticsDirective', 'ventsDirective', 'stereoDirective')
+    return [tag_map[k] for k in order if _PICKER_TOGGLES.get(k, False)]
 
 
 def _format_picker_summary(plugin):
@@ -790,6 +828,19 @@ def _toggle_stereoscope():
     _on_picker_changed(plugin, set())
     _post_chat_overlay(plugin, force=True,
                        prefix='stereoscope: %s' % ('ON' if _CFG['pickerAssumeStereoscope'] else 'OFF'))
+
+
+def _toggle_own_camo_net_directive():
+    global _OWN_CAMO_NET_DIRECTIVE
+    _OWN_CAMO_NET_DIRECTIVE = not _OWN_CAMO_NET_DIRECTIVE
+    plugin = _get_picker_plugin()
+    if plugin is not None:
+        try:
+            _tick(plugin)
+        except Exception:
+            _logger.exception('SpotMeter: tick after camo-net directive toggle failed')
+    _post_chat_overlay(plugin, force=True,
+                       prefix='naturalne maskowanie (siatka): %s' % ('ON' if _OWN_CAMO_NET_DIRECTIVE else 'OFF'))
 
 
 def _toggle_overlay():
@@ -976,6 +1027,13 @@ def _install_reload_hotkey():
         _bind('pickerReconKey', lambda: _toggle_perk('recon'), 'recon')
         _bind('pickerSitAwareKey', lambda: _toggle_perk('sitAware'), 'sitAware')
         _bind('pickerStereoKey', _toggle_stereoscope, 'stereoscope')
+        _bind('pickerOpticsDirectiveKey',
+              lambda: _toggle_perk('opticsDirective'), 'dir-optics')
+        _bind('pickerVentsDirectiveKey',
+              lambda: _toggle_perk('ventsDirective'), 'dir-vents')
+        _bind('pickerStereoDirectiveKey',
+              lambda: _toggle_perk('stereoDirective'), 'dir-stereo')
+    _bind('ownCamoNetDirectiveKey', _toggle_own_camo_net_directive, 'dir-camo-net')
     if _CFG.get('overlayEnabled', True):
         _bind('overlayToggleKey', _toggle_overlay, 'overlay-toggle')
         _bind('overlayPrintNowKey', _print_now, 'overlay-print')
