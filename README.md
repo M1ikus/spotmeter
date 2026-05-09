@@ -264,50 +264,38 @@ Model jest dwustopniowy — odzwierciedla dokładnie mechanikę z `VehicleDescrC
 | Improved Ventilation | Numpad 3 | `pickerLevelBonusVents` | `5.0` | +5 poziomów |
 | Combat Rations / cola | Numpad 1 | `pickerLevelBonusRations` | `10.0` | +10 poziomów |
 
-**Pełen wzór** (zgodny z `_processSkills` linia 301 i `_process_perk`):
+**Model multiplikatywny z empirycznymi wartościami:**
 
 ```
-extra_levels = 0
-  + 5  jeśli BIA      (brotherhood.crewLevelIncrease = 0.05 → +5)
-  + 5  jeśli Vents    (basic vents = +5 levels)
-  + 10 jeśli Rations  (combat rations = +10 levels)
-
-efficiency = (100 + extra_levels) / 100        # 1.0 ... 1.20
-
-# Etap 1: główna rola Commandera moduluje BAZOWE VR
-commander_factor = 0.57 + 0.43 × efficiency    # 1.0 ... 1.086
-
-# Etap 2: Recon/SitAware dodają do cvrB skalowanego eff. poziomem
-cvrB = (Recon-1) × efficiency + (SitAware-1) × efficiency
-
-VR_factor = commander_factor × (1 + cvrB)
+VR = base_VR
+  × descriptor_factor                   # auto z descriptora (Optyka, Stereoscope)
+  × (1.0253 jeśli BIA)
+  × (1.0253 jeśli Vents)
+  × (1.0430 jeśli Rations)
+  × (1.0288 jeśli Recon)
+  × (1.0451 jeśli SitAware)
 ```
 
-Wzór dwustopniowy bo w grze są **dwa niezależne efekty**:
-1. Commander qualification (główna rola, nie perk) — moduluje bazowe VR linijnie
-2. Recon i SitAware (osobne perki) — dodają do cvrB
+**Wartości skalibrowane empirycznie** z obserwacji w grze (czołg z bazowym VR 340m, w pełni wytrenowana załoga):
 
-**Tabela skutków** (zweryfikowana numerycznie):
+| toggle | wartość | bonus VR | weryfikacja na 340m |
+|---|---|---|---|
+| BIA | ×1.0253 | +2.53% | +8.6 m |
+| Vents | ×1.0253 | +2.53% | +8.6 m (zakładam, brak danych) |
+| Rations | ×1.0430 | +4.30% | +14.6 m ✓ |
+| Recon | ×1.0288 | +2.88% | +9.79 m ≈ +9.81 (gra) |
+| SitAware | ×1.0451 | +4.51% | +15.33 m ≈ +15.34 (gra) |
 
-| toggle | wzrost VR |
-|---|---|
-| BIA sam | **+2.15%** (przez commandera, +5 levels) |
-| Vents sam | **+2.15%** |
-| Rations sam | **+4.30%** (+10 levels) |
-| Recon sam | +2% |
-| SitAware sam | +3% |
-| Recon + SitAware | +5% |
-| BIA + Recon | +4.3% |
-| BIA + Vents + Rations | +8.6% (commander przy 120%) |
-| **Wszystkie 5 włączone** | **+15.1%** |
+Plus auto-detekcja z descriptora:
+- Coated Optics (basic): ×1.10
+- Coated Optics (deluxe / fioletowa): ×1.135
+- Coated Optics (bond / improved): może być ~×1.14 (tank-zależne)
+- Stereoscope (basic): ×1.25 (po 3s postoju)
 
-Plus auto-detekcja z descriptora (osobne mnożniki, MULTIPLIKATYWNE):
-- Coated Optics: ×1.10
-- Stereoscope: ×1.25 (po 3s postoju)
+**Tryhard stack** z fioletową optyką + wszystkimi 5 perkami:
+`1.135 × 1.0253 × 1.0253 × 1.0430 × 1.0288 × 1.0451 ≈ 1.345` → **+34.5%** do bazowego VR.
 
-**Pełny tryhard stack:** `1.151 × 1.10 × 1.25 ≈ 1.58` → **+58% do VR** z bazowego.
-
-> **v5.3.1 fix:** poprzedni v5.3.0 miał tylko Etap 2 (cvrB), pomijając commander_factor. Czyli BIA sam dawał 0% — co było niezgodne z grą bo główna rola Commandera CV jest też wzmacniana przez BIA/Vents/Rations. Teraz oba etapy są w modelu.
+> **v5.3.2 — pivot do empirycznego modelu:** v5.3.0 i v5.3.1 próbowały modelować mechanikę gry z `VehicleDescrCrew.py` (commander_factor 0.57 + 0.43×eff + cvrB perków). Niestety teoretyczny model nie do końca pasował do faktycznych wartości w grze (Recon i SitAware dawały więcej niż wyliczał wzór `factor_per_level × 100`). Bez możliwości debugowania w runtime postanowiłem wziąć empirycznie zmierzone wartości z gry jako defaulty. Klucze configu wracają do prostszej formy: `pickerVRBonusBIA/Vents/Rations` (a nie `pickerLevelBonusXxx`).
 
 > **v5.2 cleanup:** w wersjach v5.0–v5.1 były dodatkowe toggle dla dyrektyw enemy (`pickerOpticsDirective`, `pickerVentsDirective`, `pickerStereoDirective`) oraz dla dyrektywy siatki własnego czołgu (`ownCamoNetDirective`, "Naturalne maskowanie"). **Wszystkie usunięte:**
 > - Dyrektywy w slotach equipment (optics / vents / stereoscope) są już naliczone w `descr.miscAttrs.circularVisionRadiusFactor` przy budowie descriptora — manualny mnożnik podwójnie liczył.
