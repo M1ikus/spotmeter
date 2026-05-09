@@ -44,18 +44,46 @@ Po wejsciu w bitwe na minimapie pojawi sie dodatkowy okrag:
 - ciemnozielony = w postoju 3s+ (siatka maskujaca aktywna)
 - pomaranczowy  = przez ~3s po strzale (penalty za strzal)
 
-Hotkeys (numpad, NumLock musi byc WLACZONY):
-- 8 / 2     = poprzedni / nastepny przeciwnik (picker)
-- 0         = wyczysc picker
-- 1         = toggle racji bojowych
-- 3         = toggle wentylacji
-- 4 / 5 / 6 = toggle BIA / Recon / SitAware (perki zalogi)
-- 7         = toggle zalozenia o lornetce wroga
-- + / - / * = dyrektywy: optyka / wentylacja / lornetka
-- /         = dyrektywa "naturalne maskowanie" (twoja siatka)
-- 9         = toggle overlay tekstu nad minimapa
-- Enter     = pokaz aktualny spot teraz
-- .         = reload configu
+Hotkeys (numpad - dziala przy NumLock WL i WYL):
+
+  PICKER:
+    8 / 2  - poprzedni / nastepny przeciwnik
+    0      - wyczysc picker (wraca do useOwnViewRange / fallback)
+    7      - toggle zalozenia o lornetce (gdy ON i enemy ma binos: aplikuj +25%)
+
+  PERKI ZALOGI (manualne, bo serwer nie wysyla):
+    4      - toggle Brothers in Arms       (+5%)
+    5      - toggle Recon (commander)      (+2%)
+    6      - toggle Sit. Awareness (radio) (+3%)
+
+  EQUIPMENT (manualne dla rzeczy nieznanych klientowi):
+    1      - toggle Combat Rations / cola / kawa (+10%)
+    3      - toggle Improved Ventilation        (+5%)
+
+  WLASNY CZOLG:
+    /      - toggle dyrektywy "Naturalne maskowanie" (boost siatki kiedy aktywna)
+
+  OVERLAY / DIAG:
+    9      - toggle overlay tekstu (auto-update na zmiany)
+    Enter  - poka pelen status SpotMetera (state + picker + perki)
+    *      - dump descriptora wybranego enemy do python.log (diagnostyka)
+    .      - reload configu
+
+
+CO JEST AUTOMATYCZNE (bez togglowania)
+---------------------------------------
+- Coated Optics przeciwnika    - czytane z descriptora (auto +10% gdy zalozona)
+- Stereoscope przeciwnika      - czytane z descriptora (auto +25% gdy zalozona, toggle 7 wlacza/wylacza zalozenie)
+- Camo net na twoim czolgu     - czytane z descriptora, aktywowane po 3s postoju
+- Tryby siege (CS-63/S-Conq)   - opisuje silnik gry, mod uzywa wlasciwego descriptora
+- Kara za strzal               - hook na shoot, czytane invisibilityFactorAtShot z gun-u
+
+CO JEST MANUALNE (toggles na numpadzie)
+----------------------------------------
+- Skille zalogi (BIA/Recon/SitAware) - bo serwer nie wysyla skilli enemy
+- Consumablesy (rations/vents) - bo serwer nie wysyla aktywnego stanu
+- Dyrektywy w slotach equipment - mocno mieszaja sie z auto-detekcja, pomijamy
+- Naturalne maskowanie (twoja dyrektywa siatki) - bo nie umiemy wyliczyc po stronie klienta
 
 
 WERYFIKACJA / DEBUG
@@ -63,7 +91,7 @@ WERYFIKACJA / DEBUG
 Logi: <katalog gry>\python.log
 
 Po starcie gry powinien byc tam wpis:
-   SpotMeter: initialised (useOwnViewRange=True, fire=True, picker=True)
+   SpotMeter: initialised (version=5.2.0, ...)
 
 Jesli nie ma — mod sie nie zaladowal. Najczestsze przyczyny:
 - zla wersja gry (sprawdz numer w sciezce mods\<wersja>\)

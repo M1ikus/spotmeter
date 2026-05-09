@@ -1,9 +1,9 @@
 {
-    "_comment": "SpotMeter mod - configuration. Place this file at one of: mods/configs/spotmeter.json | res_mods/configs/spotmeter.json | mods/spotmeter.json (relative to game root). Legacy paths (mods/configs/wot_spot_mod.json etc.) are still tried as a fallback after rename. Press the reloadKey in-battle to hot-reload, or restart battle to apply changes.",
+    "_comment": "SpotMeter mod - configuration. Place at <WoT>/mods/configs/spotmeter.json (or one of the legacy paths). NumLock-on, NumpadPeriod (or Delete) reloads this file in-battle.",
 
     "enabled": true,
 
-    "_comment_view_mode": "If true, use the player's own view range as the assumed enemy VR. If false, use enemyViewRangeFallback. VR above 445m is allowed and gives buffer against camo, even though physical spotting caps at 445m.",
+    "_comment_view_mode": "If true (default), use the player's own view range as the assumed enemy VR. If false, use enemyViewRangeFallback. Picker (when active) overrides both.",
     "useOwnViewRange": true,
     "enemyViewRangeFallback": 445.0,
 
@@ -17,22 +17,22 @@
     "colorCamoNet": 2263842,
     "alpha": 70,
 
-    "_comment_perf": "How often to recompute (s), and the speed (m/s) above which counts as moving.",
+    "_comment_perf": "How often to recompute (s) and the speed (m/s) above which counts as moving.",
     "tickInterval": 0.2,
     "movingSpeedThreshold": 0.5,
 
-    "_comment_fire": "After firing, camo *= invisibilityFactorAtShot for fireRevealDuration seconds.",
+    "_comment_fire": "After firing: camo *= invisibilityFactorAtShot for fireRevealDuration s.",
     "applyFirePenalty": true,
     "fireRevealDuration": 3.0,
 
-    "_comment_camo_net": "Camo net activates after camoNetActivateSec of NOT MOVING and adds invisibilityBonus from descriptor. The 'Naturalne maskowanie' (camo net) directive is a manual toggle on Numpad / by default - when on, ownCamoNetDirectiveBonus (0.025 = +2.5%) is added to the camo net's contribution while it's active.",
+    "_comment_camo_net": "Camo net activates after camoNetActivateSec of NOT MOVING and adds the descriptor's invisibilityBonus. ownCamoNetDirective ('Naturalne maskowanie' directive on Numpad / by default) adds an extra additive when on.",
     "applyCamoNet": true,
     "camoNetActivateSec": 3.0,
     "camoNetFallbackBonus": 0.05,
     "ownCamoNetDirectiveKey": "KEY_NUMPADSLASH",
     "ownCamoNetDirectiveBonus": 0.025,
 
-    "_comment_picker_layout": "Hotkeys are Keys.* names from scripts/client/Keys.py. Default layout uses the numpad: 8=prev, 2=next, 0=clear. Per-perk row: 1=rations, 3=vents, 4=BIA, 5=Recon, 6=SitAware, 7=stereoscope. Operators row (directives): +=optics dir, -=vents dir, *=stereo dir, /=camo-net dir. Overlay: 9=toggle, NumpadEnter=print now, NumpadPeriod=reload config.",
+    "_comment_picker_layout": "Picker hotkeys (numpad, NumLock either way). Picker reads the enemy's full vehicle descriptor from server, including hull/turret/gun/optics/stereoscope. Crew skills, consumables and vents are NOT transmitted - manual toggles for those.",
     "pickerEnabled": true,
     "pickerNextKey": "KEY_NUMPAD2",
     "pickerPrevKey": "KEY_NUMPAD8",
@@ -43,26 +43,20 @@
     "pickerReconKey": "KEY_NUMPAD5",
     "pickerSitAwareKey": "KEY_NUMPAD6",
     "pickerStereoKey": "KEY_NUMPAD7",
+    "pickerDiagDumpKey": "KEY_NUMPADSTAR",
 
-    "_comment_picker_bonuses": "Per-perk multipliers, applied to the picked enemy's VR when toggle is on. Multiplied together when stacked. Conservative defaults; tune to match expected enemy loadouts. Rations 1.10 (combat rations/cola/coffee +10%), Vents 1.05 (improved ventilation +5%), BIA 1.05 (Brothers in Arms +5%), Recon 1.02 (commander Recon perk ~+2%), SitAware 1.03 (radio Sit. Awareness perk ~+3%).",
+    "_comment_picker_bonuses": "Manual multipliers per consumable / perk. Multiplied together. Conservative defaults.",
     "pickerVRBonusRations": 1.10,
     "pickerVRBonusVents": 1.05,
     "pickerVRBonusBIA": 1.05,
     "pickerVRBonusRecon": 1.02,
     "pickerVRBonusSitAware": 1.03,
-    "_comment_picker_directives": "Directive (enhancement) toggles. WoT 2.x stores directives as 'enhancements' on the descriptor; the server may or may not transmit them for enemy vehicles, so we expose them as manual toggles. Each multiplier is applied on top of its matching equipment / perk. Optics directive ~+5% to the optics factor. Vents directive ~+2.5% (boosts crew skill, smaller VR effect). Stereo directive ~+5%, only applied when the enemy actually has a Stereoscope equipped. Camo net directive ('Naturalne maskowanie') see _comment_camo_net.",
-    "pickerOpticsDirectiveKey": "KEY_ADD",
-    "pickerVentsDirectiveKey": "KEY_NUMPADMINUS",
-    "pickerStereoDirectiveKey": "KEY_NUMPADSTAR",
-    "pickerVRBonusOpticsDirective": 1.05,
-    "pickerVRBonusVentsDirective": 1.025,
-    "pickerVRBonusStereoDirective": 1.05,
     "pickerAssumeStereoscope": true,
     "pickerStereoscopeFallback": 1.25,
     "pickerMarker": "● ",
     "pickerIncludeDeadEnemies": false,
 
-    "_comment_overlay": "Overlay posts a chat-line with the current spot distance to the in-battle message feed (above the minimap). overlayShowOnTickChange=true posts automatically when the radius changes by overlayMinRadiusDelta or the state changes. NumpadEnter prints the current value on demand. NumpadPeriod hot-reloads the config.",
+    "_comment_overlay": "Overlay posts a chat-line with the current spot to the in-battle message feed (above minimap). NumpadEnter shows full status snapshot (all toggles + computed values). Numpad * (pickerDiagDumpKey) dumps the picked enemy's full descriptor to python.log for diagnostics.",
     "overlayEnabled": true,
     "overlayToggleKey": "KEY_NUMPAD9",
     "overlayShowOnTickChange": true,
@@ -70,6 +64,6 @@
     "overlayPrintNowKey": "KEY_NUMPADENTER",
     "reloadKey": "KEY_NUMPADPERIOD",
 
-    "_comment_debug": "Set true to log camo/radius/state each tick to python.log.",
+    "_comment_debug": "logCalcDetails=true logs camo/radius/state each tick to python.log.",
     "logCalcDetails": false
 }

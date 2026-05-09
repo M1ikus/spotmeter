@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.1.4'
+MOD_VERSION = '5.2.0'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -74,25 +74,23 @@ DEFAULT_CONFIG = {
     'pickerReconKey': 'KEY_NUMPAD5',
     'pickerSitAwareKey': 'KEY_NUMPAD6',
     'pickerStereoKey': 'KEY_NUMPAD7',
-    # Per-perk multipliers (independent, multiplied together when stacked)
+    # Per-perk multipliers (independent, multiplied together when stacked).
+    # All five represent things the server does NOT transmit for enemies
+    # (crew skill levels, active consumables, vents) so they're manual
+    # toggles. Optics, optics-directive, stereoscope-directive and the
+    # stereoscope's own factor are all already baked into the descriptor
+    # via miscAttrs.circularVisionRadiusFactor + optionalDevices, so we
+    # don't expose toggles for them - they're auto-applied.
     'pickerVRBonusRations': 1.10,
     'pickerVRBonusVents': 1.05,
     'pickerVRBonusBIA': 1.05,
     'pickerVRBonusRecon': 1.02,
     'pickerVRBonusSitAware': 1.03,
-    # Directive toggles for enemy VR (picker-only). Each is an extra
-    # multiplier on top of the matching equipment / perk if that toggle
-    # is also on. Defaults are conservative ~5% per directive.
-    'pickerOpticsDirectiveKey': 'KEY_ADD',
-    'pickerVentsDirectiveKey': 'KEY_NUMPADMINUS',
-    'pickerStereoDirectiveKey': 'KEY_NUMPADSTAR',
-    'pickerVRBonusOpticsDirective': 1.05,
-    'pickerVRBonusVentsDirective': 1.025,
-    'pickerVRBonusStereoDirective': 1.05,
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
     'pickerIncludeDeadEnemies': False,
+    'pickerDiagDumpKey': 'KEY_NUMPADSTAR',
     # v5 overlay
     'overlayEnabled': True,
     'overlayToggleKey': 'KEY_NUMPAD9',
@@ -115,9 +113,6 @@ _PICKER_TOGGLES = {
     'bia': False,
     'recon': False,
     'sitAware': False,
-    'opticsDirective': False,
-    'ventsDirective': False,
-    'stereoDirective': False,
 }
 _OWN_CAMO_NET_DIRECTIVE = False
 _OVERLAY_ENABLED_RUNTIME = True
@@ -370,19 +365,16 @@ def _picker_vr(plugin):
     misc = getattr(descr, 'miscAttrs', None) or {}
     factor = float(misc.get('circularVisionRadiusFactor', 1.0)) or 1.0
     vr = base_vr * factor
-    has_stereo = False
     if _CFG.get('pickerAssumeStereoscope', True):
         _, stereo_factor = _scan_optional_devices(descr)
         if stereo_factor > 1.001:
             vr *= stereo_factor
-            has_stereo = True
         elif _has_stereoscope_fallback(descr):
             # Couldn't read the active value (e.g. category mismatch), but
             # the device IS equipped. Fall back to a sensible constant.
             vr *= float(_CFG.get('pickerStereoscopeFallback', 1.25))
-            has_stereo = True
-    # Independent multipliers per consumable / perk. Multiplied together
-    # when several toggles are on. Defaults are conservative best-guesses.
+    # Independent multipliers per consumable / perk that the server does
+    # NOT transmit. Multiplied together when several toggles are on.
     perk_multiplier_keys = {
         'rations': 'pickerVRBonusRations',
         'vents': 'pickerVRBonusVents',
@@ -393,17 +385,6 @@ def _picker_vr(plugin):
     for toggle_name, cfg_key in perk_multiplier_keys.items():
         if _PICKER_TOGGLES.get(toggle_name, False):
             vr *= float(_CFG.get(cfg_key, 1.0))
-    # Directives are extra multiplicative bonuses on top of the matching
-    # equipment / perk. Optics & vents directives apply unconditionally
-    # (we cannot detect optics from the descriptor reliably and vents are
-    # a common assumption). Stereo directive only applies when stereoscope
-    # is detected on the enemy.
-    if _PICKER_TOGGLES.get('opticsDirective', False):
-        vr *= float(_CFG.get('pickerVRBonusOpticsDirective', 1.0))
-    if _PICKER_TOGGLES.get('ventsDirective', False):
-        vr *= float(_CFG.get('pickerVRBonusVentsDirective', 1.0))
-    if _PICKER_TOGGLES.get('stereoDirective', False) and has_stereo:
-        vr *= float(_CFG.get('pickerVRBonusStereoDirective', 1.0))
     return vr
 
 
@@ -764,13 +745,72 @@ def _active_perk_tags():
         'bia': 'BIA',
         'recon': 'recon',
         'sitAware': 'sitAware',
-        'opticsDirective': 'dir-optics',
-        'ventsDirective': 'dir-vents',
-        'stereoDirective': 'dir-stereo',
     }
-    order = ('rations', 'vents', 'bia', 'recon', 'sitAware',
-             'opticsDirective', 'ventsDirective', 'stereoDirective')
+    order = ('rations', 'vents', 'bia', 'recon', 'sitAware')
     return [tag_map[k] for k in order if _PICKER_TOGGLES.get(k, False)]
+
+
+def _dump_picker_descriptor(plugin):
+    """Log everything we read from the picked enemy's descriptor.
+
+    Use to verify what the server actually transmits about an enemy. Bound
+    to the diagnostic hotkey (pickerDiagDumpKey, default Numpad *).
+    """
+    if _PICKED_VID is None:
+        _logger.warning('SpotMeter: dump requested but no target picked')
+        _post_chat_overlay(plugin, force=True, prefix='diag: no picker target')
+        return
+    try:
+        arenaDP = plugin.sessionProvider.getArenaDP()
+    except Exception:
+        return
+    vinfo = arenaDP.getVehicleInfo(_PICKED_VID) if arenaDP else None
+    if vinfo is None or vinfo.vehicleType is None:
+        return
+    cd = getattr(vinfo.vehicleType, 'strCompactDescr', None)
+    if not cd:
+        return
+    try:
+        from items.vehicles import VehicleDescr
+        descr = VehicleDescr(compactDescr=cd)
+    except Exception:
+        _logger.exception('SpotMeter: dump - cannot decode descriptor')
+        return
+    short = vinfo.vehicleType.shortName or '?'
+    misc = getattr(descr, 'miscAttrs', None) or {}
+    devices = []
+    for d in (getattr(descr, 'optionalDevices', None) or ()):
+        if d is None:
+            continue
+        try:
+            devices.append('%s(%s)' % (type(d).__name__, getattr(d, 'name', '?')))
+        except Exception:
+            devices.append(type(d).__name__)
+    enhancements = []
+    for e in (getattr(descr, 'enhancements', None) or ()):
+        try:
+            enhancements.append('%s %s %s' % (e.name, e.op, e.value))
+        except Exception:
+            pass
+    _logger.warning(
+        'SpotMeter: descriptor dump for vid=%s name=%s\n'
+        '  turret.circularVisionRadius = %s\n'
+        '  miscAttrs.circularVisionRadiusFactor = %s\n'
+        '  miscAttrs.invisibilityFactor = %s\n'
+        '  miscAttrs.invisibilityBaseAdditive = %s\n'
+        '  miscAttrs.invisibilityAdditiveTerm = %s\n'
+        '  optionalDevices (%d): %s\n'
+        '  enhancements (%d): %s',
+        _PICKED_VID, short,
+        getattr(descr.turret, 'circularVisionRadius', None),
+        misc.get('circularVisionRadiusFactor'),
+        misc.get('invisibilityFactor'),
+        misc.get('invisibilityBaseAdditive'),
+        misc.get('invisibilityAdditiveTerm'),
+        len(devices), ', '.join(devices) or '(none)',
+        len(enhancements), ' | '.join(enhancements) or '(none)')
+    _post_chat_overlay(plugin, force=True,
+                       prefix='diag: dumped %s descriptor to python.log' % short)
 
 
 def _format_picker_summary(plugin):
@@ -861,8 +901,58 @@ def _toggle_overlay():
 
 
 def _print_now():
+    """Show a full status snapshot - all toggles, picker target, computed values."""
     plugin = _get_picker_plugin()
-    _post_chat_overlay(plugin, force=True)
+    if plugin is None:
+        return
+    veh = _get_player_vehicle()
+    if veh is None:
+        return
+    speed = 0.0
+    try:
+        speed = veh.getSpeed()
+    except Exception:
+        pass
+    is_moving = _is_player_vehicle_moving(speed)
+    after_shot = _is_after_shot()
+    camo_net_active = (not is_moving) and _is_camo_net_active(veh, is_moving) and _has_camo_net(veh)
+    state_name = _classify_state(is_moving, after_shot, camo_net_active)
+    camo = _compute_camo(veh, is_moving, after_shot, camo_net_active)
+    enemy_vr = _resolve_enemy_view_range(plugin)
+    radius = _compute_spot_radius(camo, enemy_vr)
+
+    lines = ['[SpotMeter] STATUS:']
+    state_label = {
+        'moving': 'ruch',
+        'still': 'postoj',
+        'stillNet': 'siatka aktywna',
+        'afterShot': 'po strzale',
+    }.get(state_name, state_name)
+    lines.append('  state=%s, camo=%.3f, vr=%.0fm -> spot=%.0fm'
+                 % (state_label, camo, enemy_vr, radius))
+    lines.append('  fire-penalty=%s, camo-net-dir=%s, overlay=%s'
+                 % ('ON' if after_shot else 'off',
+                    'ON' if _OWN_CAMO_NET_DIRECTIVE else 'off',
+                    'ON' if _OVERLAY_ENABLED_RUNTIME else 'off'))
+    if _PICKED_VID is None:
+        if _CFG.get('useOwnViewRange', True):
+            lines.append('  picker: NONE (using own VR)')
+        else:
+            lines.append('  picker: NONE (using fallback VR=%.0fm)'
+                         % _CFG.get('enemyViewRangeFallback', 445.0))
+    else:
+        summary = _format_picker_summary(plugin) or '?'
+        lines.append('  picker: %s' % summary)
+        tags = _active_perk_tags()
+        lines.append('  perks=%s, stereoAssumed=%s'
+                     % ('+'.join(tags) if tags else 'none',
+                        'ON' if _CFG.get('pickerAssumeStereoscope', True) else 'off'))
+    text = '\n'.join(lines)
+    try:
+        from messenger.MessengerEntry import g_instance as _messengerEntry
+        _messengerEntry.gui.addClientMessage(text, isCurrentPlayer=True)
+    except Exception:
+        _logger.exception('SpotMeter: failed to push status overlay')
 
 
 def _on_picker_changed(plugin, affected_vids):
@@ -1057,16 +1147,13 @@ def _install_reload_hotkey():
         _bind('pickerReconKey', lambda: _toggle_perk('recon'), 'recon')
         _bind('pickerSitAwareKey', lambda: _toggle_perk('sitAware'), 'sitAware')
         _bind('pickerStereoKey', _toggle_stereoscope, 'stereoscope')
-        _bind('pickerOpticsDirectiveKey',
-              lambda: _toggle_perk('opticsDirective'), 'dir-optics')
-        _bind('pickerVentsDirectiveKey',
-              lambda: _toggle_perk('ventsDirective'), 'dir-vents')
-        _bind('pickerStereoDirectiveKey',
-              lambda: _toggle_perk('stereoDirective'), 'dir-stereo')
+        _bind('pickerDiagDumpKey',
+              lambda: _dump_picker_descriptor(_get_picker_plugin()),
+              'diag-dump')
     _bind('ownCamoNetDirectiveKey', _toggle_own_camo_net_directive, 'dir-camo-net')
     if _CFG.get('overlayEnabled', True):
         _bind('overlayToggleKey', _toggle_overlay, 'overlay-toggle')
-        _bind('overlayPrintNowKey', _print_now, 'overlay-print')
+        _bind('overlayPrintNowKey', _print_now, 'status')
 
     if not bindings:
         _logger.warning('SpotMeter: no hotkeys registered (check Keys names in config)')

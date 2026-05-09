@@ -2,6 +2,27 @@
 
 Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój czołg może zostać zauważony przez przeciwnika.
 
+## Co automatycznie / co ręcznie
+
+Granica jest prosta: wszystko co jest w **descriptorze pojazdu** (transmitowanym przez serwer w `strCompactDescr`) bierzemy automatycznie. Reszta jest manualnym toggle.
+
+| Element | Auto / manualne | Skąd |
+|---|---|---|
+| Hull / turret / gun / engine / radio | ✅ auto | `descr.turret.circularVisionRadius` itd. |
+| Coated Optics przeciwnika | ✅ auto | `descr.miscAttrs.circularVisionRadiusFactor` (już z optyką) |
+| Stereoscope przeciwnika | ✅ auto + toggle Numpad 7 | `descr.optionalDevices` (Stereoscope class) |
+| Enhancements / dyrektywy w slotach equipment | ✅ auto | `descr.miscAttrs` jest rebuildowany po `installEnhancements` |
+| Camo net na **własnym** czołgu | ✅ auto, aktywne po 3s | `descr.optionalDevices` (CamouflageNet class) |
+| Tryby siege (CS-63 itp.) | ✅ auto | `CompositeVehicleDescriptor` w silniku |
+| Kara za strzał | ✅ auto | hook na `Avatar.shoot` + `miscAttrs.invisibilityFactorAtShot` |
+| Skille załogi (BIA/Recon/SitAware) | ❌ manual toggle | serwer nie wysyła |
+| Consumablesy (rations/vents) | ❌ manual toggle | serwer nie wysyła aktywnego stanu |
+| Dyrektywa "Naturalne maskowanie" (siatka) | ❌ manual toggle | nie wykrywamy stanu |
+
+W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + Stereoscope (jeśli są na tym czołgu). Toggle perków / consumables nakładasz tylko gdy zakładasz że enemy je faktycznie ma.
+
+
+
 - **Czerwony** w ruchu (camo `invMoving`)
 - **Zielony** w postoju (camo `invStill`)
 - **Ciemnozielony** w postoju 3s+ z aktywną siatką maskującą (camo `invStill + camoNetBonus`)
@@ -198,6 +219,7 @@ estimated_vr = base_vr * vr_factor
 | następny przeciwnik | Numpad 2 | `pickerNextKey` |
 | poprzedni przeciwnik | Numpad 8 | `pickerPrevKey` |
 | wyczyść picker | Numpad 0 | `pickerClearKey` |
+| toggle założenia o lornetce | Numpad 7 | `pickerStereoKey` |
 
 **Załoga (perki)**
 | akcja | klawisz | config |
@@ -206,26 +228,23 @@ estimated_vr = base_vr * vr_factor
 | toggle Recon (commander) | Numpad 5 | `pickerReconKey` |
 | toggle Sit. Awareness (radio) | Numpad 6 | `pickerSitAwareKey` |
 
-**Equipment (sprzęt)**
+**Equipment / consumables**
 | akcja | klawisz | config |
 |---|---|---|
-| toggle racji (rations / cola / coffee) | Numpad 1 | `pickerRationsKey` |
+| toggle racji bojowych | Numpad 1 | `pickerRationsKey` |
 | toggle ulepszonej wentylacji | Numpad 3 | `pickerVentsKey` |
-| toggle założenia o lornetce | Numpad 7 | `pickerStereoKey` |
 
-**Dyrektywy** (każda jako osobny toggle)
+**Własny czołg**
 | akcja | klawisz | config |
 |---|---|---|
-| dyrektywa na optykę (enemy VR) | Numpad **+** | `pickerOpticsDirectiveKey` |
-| dyrektywa na wentylację (enemy VR) | Numpad **-** | `pickerVentsDirectiveKey` |
-| dyrektywa na lornetkę (enemy VR) | Numpad **\*** | `pickerStereoDirectiveKey` |
-| naturalne maskowanie / siatka (własne camo) | Numpad **/** | `ownCamoNetDirectiveKey` |
+| dyrektywa "naturalne maskowanie" (siatka) | Numpad **/** | `ownCamoNetDirectiveKey` |
 
-**Overlay & reload**
+**Overlay / diag / reload**
 | akcja | klawisz | config |
 |---|---|---|
-| toggle overlay tekstu | Numpad 9 | `overlayToggleKey` |
-| print teraz | NumpadEnter | `overlayPrintNowKey` |
+| toggle overlay tekstu (auto) | Numpad 9 | `overlayToggleKey` |
+| pełen status snapshot | NumpadEnter | `overlayPrintNowKey` |
+| dump descriptor enemy do logu | Numpad **\*** | `pickerDiagDumpKey` |
 | reload configu | NumpadPeriod | `reloadKey` |
 
 #### Założenia w obliczeniach
@@ -238,13 +257,10 @@ Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo 
 | Brothers in Arms | Numpad 4 | `pickerVRBonusBIA` | `1.05` |
 | Recon (commander perk) | Numpad 5 | `pickerVRBonusRecon` | `1.02` |
 | Situational Awareness (radio perk) | Numpad 6 | `pickerVRBonusSitAware` | `1.03` |
-| Dyrektywa na optykę | Numpad **+** | `pickerVRBonusOpticsDirective` | `1.05` |
-| Dyrektywa na wentylację | Numpad **-** | `pickerVRBonusVentsDirective` | `1.025` |
-| Dyrektywa na lornetkę (tylko gdy enemy ma binos) | Numpad **\*** | `pickerVRBonusStereoDirective` | `1.05` |
 
-Worst-case "full tryhard" stos (rations + vents + BIA + Recon + SitAware + 3 dyrektywy + lornetka detected): `1.10 × 1.05 × 1.05 × 1.02 × 1.03 × 1.05 × 1.025 × 1.05 × 1.25 ≈ 1.84` (+84% do VR).
+Worst-case "full tryhard manual" stos (rations + vents + BIA + Recon + SitAware): `1.10 × 1.05 × 1.05 × 1.02 × 1.03 ≈ 1.27` (+27% do VR). Plus auto-detekcja Coated Optics i Stereoscope dochodzi z descriptora (już naliczone).
 
-Lornetka jest osobnym toggle (Numpad 7, `pickerAssumeStereoscope`) — jeśli **wykryta w descriptorze przeciwnika** i toggle ON, mod aplikuje czynnik z descriptora (`circularVisionRadiusFactor.getActiveValue(level)`, typowo ×1.25 bazowa).
+> **v5.2 cleanup:** wcześniejsze `pickerOpticsDirective` / `pickerVentsDirective` / `pickerStereoDirective` zostały usunięte. Były redundantne — descriptor już zawiera ich efekt w `miscAttrs.circularVisionRadiusFactor`, więc manualny mnożnik double-counted. Dyrektywy w slotach equipment są więc obsługiwane automatycznie przez auto-detekcję. Jedynie "Naturalne maskowanie" (dyrektywa siatki dla **własnego** czołgu) zostaje jako toggle — bo nie umiemy odczytać aktywności tej dyrektywy klientowo.
 
 Podczas bitwy widać aktywne flagi w logu (`python.log` → `SpotMeter: picker -> RhmPzW VR=587m [+rations +bia +recon] | stereo=on`).
 
