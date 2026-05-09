@@ -4,7 +4,7 @@ research/
 # Python
 __pycache__/
 *.py[co]
-!build/*.pyc
+!mods/*/build/*.pyc
 
 # OS / IDE
 .DS_Store
@@ -16,5 +16,5 @@ Thumbs.db
 # Local-only configs
 *.local.json
 
-# Built distribution artefacts (regenerated from src/ + packaging/)
-dist/
+# Built distribution artefacts (regenerated from mods/<name>/src + meta.xml)
+mods/*/dist/
