@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.3.0'
+MOD_VERSION = '5.3.1'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -97,6 +97,11 @@ DEFAULT_CONFIG = {
     'pickerLevelBonusBIA': 5.0,
     'pickerLevelBonusVents': 5.0,
     'pickerLevelBonusRations': 10.0,
+    # Commander main-role -> VR mapping. From _processSkills line 301:
+    # `factor = 0.57 + 0.43 * efficiency`. Tuneable in case Wargaming
+    # changes these values in a future patch.
+    'pickerCommanderBaseFactor': 0.57,
+    'pickerCommanderPerLevelFactor': 0.43,
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
@@ -379,11 +384,21 @@ def _picker_vr(plugin):
             # Couldn't read the active value (e.g. category mismatch), but
             # the device IS equipped. Fall back to a sensible constant.
             vr *= float(_CFG.get('pickerStereoscopeFallback', 1.25))
-    # Crew/perk model that mirrors VehicleDescrCrew.py:
-    #   crew_effective_level = 100 + sum(level bonuses from BIA/Vents/Rations)
-    #   cvrB = sum over active VR-perks of: (bonus_at_100% - 1) * level/100
-    #   VR_factor *= (1 + cvrB)
-    # So BIA/Vents/Rations only matter when at least one VR perk is active.
+    # Two-stage crew/perk model that mirrors VehicleDescrCrew.py exactly:
+    #
+    # 1) Commander main role: factor = 0.57 + 0.43 * efficiency
+    #    (line 301 of _processSkills). This is THE base VR multiplier.
+    #    Where efficiency = effective_level / 100. So a 100% commander
+    #    gives factor 1.0; 105% (with BIA) gives 1.0215; 120% (BIA+Vents+
+    #    Rations) gives 1.086. THIS IS WHY BIA ALONE BOOSTS VR even
+    #    without any 'VR perk' active - the commander's base
+    #    qualification is itself amplified.
+    #
+    # 2) Recon (commander_eagleEye) and SitAware (radioman_finder):
+    #    add to cvrB proportionally to effective level. Their multipliers
+    #    in config express the bonus at 100% skill (Recon=1.02 -> +2%).
+    #
+    # Final: VR_factor *= commander_factor * (1 + cvrB)
     extra_levels = 0.0
     if _PICKER_TOGGLES.get('bia', False):
         extra_levels += float(_CFG.get('pickerLevelBonusBIA', 5.0))
@@ -391,13 +406,15 @@ def _picker_vr(plugin):
         extra_levels += float(_CFG.get('pickerLevelBonusVents', 5.0))
     if _PICKER_TOGGLES.get('rations', False):
         extra_levels += float(_CFG.get('pickerLevelBonusRations', 10.0))
-    level_ratio = (100.0 + extra_levels) / 100.0
+    efficiency = (100.0 + extra_levels) / 100.0
+    commander_factor = float(_CFG.get('pickerCommanderBaseFactor', 0.57)) \
+        + float(_CFG.get('pickerCommanderPerLevelFactor', 0.43)) * efficiency
     cvr_b = 0.0
     if _PICKER_TOGGLES.get('recon', False):
-        cvr_b += (float(_CFG.get('pickerVRBonusRecon', 1.0)) - 1.0) * level_ratio
+        cvr_b += (float(_CFG.get('pickerVRBonusRecon', 1.0)) - 1.0) * efficiency
     if _PICKER_TOGGLES.get('sitAware', False):
-        cvr_b += (float(_CFG.get('pickerVRBonusSitAware', 1.0)) - 1.0) * level_ratio
-    vr *= (1.0 + cvr_b)
+        cvr_b += (float(_CFG.get('pickerVRBonusSitAware', 1.0)) - 1.0) * efficiency
+    vr *= commander_factor * (1.0 + cvr_b)
     return vr
 
 
