@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.4.0'
+MOD_VERSION = '5.4.1'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -69,18 +69,22 @@ DEFAULT_CONFIG = {
     'pickerCrewPerksKey':     'KEY_NUMPAD4',  # default ON  - BIA+Recon+SitAware bundled
     'pickerDirectivesKey':    'KEY_NUMPAD1',  # default OFF - boost auto-detected equipment
     'pickerFieldUpgradesKey': 'KEY_NUMPAD0',  # default OFF - VR-related field upgrades
-    # Picker VR multipliers. Game-UI-matching additive model: baseline =
-    # base_vr * rations_factor (if rations on) or base_vr (off), and each
-    # bonus adds baseline * (factor - 1). Crew perks bundle (BIA + Recon
-    # + SitAware) is the sum of their individual baseline-relative factors:
-    # 0.0243 + 0.0277 + 0.0433 = 0.0953 -> 1.0953. Field upgrades is a
-    # rough average for VR-affecting field upgrades (e.g. Improved Optics
-    # field upgrade adds ~5%). Directive multiplier (1.025) is the WoT
-    # 2.x equipment booster from battle_boosters.xml.
+    # Picker VR multipliers. Game-UI-matching additive model.
     'pickerVRBonusRations':       1.0430,
     'pickerVRBonusCrewPerks':     1.0953,
-    'pickerVRBonusFieldUpgrades': 1.0500,
     'pickerVRBonusDirective':     1.0250,
+    # Field upgrades on VR are tank-specific (BETA). Server doesn't
+    # transmit vehPostProgression for enemies, so this is a manual
+    # lookup. Cap at 445 m (VISIBILITY.MAX_RADIUS) is applied to the
+    # post-upgrade base VR before further bonuses. Tanks not in the
+    # map get 0 - safer default than guessing. User can extend via
+    # config JSON. Empirical values from user's hangar:
+    'pickerFieldUpgradeVR': {
+        'Rhm.-B. WT':   0.02,
+        'Obj. 907':     0.03,
+        'Jg.Pz. E 100': 0.02,
+    },
+    'pickerFieldUpgradeCap': 445.0,
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
@@ -354,13 +358,20 @@ def _picker_vr(plugin):
     misc = getattr(descr, 'miscAttrs', None) or {}
     # Game-UI-matching additive model.
     #
-    # baseline = base_vr * rations_factor (if Rations toggle ON, default ON)
-    #          or base_vr (if OFF)
-    #
-    # Each bonus adds baseline * (factor - 1) to final VR. Auto-detected
-    # equipment from descriptor (Coated Optics, Stereoscope) gets its
-    # factor from miscAttrs / optionalDevices. Directives (toggle Numpad
-    # 1, OFF default) multiply equipment factors by 1.025 each.
+    # 1. Apply field upgrade on base_vr (per-tank %, capped at 445 m).
+    #    Per WoT mechanics, the upgrade goes onto the BASE turret VR.
+    # 2. baseline = base_vr_effective * rations_factor (Rations ON, default)
+    #               or base_vr_effective (OFF)
+    # 3. Each bonus adds baseline * (factor - 1) to final VR.
+    #    - Optics, Stereoscope: auto-detected from descriptor.
+    #    - Crew perks (BIA + Recon + SitAware bundled): toggle Numpad 4.
+    #    - Directives: toggle Numpad 1 multiplies equipment factors by 1.025.
+    if _PICKER_TOGGLES.get('fieldUpgrades', False):
+        upgrade_pct = _lookup_field_upgrade_vr(
+            (vinfo.vehicleType.shortName or ''))
+        if upgrade_pct > 0:
+            cap = float(_CFG.get('pickerFieldUpgradeCap', 445.0))
+            base_vr = min(base_vr * (1.0 + upgrade_pct), cap)
     rations_factor = float(_CFG.get('pickerVRBonusRations', 1.043))
     if _PICKER_TOGGLES.get('rations', True):
         baseline = base_vr * rations_factor
@@ -392,12 +403,34 @@ def _picker_vr(plugin):
         perks_factor = float(_CFG.get('pickerVRBonusCrewPerks', 1.0953))
         final += baseline * (perks_factor - 1.0)
 
-    # Field upgrades bundle (any VR-affecting field upgrade).
-    if _PICKER_TOGGLES.get('fieldUpgrades', False):
-        upgrades_factor = float(_CFG.get('pickerVRBonusFieldUpgrades', 1.05))
-        final += baseline * (upgrades_factor - 1.0)
+    # Field upgrades on VR are applied to base_vr at the top of this
+    # function (with cap), so all subsequent baseline-relative bonuses
+    # already incorporate the upgrade. Nothing else to do here.
 
     return final
+
+
+def _lookup_field_upgrade_vr(short_name):
+    """Return field-upgrade VR % bonus for the given tank short name.
+
+    Returns 0 if tank not in the map (caller should treat as 'no
+    upgrade'). Lookup is exact first, then case-insensitive substring.
+    The table is in DEFAULT_CONFIG['pickerFieldUpgradeVR'] and can be
+    overridden / extended via spotmeter.json.
+    """
+    tank_map = _CFG.get('pickerFieldUpgradeVR') or {}
+    if not tank_map or not short_name:
+        return 0.0
+    if short_name in tank_map:
+        return float(tank_map[short_name])
+    short_lower = short_name.lower()
+    for key, val in tank_map.items():
+        try:
+            if key.lower() in short_lower or short_lower in key.lower():
+                return float(val)
+        except Exception:
+            continue
+    return 0.0
 
 
 def _has_stereoscope_fallback(descr):

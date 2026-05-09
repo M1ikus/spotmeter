@@ -10,21 +10,21 @@ Granica jest prosta: wszystko co jest w **descriptorze pojazdu** (transmitowanym
 |---|---|---|
 | Hull / turret / gun / engine / radio | ✅ auto | `descr.turret.circularVisionRadius` itd. |
 | Coated Optics przeciwnika | ✅ auto | `descr.miscAttrs.circularVisionRadiusFactor` (już z optyką) |
-| Stereoscope przeciwnika | ✅ auto + toggle Numpad 7 | `descr.optionalDevices` (Stereoscope class) |
-| Enhancements / dyrektywy w slotach equipment | ✅ auto | `descr.miscAttrs` jest rebuildowany po `installEnhancements` |
+| Stereoscope przeciwnika | ✅ auto | `descr.optionalDevices` (Stereoscope class) |
+| Enhancements / dyrektywy w slotach equipment | ❌ manual toggle (Numpad 1) | proste `*1.025` na auto-wykryte sprzęty |
 | **Ulepszenia polowe (post-progression) WŁASNE** | ✅ auto | `Vehicle.getDescr` woła `VehicleDescr(..., extData=self)` → `__applyExternalData` woła `installModifications` |
-| **Ulepszenia polowe ENEMY** | ❌ manual toggle (proxy via BIA/Recon/Vents) | `Vehicle.def` ma `vehPostProgression` jako `MY_VEHICLE` — server transmituje tylko właścicielowi |
+| **Ulepszenia polowe ENEMY (VR)** | ❌ manual toggle (Numpad 0) — **BETA** | per-czołg tabelka w configu (`pickerFieldUpgradeVR`); server transmituje `vehPostProgression` tylko właścicielowi |
 | Camo net na **własnym** czołgu | ✅ auto, aktywne po 3s | `descr.optionalDevices` (CamouflageNet class) |
 | Tryby siege (CS-63 itp.) | ✅ auto | `CompositeVehicleDescriptor` w silniku |
 | Kara za strzał | ✅ auto | hook na `Avatar.shoot` + `miscAttrs.invisibilityFactorAtShot` |
-| Skille załogi (BIA/Recon/SitAware) | ❌ manual toggle | serwer nie wysyła |
-| Consumablesy (rations/vents) | ❌ manual toggle | serwer nie wysyła aktywnego stanu |
+| Skille załogi (BIA+Recon+SitAware bundled) | ❌ manual toggle (Numpad 4) | serwer nie wysyła |
+| Combat Rations | ❌ manual toggle (Numpad 7) | serwer nie wysyła aktywnego stanu |
 
-W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + Stereoscope + dyrektywy w slotach (jeśli są na tym czołgu). Toggle perków / consumables nakładasz tylko gdy zakładasz że enemy je faktycznie ma. Ulepszenia polowe (field upgrades, post-progression) enemy są niewidoczne dla klienta — pokrywasz je przez stack BIA + Recon + SitAware + Vents (typowo +5–10% łącznie).
+W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + Stereoscope (jeśli są na tym czołgu — odczytane z descriptora). Toggle perków / consumables / dyrektyw / field-upgradów nakładasz tylko gdy zakładasz że enemy je faktycznie ma.
 
 > **Weryfikacja własnych field upgrades:** naciśnij **NumpadEnter** (status snapshot) — w chacie pojawi się m.in. linia `myVR: base=410m * factor=1.103` i `myCamo: base(...) + add=0.025`. Jeśli `factor>1.0` lub `add>0.0`, ulepszenia polowe są naliczone w descriptorze.
 
-
+## Kolory okręgu
 
 - **Czerwony** w ruchu (camo `invMoving`)
 - **Zielony** w postoju (camo `invStill`)
@@ -33,7 +33,7 @@ W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + 
 - Czołgi lekkie / niektóre kołowe — w XML mają `invMoving == invStill`, więc okrąg po prostu nie zmienia rozmiaru. Bez specjalnego case'u.
 - Czołgi z trybem siege (CS-63, S-Conqueror, italian heavies) — silnik gry sam podmienia descriptor (`CompositeVehicleDescriptor`) na właściwy tryb, więc mod automatycznie używa odpowiedniego camo dla obecnego trybu.
 
-## Wzór (zgodny z `scripts/common/items/utils.py:getInvisibility`)
+## Wzór camo (zgodny z `scripts/common/items/utils.py:getInvisibility`)
 
 ```
 camo = max(0, (base * vehicleFactor * crewBonus
@@ -52,8 +52,67 @@ spot_distance ∈ [50 m, 445 m]
 
 ## Skąd `enemyViewRange`?
 
-- **Domyślnie (`useOwnViewRange: true`)** — bierzemy własny VR z `feedback.getVehicleAttrs()['circularVisionRadius']`. Serwer go syncuje (potwierdzone w `constants.py`: `VEHICLE_ATTRS_TO_SYNC = frozenset(['circularVisionRadius', ...])`). Ten VR ma już naliczoną załogę, optykę, lornę itd.
-- **`useOwnViewRange: false`** — używamy `enemyViewRangeFallback` (domyślnie 445 m = max w grze).
+Trzy źródła w kolejności priorytetu:
+
+1. **Picker aktywny** — bierzemy descriptor wybranego enemy (`strCompactDescr`), liczymy bazowy VR z wieży, dodajemy auto-wykryte (Optics, Stereoscope) i opcjonalnie zaznaczone toggle (Rations, Crew Perks, Directives, Field Upgrades).
+2. **`useOwnViewRange: true`** (default, picker nieaktywny) — bierzemy własny VR z `feedback.getVehicleAttrs()['circularVisionRadius']`. Serwer go syncuje (`VEHICLE_ATTRS_TO_SYNC`). Ten VR ma już naliczoną załogę, optykę, lornę itd.
+3. **`useOwnViewRange: false`** — używamy `enemyViewRangeFallback` (domyślnie 445 m = max w grze).
+
+## Model picker VR (v5.3+, game-UI matching)
+
+Gra w UI dodaje wszystkie bonusy **addytywnie** wobec baseline `(base_VR × rations)`. Mod robi tak samo:
+
+```
+1. base_vr  ← descr.turret.circularVisionRadius
+2. JEŚLI Field Upgrades ON i czołg w tabelce:
+       base_vr ← min(base_vr * (1 + upgrade%), 445m)
+3. baseline ← base_vr * (Rations ? 1.0430 : 1.0)
+4. final    ← baseline
+   + baseline * (optics_factor * directive_factor - 1)        # auto z descriptora
+   + baseline * (stereo_factor * directive_factor - 1)        # auto z descriptora (jeśli ma)
+   + baseline * (CrewPerks_factor - 1)                        # toggle, ON default
+```
+
+**Mnożniki** (skalibrowane empirycznie wobec UI gry):
+
+| toggle | klawisz | config | default | znaczenie |
+|---|---|---|---|---|
+| Rations | Numpad 7 | `pickerVRBonusRations` | `1.0430` | **default ON** — racje +4.30% |
+| CrewPerks bundled (BIA+Recon+SitAware) | Numpad 4 | `pickerVRBonusCrewPerks` | `1.0953` | **default ON** — łącznie +9.53% |
+| Directives na sprzęt | Numpad 1 | `pickerVRBonusDirective` | `1.0250` | **default OFF** — mnożnik na auto-wykryte (optics, stereo) |
+| Field Upgrades VR | Numpad 0 | `pickerFieldUpgradeVR` | per-czołg tabelka | **default OFF** — **BETA** |
+
+Plus auto-detekcja z descriptora przeciwnika (zawsze, niezależnie od toggle):
+- Coated Optics (basic): ×1.10
+- Coated Optics (deluxe / fioletowa): ×1.135
+- Coated Optics (bond / improved): ~×1.14 (tank-zależne)
+- Stereoscope (basic): ×1.25 (założenie: zawsze aktywna; toggle przez `pickerAssumeStereoscope`)
+
+Verifikacja na czołgu z bazowym VR 340m, 100% załoga:
+- BIA alone: +8.6m ✓
+- Recon: +9.79m ≈ +9.81 (gra) ✓
+- SitAware: +15.33m ≈ +15.34 (gra) ✓
+- Rations: +14.6m ✓
+- Optyka deluxe: +47.87m (liczona z `(340+rations)*0.135`) ✓
+
+## Field Upgrades VR — BETA (v5.4.1)
+
+Server NIE wysyła `vehPostProgression` przeciwnika (jest to `MY_VEHICLE` scope). Mod używa **ręcznie utrzymywanej tabelki per-czołg** w configu:
+
+```json
+"pickerFieldUpgradeVR": {
+    "Rhm.-B. WT":   0.02,
+    "Obj. 907":     0.03,
+    "Jg.Pz. E 100": 0.02
+},
+"pickerFieldUpgradeCap": 445.0
+```
+
+**Mechanika:** po wciśnięciu Numpad 0 (toggle ON), mod szuka czołgu po `shortName` w tabelce. Jeśli znajdzie, mnoży `base_vr` przez `(1 + %)` z capem 445m, **przed** dodaniem rations/perks/directives. Czołgi spoza tabelki = 0% (toggle nie robi nic). EBR 105 nie ma w post-progression żadnego upgradeu na VR, więc go w tabelce nie ma.
+
+**Dopisuj własne wpisy** — sprawdź `shortName` przez Numpad `*` (dump descryptora wybranego enemy do `python.log`), znajdź wpis i dodaj do tabelki w `spotmeter.json`. Np. dla czołgu z +2.5% upgradeu na VR: `"NazwaCzolgu": 0.025`.
+
+> **Dlaczego BETA:** lista czołgów z VR upgrades w post-progression nie jest wyczerpująco udokumentowana publicznie, więc tabelka jest aktualnie bardzo skromna. Jeśli zauważysz zaniżony radius na konkretnym czołgu enemy, to znak że ma upgradeu na VR i trzeba go dopisać.
 
 ## Instalacja (release / dla kolegi)
 
@@ -65,29 +124,50 @@ Pobierz `spotmeter-v<wersja>.zip` z [GitHub Releases](https://github.com/M1ikus/
 
 Gra automatycznie ładuje wszystkie `.wotmod` z `mods/<wersja>/` po starcie. Bez configu mod używa sensownych domyślnych wartości.
 
-## Instalacja (dev / własny build)
+## Hotkeys (numpad layout)
 
-1. `build/mod_spotmeter.pyc` →  
-   `<WoT>/res_mods/2.2.1.2/scripts/client/gui/mods/mod_spotmeter.pyc`
-2. `src/spotmeter.json` →  
-   `<WoT>/mods/configs/spotmeter.json`
+```
++-----+-----+-----+-----+
+|     |  /  |  *  |  -  |    *=dump descryptor enemy do log
++-----+-----+-----+-----+
+|  7  |  8  |  9  |  +  |    7=rations  8=prev    9=overlay-toggle
++-----+-----+-----+-----+
+|  4  |  5  |  6  |     |    4=crew-perks  5=clear-picker
++-----+-----+-----+-----+
+|  1  |  2  |  3  |Enter|    1=directives  2=next  Enter=full-status
++-----+-----+-----+-----+
+|     0     |  .  |          0=field-upgrades   .=reload-config
++-----+-----+-----+-----+
+```
 
-Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`). Po patchu gry trzeba zwykle przekompilować i wrzucić do nowej wersji `res_mods/<wersja>/...`.
+| akcja | klawisz | config | default state |
+|---|---|---|---|
+| następny przeciwnik | Numpad 2 | `pickerNextKey` | — |
+| poprzedni przeciwnik | Numpad 8 | `pickerPrevKey` | — |
+| wyczyść picker | Numpad 5 | `pickerClearKey` | — |
+| toggle Rations | Numpad 7 | `pickerRationsKey` | **ON** |
+| toggle Crew Perks (BIA+Recon+SitAware) | Numpad 4 | `pickerCrewPerksKey` | **ON** |
+| toggle Directives na sprzęt | Numpad 1 | `pickerDirectivesKey` | OFF |
+| toggle Field Upgrades VR (BETA) | Numpad 0 | `pickerFieldUpgradesKey` | OFF |
+| toggle overlay tekstu (auto) | Numpad 9 | `overlayToggleKey` | (config) |
+| pełen status snapshot | NumpadEnter | `overlayPrintNowKey` | — |
+| dump descriptor enemy do logu | Numpad **\*** | `pickerDiagDumpKey` | — |
+| reload configu | NumpadPeriod | `reloadKey` | — |
 
-> **Migracja z `wot_spot_mod`:** loader nadal akceptuje stare ścieżki configu (`wot_spot_mod.json` itp.) jako fallback, ale plik moda przy nowej nazwie to `mod_spotmeter.pyc` — usuń stary `mod_spot_circle.pyc` żeby nie ładowały się obie kopie naraz.
+Działa przy **NumLock włączonym i wyłączonym**.
 
 ## Konfiguracja (`spotmeter.json`)
 
 | pole | default | opis |
 |---|---|---|
 | `enabled` | `true` | wyłącza moda bez odinstalowywania |
-| `useOwnViewRange` | `true` | używa Twojego VR jako założonego VR przeciwnika |
+| `useOwnViewRange` | `true` | używa Twojego VR jako założonego VR przeciwnika (gdy picker nieaktywny) |
 | `enemyViewRangeFallback` | `445.0` | VR używany kiedy `useOwnViewRange = false` |
-| `crewCamoBonus` | `1.05` | przybliżenie bonusu skilla Camouflage |
-| `colorMoving` | `0xFF6347` | kolor okręgu w ruchu |
-| `colorStill` | `0x32CD32` | kolor okręgu w postoju |
-| `colorAfterShot` | `0xFFA500` | kolor okręgu po strzale (przez `fireRevealDuration`) |
-| `colorCamoNet` | `0x228B22` | kolor okręgu gdy siatka aktywna (postój 3s+) |
+| `crewCamoBonus` | `1.05` | przybliżenie bonusu skilla Camouflage załogi |
+| `colorMoving` | `0xFF6347` | kolor okręgu w ruchu (tomato) |
+| `colorStill` | `0x32CD32` | kolor okręgu w postoju (lime) |
+| `colorAfterShot` | `0xFFA500` | kolor okręgu po strzale (orange) |
+| `colorCamoNet` | `0x228B22` | kolor okręgu gdy siatka aktywna (forestGreen) |
 | `alpha` | `70` | przezroczystość 0–100 |
 | `tickInterval` | `0.2` | jak często aktualizować (s) |
 | `movingSpeedThreshold` | `0.5` | prędkość uznawana za ruch (m/s) |
@@ -96,56 +176,56 @@ Ten mod był zbudowany pod **WoT 2.2.1.2** (Py 2.7 bytecode, magic `03 F3 0D 0A`
 | `applyCamoNet` | `true` | uwzględnia siatkę maskującą po `camoNetActivateSec` w postoju |
 | `camoNetActivateSec` | `3.0` | czas postoju do aktywacji siatki (s) |
 | `camoNetFallbackBonus` | `0.05` | bonus jeśli odczyt z descriptora padnie |
+| `pickerEnabled` | `true` | włącza picker przeciwnika |
+| `pickerVRBonusRations` | `1.0430` | mnożnik gdy toggle Rations ON |
+| `pickerVRBonusCrewPerks` | `1.0953` | mnożnik gdy toggle Crew Perks ON (BIA+Recon+SitAware bundled) |
+| `pickerVRBonusDirective` | `1.0250` | mnożnik na auto-wykryte sprzęty gdy toggle Directives ON |
+| `pickerFieldUpgradeVR` | per-tank dict | **BETA**, mapuje `shortName` → % VR upgrade |
+| `pickerFieldUpgradeCap` | `445.0` | cap na `base_vr` po zastosowaniu upgrade'u (m) |
 | `pickerAssumeStereoscope` | `true` | jeśli enemy ma lornetkę, zakłada że jest aktywna |
 | `pickerStereoscopeFallback` | `1.25` | mnożnik VR jeśli odczyt z descriptora padnie |
+| `pickerMarker` | `"● "` | prefix nazwy wybranego przeciwnika |
+| `pickerIncludeDeadEnemies` | `false` | czy uwzględniać martwych w cyklu |
 | `overlayEnabled` | `true` | włącza overlay tekstu (chat-line nad minimapą) |
 | `overlayShowOnTickChange` | `true` | automatycznie pokazuje przy istotnej zmianie radiusa |
 | `overlayMinRadiusDelta` | `15.0` | próg zmiany w m do auto-display |
-| `pickerEnabled` | `true` | włącza picker przeciwnika (PgUp/PgDn) |
 | `pickerNextKey` | `KEY_NUMPAD2` | następny przeciwnik |
 | `pickerPrevKey` | `KEY_NUMPAD8` | poprzedni przeciwnik |
-| `pickerClearKey` | `KEY_NUMPAD0` | wyczyść picker |
-| `pickerRationsKey` | `KEY_NUMPAD1` | toggle Combat Rations |
-| `pickerVentsKey` | `KEY_NUMPAD3` | toggle Improved Ventilation |
-| `pickerBIAKey` | `KEY_NUMPAD4` | toggle Brothers in Arms |
-| `pickerReconKey` | `KEY_NUMPAD5` | toggle Recon (commander) |
-| `pickerSitAwareKey` | `KEY_NUMPAD6` | toggle Sit. Awareness (radio) |
-| `pickerStereoKey` | `KEY_NUMPAD7` | toggle założenia o lornetce |
+| `pickerClearKey` | `KEY_NUMPAD5` | wyczyść picker |
+| `pickerRationsKey` | `KEY_NUMPAD7` | toggle Rations |
+| `pickerCrewPerksKey` | `KEY_NUMPAD4` | toggle Crew Perks (BIA+Recon+SitAware) |
+| `pickerDirectivesKey` | `KEY_NUMPAD1` | toggle Directives |
+| `pickerFieldUpgradesKey` | `KEY_NUMPAD0` | toggle Field Upgrades (BETA) |
+| `pickerDiagDumpKey` | `KEY_NUMPADSTAR` | dump enemy descriptor do `python.log` |
 | `overlayToggleKey` | `KEY_NUMPAD9` | toggle overlay tekstu |
-| `overlayPrintNowKey` | `KEY_NUMPADENTER` | pokaż aktualny spot teraz |
+| `overlayPrintNowKey` | `KEY_NUMPADENTER` | pokaż pełen status snapshot |
 | `reloadKey` | `KEY_NUMPADPERIOD` | reload configu |
-| `pickerVRBonusRations` | `1.10` | mnożnik gdy Rations ON |
-| `pickerVRBonusVents` | `1.05` | mnożnik gdy Vents ON |
-| `pickerVRBonusBIA` | `1.05` | mnożnik gdy BIA ON |
-| `pickerVRBonusRecon` | `1.02` | mnożnik gdy Recon ON |
-| `pickerVRBonusSitAware` | `1.03` | mnożnik gdy SitAware ON |
-| `pickerMarker` | `"● "` | prefix nazwy wybranego przeciwnika |
-| `pickerIncludeDeadEnemies` | `false` | czy uwzględniać martwych w cyklu |
 | `logCalcDetails` | `false` | wypisuje camo/radius/state do `python.log` |
 
 Nazwy klawiszy: nazwy z modułu `Keys` (np. `KEY_F8`, `KEY_F7`, `KEY_HOME`, `KEY_INSERT`). Pusty string = bez hotkeya.
 
 ## Co serwer faktycznie wysyła do klienta?
 
-Tak, sprawdziłem w zdekompilowanych plikach `scripts/common/constants.py` i `scripts/client/Avatar.py`:
+Sprawdziłem w zdekompilowanych plikach `scripts/common/constants.py` i `scripts/client/Avatar.py`:
 
-- **View range**: tak, `circularVisionRadius` (m) jest jawnie syncowany z serwerem (`VEHICLE_ATTRS_TO_SYNC`). Mamy go w `feedback.getVehicleAttrs()` w trakcie bitwy.
-- **Camouflage / invisibility**: NIE jest syncowane jako pojedyncza liczba. Klient liczy go sam z deskryptora pojazdu (`computeBaseInvisibility` + `getInvisibility` w `scripts/common/items/utils.py`). Wszystkie składniki potrzebne do tego (`type.invisibility`, `miscAttrs.invisibilityFactor`, `miscAttrs.invisibilityBaseAdditive`, `miscAttrs.invisibilityAdditiveTerm`, `miscAttrs.invisibilityMultFactor`) są w pełni dostępne klientowi z deskryptora czołgu — to nic niejawnego.
+- **View range własny**: tak, `circularVisionRadius` (m) jest jawnie syncowany z serwerem (`VEHICLE_ATTRS_TO_SYNC`). Mamy go w `feedback.getVehicleAttrs()` w trakcie bitwy.
+- **Camouflage / invisibility**: NIE jest syncowane jako pojedyncza liczba. Klient liczy go sam z deskryptora pojazdu (`computeBaseInvisibility` + `getInvisibility` w `scripts/common/items/utils.py`). Wszystkie składniki potrzebne do tego są w pełni dostępne klientowi z deskryptora czołgu.
+- **`strCompactDescr` przeciwnika**: tak, pełny binarny descriptor każdego pojazdu (`gui/battle_control/arena_info/arena_vos.py`). Po dekodowaniu mamy: hull/turret/gun/engine/radio, zainstalowany sprzęt (binokle, optyka, dyrektywy w slotach), camouflage skin/styl, tier/klasa/rola/max HP.
+- **`vehPostProgression` przeciwnika**: NIE — server-side tagged jako `MY_VEHICLE` w `Vehicle.def`. Ulepszenia polowe enemy są niewidoczne dla klienta. Stąd toggle Numpad 0 + ręczna tabelka.
+- **Skille załogi przeciwnika** (BIA, Recon, SitAware): NIE — stąd toggle Numpad 4.
+- **Aktywne consumables przeciwnika** (Rations): NIE — stąd toggle Numpad 7.
 
-Innymi słowy: mod nie odczytuje żadnej informacji do której nie miałby normalnie dostępu. Liczy tylko z Twojego czołgu i ze stałych z gry.
+Innymi słowy: mod nie odczytuje żadnej informacji do której nie miałby normalnie dostępu. Przy własnym czołgu liczy ze wszystkiego co dostarcza descriptor + sync. Przy enemy: descriptor + manualne toggle dla rzeczy server-private.
 
 ## Aspekt prawny / fair-play
 
 - **Mod jest legalny w świetle Wargaming Fair Play Policy.** WG od dawna toleruje (i zalicza do oficjalnych przykładów) okręgi widoczności na minimapie — patrz np. domyślne ustawienia gry `MINIMAP_VIEW_RANGE` / `MINIMAP_MAX_VIEW_RANGE` / `MINIMAP_MIN_SPOTTING_RANGE` (są to opcje wbudowane). XVM, Aslain's modpack i inne ogólnodostępne packi zawierają od lat funkcję "Spot Range Circle" — działa to dokładnie tak jak ten mod.
-- Zakazane są mody, które (a) pokazują pozycje przeciwników, których normalnie nie widzisz (np. tracery wyłączone, wallhack), (b) automatyzują celowanie / poruszanie się, (c) odczytują dane serwerowe, do których klient nie ma normalnie dostępu, (d) omijają płatne funkcje gry. Ten mod NIC z tej listy nie robi — pokazuje wyłącznie metryki dotyczące Twojego własnego czołgu (camo + VR), które w pełni pochodzą z deskryptora Twojego pojazdu.
-- Dla pewności: w Public Test / Sandbox czasem pojawiają się tymczasowe restrykcje moddingowe (zwłaszcza w turniejach). Na zwykłym serwerze losowych bitew okręgi widoczności są w porządku.
-
-Linki referencyjne (w razie wątpliwości warto sprawdzić aktualną wersję):  
-- [WG EU Fair Play Policy](https://eu.wargaming.net/support/en/products/wot/article/29104/) — kategoria "Allowed mods" obejmuje minimap improvements/markers.
+- Zakazane są mody, które (a) pokazują pozycje przeciwników, których normalnie nie widzisz, (b) automatyzują celowanie / poruszanie się, (c) odczytują dane serwerowe, do których klient nie ma normalnie dostępu, (d) omijają płatne funkcje gry. Ten mod NIC z tej listy nie robi.
+- Linki: [WG EU Fair Play Policy](https://eu.wargaming.net/support/en/products/wot/article/29104/) — kategoria "Allowed mods" obejmuje minimap improvements/markers.
 
 ## Hot-reload w bitwie
 
-W bitwie naciśnij `F8` (lub klawisz z `reloadKey`) — config wczytuje się ponownie i okrąg uwzględnia nowe wartości w czasie 1 ticka (0.2 s). Pozwala iterować nad kolorami / VR / `crewCamoBonus` bez zamykania bitwy.
+W bitwie naciśnij `NumpadPeriod` (lub klawisz z `reloadKey`) — config wczytuje się ponownie i okrąg uwzględnia nowe wartości w czasie 1 ticka (0.2 s). Pozwala iterować nad kolorami / VR / `crewCamoBonus` bez zamykania bitwy. Wymaga **NumLock ON**.
 
 ## Co technicznie robi mod
 
@@ -162,181 +242,52 @@ W bitwie naciśnij `F8` (lub klawisz z `reloadKey`) — config wczytuje się pon
 
 ## Roadmap
 
-### v5 — numpad layout, per-perk toggles, overlay text ✅
+### v5.4 — field upgrades BETA ✅
 
-- **Numpad-based hotkeys**: cały picker przeniesiony na klawiaturę numeryczną (8/2/0 dla pickera, 4/5/6 dla perków załogi, 1/3 dla rations/vents, 7 dla lornetki, 9 dla overlay, NumpadEnter dla print-now, NumpadPeriod dla reload).
-- **Perki rozdzielone na osobne toggle**: każdy modyfikator (Rations, Vents, BIA, Recon, Sit. Awareness) ma swój klawisz i konfigurowalny mnożnik. Przed v5 było tylko zbiorcze "+perks". Teraz można precyzyjnie odzwierciedlić znany stan przeciwnika (np. tylko Rations jeśli wiemy że jest light z colą ale bez perków).
-- **Overlay tekstu nad minimapą**: chat-line w battle-message-feed (obszar nad minimapą) z formatu `[SpotMod] Spot: 287 m (postoj, vs VR 445 m) | target: RhmPzW VR=587m [+rations +bia]`. Domyślnie pokazuje się przy istotnych zmianach radiusa (>15m delta) lub stanu (still↔moving↔afterShot). NumpadEnter wymusza print teraz, Numpad9 włącza/wyłącza auto-display.
+- **Numpad 0 toggle** = ulepszenia polowe na VR (BETA)
+- per-czołg tabelka `pickerFieldUpgradeVR` w configu (`shortName` → %)
+- pre-fill: Rhm.-B. WT (+2%), Obj. 907 (+3%), Jg.Pz. E 100 (+2%)
+- cap 445m
+- EBR 105 = brak (nie ma takiego upgradeu)
 
-Implementacja overlay'a używa `MessengerEntry.g_instance.gui.addClientMessage(text, isCurrentPlayer=True)` — to wbudowany kanał komunikatów klient-only (nie wysyłany na serwer). Wiadomości pojawiają się w tym samym miejscu co system messages od gry.
+### v5.3 — empiryczna kalibracja modelu ✅
+
+- Mnożniki dla rations/crew/directive zmierzone wobec UI gry (czołg z bazowym VR 340m)
+- Game-UI matching additive model: wszystko addytywne wobec `(base_vr × rations)` baseline
+- BIA+Recon+SitAware bundled w jeden toggle (nie da się ich w grze rozdzielić w UI VR)
+
+### v5 — numpad layout, redesigned toggles, overlay text ✅
+
+- Cały picker przeniesiony na klawiaturę numeryczną (działa NumLock ON i OFF)
+- 4 toggle'e dla VR enemy: Rations / Crew Perks bundle / Directives / Field Upgrades
+- Overlay tekstu nad minimapą (chat-line w battle-message-feed)
+- NumpadEnter — pełen status snapshot
+- Numpad `*` — dump descryptora enemy do `python.log`
+- NumpadPeriod — hot-reload configu
 
 ### v4.5 — binoculars in picker + camo net for own tank ✅
 
-Conditional optional devices uwzględnione zgodnie z `scripts/common/items/artefacts.py`:
-
-- **Stereoscope (lornetka)** w pickerze — gdy wykryta w `descr.optionalDevices`, automatycznie aplikuje czynnik `circularVisionRadiusFactor.getActiveValue(level)` (typowo `1.25` dla tier I, więcej dla improved/bond). Worst-case assumption: lorna jest zawsze aktywna (3s standstill check pomijamy bo nie wiemy kiedy enemy zaczął stać). Toggle przez `pickerAssumeStereoscope`.
-- **CamouflageNet (siatka)** dla własnego czołgu — silnik gry trackuje `_LAST_MOVEMENT_TIME`. Po `camoNetActivateSec` (default `3.0` s) bez ruchu siatka się aktywuje i bonus `invisibilityBonus` jest dodawany do `additive` w wzorze. Zgodnie z grą: strzał nie resetuje timera ruchu, tylko sam ruch resetuje. Kolor okręgu zmienia się na **ciemnozielony** w tym stanie.
-
-Kod sczytuje wartości z descriptora przez `device.defineActiveValueForSpecFactor(descr, 'invisibilityBonus', level)` / `device.circularVisionRadiusFactor.getActiveValue(level)` — czyli używamy DOKŁADNIE tych wartości, których używa gra. Fallback constants (`camoNetFallbackBonus=0.05`, `pickerStereoscopeFallback=1.25`) tylko jeśli odczyt descriptora padnie z jakiegoś powodu.
-
-### v3 — fire penalty + siege modes ✅
-
-- **Kara za strzał (firePenalty)** — hook na `PlayerAvatar.shoot()` i `shootDualGun()`. Przez `fireRevealDuration` (domyślnie 3 s) po strzale aplikujemy `camo *= invisibilityFactorAtShot` z descryptora działa. Okrąg w tym czasie świeci pomarańczowo (`colorAfterShot`).
-- **Tryby (CS-63, S-Conqueror, italian heavy, etc.)** — silnik gry obsługuje to automatycznie. `vehicle.typeDescriptor` jest `CompositeVehicleDescriptor`, który dynamicznie deleguje atrybuty do właściwego sub-descriptora (default vs siege) na podstawie aktualnego stanu (`__vehicleMode`). Mod nie wymaga osobnej obsługi — `descr.type.invisibility` zwraca prawidłowe wartości dla bieżącego trybu out of the box.
-- **EBR / wheeled** — bez specjalnego case'u; XML czołgu ma `invMoving == invStill`, mod automatycznie pokazuje stały okrąg.
+- **Stereoscope (lornetka)** w pickerze — gdy wykryta w `descr.optionalDevices`, automatycznie aplikuje czynnik `circularVisionRadiusFactor.getActiveValue(level)`. Worst-case assumption: lorna jest zawsze aktywna. Toggle przez `pickerAssumeStereoscope`.
+- **CamouflageNet (siatka)** dla własnego czołgu — silnik gry trackuje `_LAST_MOVEMENT_TIME`. Po `camoNetActivateSec` (default `3.0` s) bez ruchu siatka się aktywuje i bonus `invisibilityBonus` jest dodawany. Kolor okręgu zmienia się na **ciemnozielony**.
 
 ### v4 — picker enemy tank ✅
 
-W bitwie wybierasz konkretnego przeciwnika hotkeyami i okrąg dostosowuje się do jego VR. Server wysyła pełny `strCompactDescr` każdego pojazdu od początku bitwy (potwierdzone w `gui/battle_control/arena_info/arena_vos.py:277`), więc dekodujemy lokalnie:
+W bitwie wybierasz konkretnego przeciwnika hotkeyami i okrąg dostosowuje się do jego VR. Server wysyła pełny `strCompactDescr` każdego pojazdu od początku bitwy, więc dekodujemy lokalnie.
 
-```python
-from items.vehicles import VehicleDescr
-descr = VehicleDescr(compactDescr=enemy.vehicleType.strCompactDescr)
-base_vr = descr.turret.circularVisionRadius
-vr_factor = descr.miscAttrs.get('circularVisionRadiusFactor', 1.0)  # optyka itd.
-estimated_vr = base_vr * vr_factor
-# opcjonalnie * pickerVRBonusRations (default 1.10) jeśli zakładamy racje bojowe
-# opcjonalnie * pickerVRBonusPerks (default 1.10) jeśli zakładamy BIA + Recon + SitAware
-```
+### v3 — fire penalty + siege modes ✅
 
-#### Hotkeys (numpad layout, configurable)
-
-```
-+-----+-----+-----+-----+
-|     |  /  |  *  |  -  |    /=dir-camo-net (own)  *=dir-stereo  -=dir-vents
-+-----+-----+-----+-----+
-|  7  |  8  |  9  |  +  |    7=stereo   8=prev    9=overlay-toggle  +=dir-optics
-+-----+-----+-----+-----+
-|  4  |  5  |  6  |     |    4=BIA      5=Recon   6=SitAware
-+-----+-----+-----+-----+
-|  1  |  2  |  3  |Enter|    1=rations  2=next    3=vents   Enter=print-now
-+-----+-----+-----+-----+
-|     0     |  .  |          0=clear-picker   .=reload-config
-+-----+-----+-----+-----+
-```
-
-**Picker — wybór przeciwnika**
-| akcja | klawisz | config |
-|---|---|---|
-| następny przeciwnik | Numpad 2 | `pickerNextKey` |
-| poprzedni przeciwnik | Numpad 8 | `pickerPrevKey` |
-| wyczyść picker | Numpad 0 | `pickerClearKey` |
-| toggle założenia o lornetce | Numpad 7 | `pickerStereoKey` |
-
-**Załoga (perki)**
-| akcja | klawisz | config |
-|---|---|---|
-| toggle Brothers in Arms (BIA) | Numpad 4 | `pickerBIAKey` |
-| toggle Recon (commander) | Numpad 5 | `pickerReconKey` |
-| toggle Sit. Awareness (radio) | Numpad 6 | `pickerSitAwareKey` |
-
-**Equipment / consumables**
-| akcja | klawisz | config |
-|---|---|---|
-| toggle racji bojowych | Numpad 1 | `pickerRationsKey` |
-| toggle ulepszonej wentylacji | Numpad 3 | `pickerVentsKey` |
-
-**Overlay / diag / reload**
-| akcja | klawisz | config |
-|---|---|---|
-| toggle overlay tekstu (auto) | Numpad 9 | `overlayToggleKey` |
-| pełen status snapshot | NumpadEnter | `overlayPrintNowKey` |
-| dump descriptor enemy do logu | Numpad **\*** | `pickerDiagDumpKey` |
-| reload configu | NumpadPeriod | `reloadKey` |
-
-#### Założenia w obliczeniach
-Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo serwer tego nie wysyła). Każdy modyfikator ma własny toggle z osobnym multiplikatorem (multiplikatywne, mnożone razem przy stackowaniu):
-
-Model jest dwustopniowy — odzwierciedla dokładnie mechanikę z `VehicleDescrCrew.py:_process_perk`.
-
-**Bezpośrednie perki VR (multiplikatory przy 100% skilla):**
-
-| toggle | klawisz | config | default | znaczenie |
-|---|---|---|---|---|
-| Recon (commander) | Numpad 5 | `pickerVRBonusRecon` | `1.02` | +2% przy 100% Recon |
-| Sit. Awareness (radio) | Numpad 6 | `pickerVRBonusSitAware` | `1.03` | +3% przy 100% SitAware |
-
-**Wzmacniacze poziomu załogi (poziomy do akumulatora):**
-
-| toggle | klawisz | config | default | dodaje do efektywnego poziomu |
-|---|---|---|---|---|
-| Brothers in Arms | Numpad 4 | `pickerLevelBonusBIA` | `5.0` | +5 poziomów |
-| Improved Ventilation | Numpad 3 | `pickerLevelBonusVents` | `5.0` | +5 poziomów |
-| Combat Rations / cola | Numpad 1 | `pickerLevelBonusRations` | `10.0` | +10 poziomów |
-
-**Model multiplikatywny z empirycznymi wartościami:**
-
-```
-VR = base_VR
-  × descriptor_factor                   # auto z descriptora (Optyka, Stereoscope)
-  × (1.0253 jeśli BIA)
-  × (1.0253 jeśli Vents)
-  × (1.0430 jeśli Rations)
-  × (1.0288 jeśli Recon)
-  × (1.0451 jeśli SitAware)
-```
-
-**Wartości skalibrowane empirycznie** z obserwacji w grze (czołg z bazowym VR 340m, w pełni wytrenowana załoga):
-
-| toggle | wartość | bonus VR | weryfikacja na 340m |
-|---|---|---|---|
-| BIA | ×1.0253 | +2.53% | +8.6 m |
-| Vents | ×1.0253 | +2.53% | +8.6 m (zakładam, brak danych) |
-| Rations | ×1.0430 | +4.30% | +14.6 m ✓ |
-| Recon | ×1.0288 | +2.88% | +9.79 m ≈ +9.81 (gra) |
-| SitAware | ×1.0451 | +4.51% | +15.33 m ≈ +15.34 (gra) |
-
-Plus auto-detekcja z descriptora:
-- Coated Optics (basic): ×1.10
-- Coated Optics (deluxe / fioletowa): ×1.135
-- Coated Optics (bond / improved): może być ~×1.14 (tank-zależne)
-- Stereoscope (basic): ×1.25 (po 3s postoju)
-
-**Tryhard stack** z fioletową optyką + wszystkimi 5 perkami:
-`1.135 × 1.0253 × 1.0253 × 1.0430 × 1.0288 × 1.0451 ≈ 1.345` → **+34.5%** do bazowego VR.
-
-> **v5.3.2 — pivot do empirycznego modelu:** v5.3.0 i v5.3.1 próbowały modelować mechanikę gry z `VehicleDescrCrew.py` (commander_factor 0.57 + 0.43×eff + cvrB perków). Niestety teoretyczny model nie do końca pasował do faktycznych wartości w grze (Recon i SitAware dawały więcej niż wyliczał wzór `factor_per_level × 100`). Bez możliwości debugowania w runtime postanowiłem wziąć empirycznie zmierzone wartości z gry jako defaulty. Klucze configu wracają do prostszej formy: `pickerVRBonusBIA/Vents/Rations` (a nie `pickerLevelBonusXxx`).
-
-> **v5.2 cleanup:** w wersjach v5.0–v5.1 były dodatkowe toggle dla dyrektyw enemy (`pickerOpticsDirective`, `pickerVentsDirective`, `pickerStereoDirective`) oraz dla dyrektywy siatki własnego czołgu (`ownCamoNetDirective`, "Naturalne maskowanie"). **Wszystkie usunięte:**
-> - Dyrektywy w slotach equipment (optics / vents / stereoscope) są już naliczone w `descr.miscAttrs.circularVisionRadiusFactor` przy budowie descriptora — manualny mnożnik podwójnie liczył.
-> - "Naturalne maskowanie" sprawdziłem w `battle_boosters.xml` — taka dyrektywa po prostu nie istnieje w WoT 2.x. Wymyślona z głowy w v3 na podstawie starych źródeł WoT 1.x. Wycofana.
-> 
-> Wszystkie pozostałe toggle (BIA, Recon, SitAware, rations, vents) są ściśle dla **VR przeciwnika** (w pickerze) — nasz własny camo bierze się z descriptora bez interakcji.
-
-Podczas bitwy widać aktywne flagi w logu (`python.log` → `SpotMeter: picker -> RhmPzW VR=587m [+rations +bia +recon] | stereo=on`).
-
-#### Wizualny marker
-Hook na `PlayerFullNameFormatter.format` wstrzykuje konfigurowalny prefix (`pickerMarker`, default `'● '`) przed nazwę gracza dla wybranego czołgu. **Caveat:** classic players panel (top-right) nie udostępnia API do natychmiastowej zmiany wyświetlanej nazwy — marker pojawia się przy najbliższym naturalnym redraw'ie wiersza (zmiana HP, śmierć, otwarcie pełnego panelu Tab). Kliknij Tab dla pełnej listy ze świeżą formatą.
-
-Główny feedback: **zmiana rozmiaru okręgu na minimapie** — od razu po cyklu okrąg dostosowuje się do nowego VR-u.
-
-#### Co serwer wysyła i czego brakuje
-| pole | dostępne klientowi | uwagi |
-|---|---|---|
-| model czołgu, hull/turret/gun/engine | ✅ | z `strCompactDescr` |
-| zainstalowany sprzęt (binokle, optyka itd.) | ✅ | z `strCompactDescr` |
-| camouflage skin / styl | ✅ | z `strCompactDescr` |
-| tier, klasa, rola, max HP | ✅ | z `VehicleTypeInfoVO` |
-| skille załogi (Recon, Sit. Awareness, BIA) | ❌ | toggle `pickerVRBonusPerks` |
-| aktywne consumable'y (cola, kawa) | ❌ | toggle `pickerVRBonusRations` |
-| czy lorna jest właśnie aktywna (3s standstill) | ❌ | nie modelujemy w v4 |
-
-### v5 — UI/UX
-
-- **Pełen settings panel** w `Settings → Mods` zamiast pliku JSON. Wymaga osobnego SWF / Pythonowego widoku Scaleform; rozważam też integrację z istniejącym frameworkiem [ModsListAPI](https://wgmods.net/).
-- **Natychmiastowy marker w panelu**: classic players panel nie ma Python-side hooka do nazw, więc trzeba: (a) załadować osobny SWF nakładający marker poza panelem, albo (b) hookować bardziej wewnętrzną AS3 gateway. Do rozważenia.
-- **Okrąg "ja widzę" obok "ja jestem widzialny"** — drugi okrąg z aktualnym VR gracza (jest już w grze jako VIEW_RANGE, ale może być wyłączony przez ustawienia, więc opcjonalnie zdublujemy).
-- **Per-class presety** dla `enemyViewRangeFallback` (scout 420, heavy 380, arta 350).
-- **Lornetka w trybie aktywnym** (3s standstill detection dla pickera) — wymaga utrzymywania `last_speed_change` per enemy, ale działa tylko dla spotted enemies.
+- **Kara za strzał** — hook na `PlayerAvatar.shoot()` i `shootDualGun()`. Przez `fireRevealDuration` (3 s) po strzale aplikujemy `camo *= invisibilityFactorAtShot`.
+- **Tryby (CS-63, S-Conqueror itp.)** — silnik gry obsługuje to automatycznie przez `CompositeVehicleDescriptor`.
+- **EBR / wheeled** — bez specjalnego case'u; XML czołgu ma `invMoving == invStill`.
 
 ### Nie planujemy
 
 - **Bonus za roślinność (foliage)** — częściowo obliczany serwerowo, wymaga raycastów do każdego krzaka. Złożoność niewspółmierna do zysku.
-- **Pokazywanie czyjegoś camo / VR jako liczby** — to "softcheat" w niektórych interpretacjach. Nasz mod liczy tylko własne wartości i pokazuje wynik geometrycznie.
+- **Pokazywanie czyjegoś camo / VR jako liczby na ekranie** — to "softcheat" w niektórych interpretacjach. Mod liczy tylko własne wartości i pokazuje wynik geometrycznie.
 
 ## Dev / build
 
-Wymaga Python 2.7 (do kompilacji `.pyc` zgodnego z silnikiem WoT-a) i Python 3.x (do uruchomienia build skryptu).
+Wymaga Python 2.7 (do kompilacji `.pyc` zgodnego z silnikiem WoT-a, Anaconda env `py27`) i Python 3.10 (do uruchomienia build skryptu).
 
 ### Kompilacja .pyc
 
@@ -347,7 +298,7 @@ Wymaga Python 2.7 (do kompilacji `.pyc` zgodnego z silnikiem WoT-a) i Python 3.x
 ### Pakowanie .wotmod (release)
 
 ```sh
-py -3 packaging/build_wotmod.py
+py -3.10 packaging/build_wotmod.py
 ```
 
 Output do `dist/`:

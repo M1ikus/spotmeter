@@ -54,7 +54,7 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     7      - racje bojowe              (default ON - wylacz jesli enemy nie ma)
     4      - perki zalogi (BIA+Recon+SitAware bundled)  (default ON)
     1      - dyrektywy na wyposazenie  (default OFF - 1.025 boost na auto-wykryte sprzety)
-    0      - ulepszenia polowe na VR   (default OFF - rough +5% jesli enemy ma)
+    0      - ulepszenia polowe na VR   (default OFF - BETA, per-czolg tabelka w configu)
 
   OVERLAY / DIAG:
     9      - toggle overlay tekstu (auto-update na zmiany)
@@ -77,7 +77,25 @@ CO JEST MANUALNE (toggles)
 - Racje bojowe (Rations)                  - server-private; default ON (zakladamy aktywne)
 - Crew perks (BIA+Recon+SitAware razem)  - server-private; default ON
 - Dyrektywy na wyposazenie               - server-private; default OFF (rzadsze)
-- Ulepszenia polowe wp\lywajace na VR    - server-private; default OFF (rzadsze)
+- Ulepszenia polowe wp\lywajace na VR    - BETA, server-private; default OFF
+
+
+ULEPSZENIA POLOWE NA VR (BETA)
+-------------------------------
+Server NIE wysyla `vehPostProgression` przeciwnika do klienta (jest to
+`MY_VEHICLE` scope), wiec mod uzywa recznie utrzymywanej tabelki per-czolg.
+Tabelka jest w `spotmeter.json` pod kluczem `pickerFieldUpgradeVR` i mapuje
+shortName czolgu -> procent VR (np. 0.02 = +2%). Po wlaczeniu toggle (Numpad 0)
+mod stosuje ten % multiplikatywnie do bazowego VR przeciwnika, capped na 445m.
+Czolgi spoza tabelki = 0% (bez efektu).
+
+Domyslnie pre-fill (mozna dopisac wiecej):
+   "Rhm.-B. WT":   0.02   (+2%)
+   "Obj. 907":     0.03   (+3%)
+   "Jg.Pz. E 100": 0.02   (+2%)
+
+EBR 105 nie ma w postep-progression upgradeu na VR, wiec go w tabelce nie ma.
+Dopisuj wlasne wpisy po shortName (sprawdzisz przez Numpad * - dump descryptora).
 
 
 WERYFIKACJA / DEBUG

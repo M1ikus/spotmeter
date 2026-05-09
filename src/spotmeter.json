@@ -41,11 +41,18 @@
     "pickerFieldUpgradesKey": "KEY_NUMPAD0",
     "pickerDiagDumpKey": "KEY_NUMPADSTAR",
 
-    "_comment_picker_bonuses": "Game-UI-matching additive model. baseline = base_vr * pickerVRBonusRations (if Rations toggle ON) or base_vr (OFF). Each subsequent toggle adds baseline * (factor - 1) to VR. CrewPerks bundle = sum of empirical BIA + Recon + SitAware vs baseline (1.0243 + 1.0277 + 1.0433 - 2 = 1.0953). Directives multiplier (1.025) applies to auto-detected equipment (optics, stereoscope) when toggle is on. FieldUpgrades is a generic +5% representing VR-affecting field upgrades that the server doesn't transmit for enemies.",
-    "pickerVRBonusRations":       1.0430,
-    "pickerVRBonusCrewPerks":     1.0953,
-    "pickerVRBonusFieldUpgrades": 1.0500,
-    "pickerVRBonusDirective":     1.0250,
+    "_comment_picker_bonuses": "Game-UI-matching additive model. Order: (1) field upgrade applies % to base_vr, capped at 445m; (2) baseline = base_vr * pickerVRBonusRations (if Rations toggle ON) or base_vr (OFF); (3) each subsequent toggle adds baseline * (factor - 1). CrewPerks bundle = empirical BIA + Recon + SitAware vs baseline. Directives multiplier (1.025) multiplies auto-detected equipment (optics, stereoscope) when toggle is on.",
+    "pickerVRBonusRations":   1.0430,
+    "pickerVRBonusCrewPerks": 1.0953,
+    "pickerVRBonusDirective": 1.0250,
+
+    "_comment_field_upgrades_BETA": "BETA. Per-tank field-upgrade VR % for tanks that have a VR-related upgrade in their post-progression tree. Applied multiplicatively to base_vr, capped at pickerFieldUpgradeCap (445m). Tanks not listed get 0% (= no effect). Add your own entries by their shortName. Server doesn't transmit vehPostProgression for enemies, so this is a manual lookup. EBR 105 has no VR upgrade.",
+    "pickerFieldUpgradeVR": {
+        "Rhm.-B. WT":   0.02,
+        "Obj. 907":     0.03,
+        "Jg.Pz. E 100": 0.02
+    },
+    "pickerFieldUpgradeCap": 445.0,
     "pickerAssumeStereoscope": true,
     "pickerStereoscopeFallback": 1.25,
     "pickerMarker": "● ",
