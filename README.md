@@ -247,32 +247,43 @@ estimated_vr = base_vr * vr_factor
 #### Założenia w obliczeniach
 Domyślnie zakładamy że przeciwnik **NIE MA** consumablesów ani VR-perks (bo serwer tego nie wysyła). Każdy modyfikator ma własny toggle z osobnym multiplikatorem (multiplikatywne, mnożone razem przy stackowaniu):
 
-| toggle | klawisz | mnożnik (config) | default |
-|---|---|---|---|
-| Recon (commander perk) | Numpad 5 | `pickerVRBonusRecon` | `1.02` |
-| Situational Awareness (radio perk) | Numpad 6 | `pickerVRBonusSitAware` | `1.03` |
-| Combat Rations / cola / coffee | Numpad 1 | `pickerVRBonusRations` | `1.01` |
-| Improved Ventilation | Numpad 3 | `pickerVRBonusVents` | `1.005` |
-| Brothers in Arms | Numpad 4 | `pickerVRBonusBIA` | `1.005` |
+Model jest dwustopniowy — odzwierciedla dokładnie mechanikę z `VehicleDescrCrew.py:_process_perk`.
 
-#### Skąd te liczby się biorą
+**Bezpośrednie perki VR (multiplikatory przy 100% skilla):**
 
-Z `VehicleDescrCrew.py:_process_perk` i `perks.xml`:
-- **Recon** (`commander_eagleEye`): `factor_per_level = 0.0002` → +2% przy 100% skilla
-- **SitAware** (`radioman_finder`): `factor_per_level = 0.0003` → +3% przy 100% skilla
-- **Końcowe**: `VR_factor = cvrA × (1 + cvrB)`, gdzie `cvrB = Recon + SitAware`
+| toggle | klawisz | config | default | znaczenie |
+|---|---|---|---|---|
+| Recon (commander) | Numpad 5 | `pickerVRBonusRecon` | `1.02` | +2% przy 100% Recon |
+| Sit. Awareness (radio) | Numpad 6 | `pickerVRBonusSitAware` | `1.03` | +3% przy 100% SitAware |
 
-Brotherhood, Vents i Rations **NIE** mnożą VR bezpośrednio — boostują tylko *efektywny poziom skilli załogi* (`crewLevelIncrease`):
-- BIA: `+5` poziomów (`brotherhood.crewLevelIncrease = 0.05` przy max)
-- Vents (basic): `+5` poziomów (`miscAttrs/crewLevelIncrease += 5`)
-- Rations: `+10` poziomów (`crewLevelIncrease = 10`)
+**Wzmacniacze poziomu załogi (poziomy do akumulatora):**
 
-Te +20 poziomów łącznie skaluje Recon (`120 × 0.0002 = 0.024` zamiast `100 × 0.0002 = 0.02`) i SitAware (`120 × 0.0003 = 0.036` zamiast `0.030`). Cały stack BIA + Vents + Rations dorzuca do cvrB tylko `0.0085` (+0.85% do VR).
+| toggle | klawisz | config | default | dodaje do efektywnego poziomu |
+|---|---|---|---|---|
+| Brothers in Arms | Numpad 4 | `pickerLevelBonusBIA` | `5.0` | +5 poziomów |
+| Improved Ventilation | Numpad 3 | `pickerLevelBonusVents` | `5.0` | +5 poziomów |
+| Combat Rations / cola | Numpad 1 | `pickerLevelBonusRations` | `10.0` | +10 poziomów |
 
-**Tryhard stack realny:** `1.02 × 1.03 × 1.005 × 1.005 × 1.01 ≈ 1.07` (+7% do VR z manualnych toggle).
-**Plus** auto-detekcja Coated Optics (×1.10) i Stereoscope (×1.25) z descriptora — czyli totalny tryhard (full perki + lornetka aktywna): `1.07 × 1.10 × 1.25 ≈ 1.47` (+47% do VR).
+**Wzór** (zgodny z grą):
+```
+crew_effective_level = 100 + suma(BIA + Vents + Rations dla aktywnych toggle)
+cvrB = sum dla aktywnych perków VR: (mnożnik − 1) × crew_effective_level / 100
+final_VR_factor = (1 + cvrB)  # w pickerze, na bazowym VR z descriptora
+```
 
-> **v5.2.3 fix:** Wcześniejsze defaulty `BIA=1.05, Vents=1.05, Rations=1.10` traktowały te toggle jak bezpośrednie multiplikatory VR. To było ZA WYSOKO ~20 punktów procentowych przy stacku. Sprawdziłem mechanikę w grze i obniżyłem do realistycznych wartości.
+Skutek:
+- **BIA sam** (bez Recon/SitAware) → 0% (nie ma czego wzmocnić)
+- **BIA + Recon** → `1.02 × 105/100 = +2.1%` (~+0.1% bonus z BIA)
+- **Wszystkie 5 włączone** → `cvrB = (0.02 + 0.03) × 120/100 = 0.06` → **+6% do VR**
+- **Tylko Recon + SitAware** → `cvrB = 0.05 × 1.0 = 0.05` → +5%
+
+Plus auto-detekcja z descriptora (osobne mnożniki, MULTIPLIKATYWNE):
+- Coated Optics: ×1.10 (zawsze, gdy zainstalowana)
+- Stereoscope: ×1.25 (po 3s postoju gdy zainstalowana)
+
+**Tryhard pełny stack:** `1.06 × 1.10 × 1.25 ≈ 1.46` → +46% do VR z bazowego.
+
+> **v5.3.0 cleanup:** wcześniej BIA/Vents/Rations były niezależnymi multiplikatorami (1.05/1.05/1.10 → 1.005/1.005/1.01 w v5.2.3). Oba modele były niedokładne — bo BIA bez Recon/SitAware NIE powinien dodać 0.5%, powinien dodać 0%. Teraz model jest pełny: amplifyery działają tylko przy aktywnych perkach, dokładnie jak w `_process_perk`. Klucze configu zmienione: `pickerVRBonusBIA/Vents/Rations` → `pickerLevelBonusBIA/Vents/Rations`.
 
 > **v5.2 cleanup:** w wersjach v5.0–v5.1 były dodatkowe toggle dla dyrektyw enemy (`pickerOpticsDirective`, `pickerVentsDirective`, `pickerStereoDirective`) oraz dla dyrektywy siatki własnego czołgu (`ownCamoNetDirective`, "Naturalne maskowanie"). **Wszystkie usunięte:**
 > - Dyrektywy w slotach equipment (optics / vents / stereoscope) są już naliczone w `descr.miscAttrs.circularVisionRadiusFactor` przy budowie descriptora — manualny mnożnik podwójnie liczył.

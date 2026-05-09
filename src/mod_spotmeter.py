@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.2.3'
+MOD_VERSION = '5.3.0'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -71,31 +71,32 @@ DEFAULT_CONFIG = {
     'pickerReconKey': 'KEY_NUMPAD5',
     'pickerSitAwareKey': 'KEY_NUMPAD6',
     'pickerStereoKey': 'KEY_NUMPAD7',
-    # Per-perk multipliers (independent, multiplied together when stacked).
-    # Calibrated to match WoT 2.x's actual mechanic from VehicleDescrCrew.py
-    # and perks.xml:
+    # Picker VR model - implements the actual game mechanic from
+    # VehicleDescrCrew.py:_process_perk + perks.xml + optional_devices.xml.
     #
-    #   Recon (commander_eagleEye):  factor_per_level = 0.0002 -> +2% at L100
-    #   SitAware (radioman_finder):  factor_per_level = 0.0003 -> +3% at L100
-    #   Final VR factor = cvrA * (1 + cvrB)  where cvrB sums the two perks.
+    # Two categories:
+    #   - Direct VR perks (Recon, Sit. Awareness) directly add to cvrB
+    #     proportionally to the crew effective level. Final factor is
+    #     `1 + cvrB`. These multipliers express the value at base level
+    #     100% (no crew amplifiers): Recon = 1.02 means '+2% to VR at
+    #     100% skill'.
+    #   - Crew-level amplifiers (BIA, Vents, Rations) increase the
+    #     effective crew level for the perk computation. They only have
+    #     effect when at least one direct perk is also active. BIA at
+    #     max = +5 levels; basic Vents = +5; Combat Rations = +10.
     #
-    # Brotherhood / Vents / Rations don't directly modify VR - they only
-    # add to the *effective* crew skill level used by Recon / SitAware:
-    #
-    #   BIA:      crewLevelIncrease = 0.05 -> +5 levels (when at max)
-    #   Vents:    crewLevelIncrease = 5    -> +5 levels
-    #   Rations:  crewLevelIncrease = 10   -> +10 levels
-    #
-    # So enabling BIA on top of an already 100% crew with Recon+SitAware
-    # boosts cvrB by ~+0.25% (5 * 0.0002 + 5 * 0.0003 = 0.0025) - a tiny
-    # multiplier of 1.0025, NOT 1.05. Earlier defaults treated all five
-    # toggles as independent direct multipliers and overshot the realistic
-    # 'tryhard stack' VR by ~20 percentage points.
-    'pickerVRBonusRations': 1.01,
-    'pickerVRBonusVents': 1.005,
-    'pickerVRBonusBIA': 1.005,
+    # _picker_vr scales Recon/SitAware contributions by the effective
+    # level ratio (level / 100), so:
+    #   - Toggle BIA alone: 0% VR change (no perks to amplify)
+    #   - Toggle BIA + Recon: +2% * 1.05 = +2.1% VR
+    #   - Full stack (BIA+Vents+Rations+Recon+SitAware): cvrB =
+    #     (0.02 + 0.03) * 1.20 = 0.06 -> 1.06x (+6% VR), matching the
+    #     game's actual computation exactly.
     'pickerVRBonusRecon': 1.02,
     'pickerVRBonusSitAware': 1.03,
+    'pickerLevelBonusBIA': 5.0,
+    'pickerLevelBonusVents': 5.0,
+    'pickerLevelBonusRations': 10.0,
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
     'pickerMarker': u'● ',
@@ -378,18 +379,25 @@ def _picker_vr(plugin):
             # Couldn't read the active value (e.g. category mismatch), but
             # the device IS equipped. Fall back to a sensible constant.
             vr *= float(_CFG.get('pickerStereoscopeFallback', 1.25))
-    # Independent multipliers per consumable / perk that the server does
-    # NOT transmit. Multiplied together when several toggles are on.
-    perk_multiplier_keys = {
-        'rations': 'pickerVRBonusRations',
-        'vents': 'pickerVRBonusVents',
-        'bia': 'pickerVRBonusBIA',
-        'recon': 'pickerVRBonusRecon',
-        'sitAware': 'pickerVRBonusSitAware',
-    }
-    for toggle_name, cfg_key in perk_multiplier_keys.items():
-        if _PICKER_TOGGLES.get(toggle_name, False):
-            vr *= float(_CFG.get(cfg_key, 1.0))
+    # Crew/perk model that mirrors VehicleDescrCrew.py:
+    #   crew_effective_level = 100 + sum(level bonuses from BIA/Vents/Rations)
+    #   cvrB = sum over active VR-perks of: (bonus_at_100% - 1) * level/100
+    #   VR_factor *= (1 + cvrB)
+    # So BIA/Vents/Rations only matter when at least one VR perk is active.
+    extra_levels = 0.0
+    if _PICKER_TOGGLES.get('bia', False):
+        extra_levels += float(_CFG.get('pickerLevelBonusBIA', 5.0))
+    if _PICKER_TOGGLES.get('vents', False):
+        extra_levels += float(_CFG.get('pickerLevelBonusVents', 5.0))
+    if _PICKER_TOGGLES.get('rations', False):
+        extra_levels += float(_CFG.get('pickerLevelBonusRations', 10.0))
+    level_ratio = (100.0 + extra_levels) / 100.0
+    cvr_b = 0.0
+    if _PICKER_TOGGLES.get('recon', False):
+        cvr_b += (float(_CFG.get('pickerVRBonusRecon', 1.0)) - 1.0) * level_ratio
+    if _PICKER_TOGGLES.get('sitAware', False):
+        cvr_b += (float(_CFG.get('pickerVRBonusSitAware', 1.0)) - 1.0) * level_ratio
+    vr *= (1.0 + cvr_b)
     return vr
 
 
