@@ -19,6 +19,12 @@ from gui.battle_control import matrix_factory
 
 _logger = logging.getLogger('SpotMeter')
 
+# WARNING-level so the line shows up in python.log even if the user's logging
+# level is filtering INFO out. This proves the mod was at least imported by
+# the loader; if you don't see this line, the .wotmod isn't being picked up.
+MOD_VERSION = '5.1.2'
+_logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
+
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
 _C_NAME = _mm_settings.CONTAINER_NAME
 _AS3 = _mm_settings.VIEW_RANGE_CIRCLES_AS3_DESCR
@@ -139,18 +145,21 @@ def _read_config():
 
 
 def init():
+    _logger.warning('SpotMeter: init() called')
     try:
         _read_config()
         if not _CFG.get('enabled', True):
-            _logger.info('SpotMeter: disabled by config')
+            _logger.warning('SpotMeter: disabled by config')
             return
         _patch_plugin()
         _patch_avatar_shoot()
         if _CFG.get('pickerEnabled', True):
             _patch_player_name_formatter()
         _install_reload_hotkey()
-        _logger.info('SpotMeter: initialised (useOwnViewRange=%s, fire=%s, picker=%s)',
-                     _CFG['useOwnViewRange'], _CFG['applyFirePenalty'], _CFG['pickerEnabled'])
+        _logger.warning(
+            'SpotMeter: initialised (version=%s, useOwnViewRange=%s, fire=%s, picker=%s)',
+            MOD_VERSION, _CFG['useOwnViewRange'],
+            _CFG['applyFirePenalty'], _CFG['pickerEnabled'])
     except Exception:
         _logger.exception('SpotMeter: init failed')
 
@@ -983,38 +992,59 @@ def _patch_player_name_formatter():
 def _install_reload_hotkey():
     try:
         import Keys
-        from gui import InputHandler
     except ImportError:
-        _logger.info('SpotMeter: hotkey support unavailable, edits to config require battle restart')
+        _logger.warning('SpotMeter: Keys module unavailable - cannot bind hotkeys')
         return
 
     bindings = []
-    # Backwards-compat aliases for users who copied the v4 config that shipped
-    # with the wrong constant names. WoT's Keys module uses KEY_PGUP / KEY_PGDN
-    # rather than the Windows VK_PRIOR / VK_NEXT spelling.
+    # Backwards-compat / NumLock-off aliases. NumLock-off on most keyboards
+    # remaps the numpad navigation cluster to KEY_HOME/END/PGUP/PGDN/etc.,
+    # so we register both the numpad scancode AND the alternate one for the
+    # navigation actions. That way the hotkeys work whether NumLock is on or
+    # off and regardless of which name the user put in their config.
     _key_aliases = {
-        'KEY_PRIOR': 'KEY_PGUP',
-        'KEY_NEXT': 'KEY_PGDN',
-        'KEY_PAGEUP': 'KEY_PGUP',
-        'KEY_PAGEDOWN': 'KEY_PGDN',
+        'KEY_PRIOR': ['KEY_PGUP'],
+        'KEY_NEXT': ['KEY_PGDN'],
+        'KEY_PAGEUP': ['KEY_PGUP'],
+        'KEY_PAGEDOWN': ['KEY_PGDN'],
+        # Numpad -> nav cluster fallbacks for NumLock-off case
+        'KEY_NUMPAD0': ['KEY_INSERT'],
+        'KEY_NUMPAD1': ['KEY_END'],
+        'KEY_NUMPAD2': ['KEY_DOWNARROW', 'KEY_PGDN'],
+        'KEY_NUMPAD3': ['KEY_PGDN'],
+        'KEY_NUMPAD4': ['KEY_LEFT'],
+        'KEY_NUMPAD5': [],
+        'KEY_NUMPAD6': ['KEY_RIGHT'],
+        'KEY_NUMPAD7': ['KEY_HOME'],
+        'KEY_NUMPAD8': ['KEY_UPARROW', 'KEY_PGUP'],
+        'KEY_NUMPAD9': ['KEY_PGUP'],
+        'KEY_NUMPADPERIOD': ['KEY_DELETE'],
     }
 
-    def _bind(cfg_key, action, label):
+    def _resolve_keys(cfg_key):
         key_name = _CFG.get(cfg_key) or ''
         if not key_name:
-            return
-        if key_name in _key_aliases:
-            alias = _key_aliases[key_name]
-            if hasattr(Keys, alias):
-                key_name = alias
-        key_id = getattr(Keys, key_name, None)
-        if key_id is None:
+            return []
+        names = [key_name] + _key_aliases.get(key_name, [])
+        ids = []
+        unknown = []
+        for n in names:
+            kid = getattr(Keys, n, None)
+            if kid is None:
+                unknown.append(n)
+            elif kid not in ids:
+                ids.append(kid)
+        if unknown and not ids:
             _logger.warning(
                 'SpotMeter: hotkey for %s = %r not found in Keys module. '
                 'Common names: KEY_F1..F12, KEY_PGUP, KEY_PGDN, KEY_HOME, '
-                'KEY_END, KEY_INSERT, KEY_DELETE.', cfg_key, _CFG.get(cfg_key))
-            return
-        bindings.append((key_id, action, label, key_name))
+                'KEY_END, KEY_INSERT, KEY_DELETE, KEY_NUMPAD0..9.',
+                cfg_key, _CFG.get(cfg_key))
+        return [(kid, key_name) for kid in ids]
+
+    def _bind(cfg_key, action, label):
+        for key_id, key_name in _resolve_keys(cfg_key):
+            bindings.append((key_id, action, label, key_name))
 
     _bind('reloadKey', _hot_reload, 'reload')
     if _CFG.get('pickerEnabled', True):
@@ -1039,12 +1069,12 @@ def _install_reload_hotkey():
         _bind('overlayPrintNowKey', _print_now, 'overlay-print')
 
     if not bindings:
-        _logger.info('SpotMeter: no hotkeys registered')
+        _logger.warning('SpotMeter: no hotkeys registered (check Keys names in config)')
         return
 
-    def _on_key(event):
+    def _on_key_event(event):
         if not event.isKeyDown():
-            return
+            return False
         key = event.key
         for key_id, action, label, _name in bindings:
             if key == key_id:
@@ -1052,11 +1082,29 @@ def _install_reload_hotkey():
                     action()
                 except Exception:
                     _logger.exception('SpotMeter: hotkey %s failed', label)
-                return
+                return False  # don't consume - let other handlers see it too
+        return False
 
+    # Register through TWO independent channels to maximise the chance the
+    # event reaches us even when something else captures keys: (1) the
+    # InputHandler.g_instance.onKeyDown event used by the rest of the
+    # battle UI, (2) gui.g_keyEventHandlers, the catch-all set iterated
+    # last in game.handleKeyEvent.
+    bound_via = []
     try:
-        InputHandler.g_instance.onKeyDown += _on_key
-        names = ', '.join('%s=%s' % (label, name) for _, _, label, name in bindings)
-        _logger.info('SpotMeter: hotkeys bound (%s)', names)
+        from gui import InputHandler as _IH
+        _IH.g_instance.onKeyDown += _on_key_event
+        bound_via.append('InputHandler.onKeyDown')
     except Exception:
-        _logger.exception('SpotMeter: cannot bind hotkeys')
+        _logger.exception('SpotMeter: failed to bind via InputHandler.g_instance.onKeyDown')
+    try:
+        import gui as _gui_mod
+        if hasattr(_gui_mod, 'g_keyEventHandlers'):
+            _gui_mod.g_keyEventHandlers.add(_on_key_event)
+            bound_via.append('gui.g_keyEventHandlers')
+    except Exception:
+        _logger.exception('SpotMeter: failed to bind via gui.g_keyEventHandlers')
+
+    names = ', '.join('%s=%s' % (label, name) for _, _, label, name in bindings)
+    _logger.warning('SpotMeter: hotkeys bound via [%s] - %d entries: %s',
+                    ' & '.join(bound_via) or 'NONE', len(bindings), names)
