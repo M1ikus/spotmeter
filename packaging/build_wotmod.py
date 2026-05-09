@@ -46,18 +46,42 @@ def main():
     version = read_version()
     out_path = os.path.join(DIST, 'spotmeter-v%s.wotmod' % version)
 
-    # WoT's .wotmod loader expects ZIP_STORED (no compression) so the
-    # engine can mmap entries directly; ZIP_DEFLATED triggers
-    # 'Mod package not loaded' on at least WoT 2.2.1.2.
+    # Two requirements for WoT 2.x .wotmod files (verified against
+    # working community mods like wot-public-mods/replays-manager):
     #
-    # Path layout: paths.xml has
-    #     <Path mask="*.wotmod" mode="recursive" root="res">./mods/2.2.1.2</Path>
-    # so the archive content is mounted at the engine's resource root
-    # (the same level as the game's res/ directory). Files therefore
-    # go in directly without a 'res/' prefix.
+    #   1. ZIP_STORED (no compression). The engine mmaps entries
+    #      directly; ZIP_DEFLATED triggers 'compression not supported'
+    #      at load time on at least WoT 2.2.1.2.
+    #
+    #   2. Files live under a 'res/' prefix inside the archive AND
+    #      every intermediate directory must be present as its own
+    #      empty entry. paths.xml has
+    #         <Path mask="*.wotmod" mode="recursive" root="res">./mods/2.2.1.2</Path>
+    #      and the engine's resource manager only finds files inside
+    #      a 'res/' tree that it can walk top-down via real directory
+    #      entries. Without the directory entries the file is in the
+    #      archive but the gui mods loader's ResMgr.openSection() does
+    #      not see it - the .wotmod 'loads' but the python module is
+    #      never imported. (This is the bug v5.1.1 hit.)
+    payload_entries = [
+        ('res/', None),
+        ('res/scripts/', None),
+        ('res/scripts/client/', None),
+        ('res/scripts/client/gui/', None),
+        ('res/scripts/client/gui/mods/', None),
+        ('res/scripts/client/gui/mods/mod_spotmeter.pyc', SRC_PYC),
+    ]
     with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_STORED) as z:
         z.write(META_XML, 'meta.xml')
-        z.write(SRC_PYC, 'scripts/client/gui/mods/mod_spotmeter.pyc')
+        for arcname, src in payload_entries:
+            if src is None:
+                # Directory entry: zero-byte stored file with a name
+                # ending in '/' is how ZIP encodes a folder.
+                info = zipfile.ZipInfo(arcname)
+                info.compress_type = zipfile.ZIP_STORED
+                z.writestr(info, b'')
+            else:
+                z.write(src, arcname)
 
     # Also drop the default config and install instructions next to the
     # .wotmod so the user has everything they need from one folder.
