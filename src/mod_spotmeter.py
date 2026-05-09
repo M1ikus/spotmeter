@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.1.3'
+MOD_VERSION = '5.1.4'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -1085,26 +1085,31 @@ def _install_reload_hotkey():
                 return False  # don't consume - let other handlers see it too
         return False
 
-    # Register through TWO independent channels to maximise the chance the
-    # event reaches us even when something else captures keys: (1) the
-    # InputHandler.g_instance.onKeyDown event used by the rest of the
-    # battle UI, (2) gui.g_keyEventHandlers, the catch-all set iterated
-    # last in game.handleKeyEvent.
-    bound_via = []
-    try:
-        from gui import InputHandler as _IH
-        _IH.g_instance.onKeyDown += _on_key_event
-        bound_via.append('InputHandler.onKeyDown')
-    except Exception:
-        _logger.exception('SpotMeter: failed to bind via InputHandler.g_instance.onKeyDown')
+    # game.handleKeyEvent dispatches a single key event through BOTH
+    # InputHandler.g_instance.handleKeyEvent and the g_keyEventHandlers
+    # set. Registering in both fires our action twice per press (ON
+    # then immediately OFF for toggles). Pick exactly one channel:
+    # prefer g_keyEventHandlers because that's the standard catch-all
+    # mod hook iterated last, so it sees keys even when other handlers
+    # have already processed them. Fall back to InputHandler.onKeyDown
+    # only if g_keyEventHandlers is unavailable for some reason.
+    bound_via = None
     try:
         import gui as _gui_mod
         if hasattr(_gui_mod, 'g_keyEventHandlers'):
             _gui_mod.g_keyEventHandlers.add(_on_key_event)
-            bound_via.append('gui.g_keyEventHandlers')
+            bound_via = 'gui.g_keyEventHandlers'
     except Exception:
         _logger.exception('SpotMeter: failed to bind via gui.g_keyEventHandlers')
 
+    if bound_via is None:
+        try:
+            from gui import InputHandler as _IH
+            _IH.g_instance.onKeyDown += _on_key_event
+            bound_via = 'InputHandler.onKeyDown'
+        except Exception:
+            _logger.exception('SpotMeter: failed to bind via InputHandler.g_instance.onKeyDown')
+
     names = ', '.join('%s=%s' % (label, name) for _, _, label, name in bindings)
     _logger.warning('SpotMeter: hotkeys bound via [%s] - %d entries: %s',
-                    ' & '.join(bound_via) or 'NONE', len(bindings), names)
+                    bound_via or 'NONE', len(bindings), names)
