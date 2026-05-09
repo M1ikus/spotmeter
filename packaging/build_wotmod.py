@@ -46,19 +46,28 @@ def main():
     version = read_version()
     out_path = os.path.join(DIST, 'spotmeter-v%s.wotmod' % version)
 
-    # Some installers want stored (no compression) .wotmods so the
-    # game can mmap them directly. ZIP_DEFLATED works too and produces
-    # a smaller file - go with deflate since the payload is tiny.
-    with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_DEFLATED) as z:
+    # WoT's .wotmod loader expects ZIP_STORED (no compression) so the
+    # engine can mmap entries directly; ZIP_DEFLATED triggers
+    # 'Mod package not loaded' on at least WoT 2.2.1.2.
+    #
+    # Path layout: paths.xml has
+    #     <Path mask="*.wotmod" mode="recursive" root="res">./mods/2.2.1.2</Path>
+    # so the archive content is mounted at the engine's resource root
+    # (the same level as the game's res/ directory). Files therefore
+    # go in directly without a 'res/' prefix.
+    with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_STORED) as z:
         z.write(META_XML, 'meta.xml')
-        z.write(SRC_PYC, 'res/scripts/client/gui/mods/mod_spotmeter.pyc')
+        z.write(SRC_PYC, 'scripts/client/gui/mods/mod_spotmeter.pyc')
 
     # Also drop the default config and install instructions next to the
     # .wotmod so the user has everything they need from one folder.
     shipped_config = os.path.join(DIST, 'spotmeter.json')
     shipped_install = os.path.join(DIST, 'INSTALL.txt')
     shutil.copy2(SRC_JSON, shipped_config)
-    shutil.copy2(INSTALL_TXT, shipped_install)
+    with open(INSTALL_TXT, 'rb') as fin:
+        install_text = fin.read().replace(b'{{VERSION}}', version.encode('utf-8'))
+    with open(shipped_install, 'wb') as fout:
+        fout.write(install_text)
 
     # Bundle ZIP for one-link sharing: contains the .wotmod, default
     # config, and INSTALL.txt under a single versioned folder.
