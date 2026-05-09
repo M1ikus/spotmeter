@@ -48,38 +48,36 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
 
   PICKER:
     8 / 2  - poprzedni / nastepny przeciwnik
-    0      - wyczysc picker (wraca do useOwnViewRange / fallback)
-    7      - toggle zalozenia o lornetce (gdy ON i enemy ma binos: aplikuj +25%)
+    5      - wyczysc picker (wraca do useOwnViewRange / fallback)
 
-  PERKI ZALOGI (manualne, bo serwer nie wysyla):
-    4      - toggle Brothers in Arms       (+5%)
-    5      - toggle Recon (commander)      (+2%)
-    6      - toggle Sit. Awareness (radio) (+3%)
-
-  EQUIPMENT (manualne dla rzeczy nieznanych klientowi):
-    1      - toggle Combat Rations / cola / kawa (+10%)
-    3      - toggle Improved Ventilation        (+5%)
+  TOGGLE'i WP\LYWAJACE NA OBLICZONY VR PRZECIWNIKA:
+    7      - racje bojowe              (default ON - wylacz jesli enemy nie ma)
+    4      - perki zalogi (BIA+Recon+SitAware bundled)  (default ON)
+    1      - dyrektywy na wyposazenie  (default OFF - 1.025 boost na auto-wykryte sprzety)
+    0      - ulepszenia polowe na VR   (default OFF - rough +5% jesli enemy ma)
 
   OVERLAY / DIAG:
     9      - toggle overlay tekstu (auto-update na zmiany)
-    Enter  - poka pelen status SpotMetera (state + picker + perki)
+    Enter  - pokaz pelen status SpotMetera (state + picker + toggles)
     *      - dump descriptora wybranego enemy do python.log (diagnostyka)
     .      - reload configu
 
 
-CO JEST AUTOMATYCZNE (bez togglowania)
----------------------------------------
-- Coated Optics przeciwnika    - czytane z descriptora (auto +10% gdy zalozona)
-- Stereoscope przeciwnika      - czytane z descriptora (auto +25% gdy zalozona, toggle 7 wlacza/wylacza zalozenie)
-- Camo net na twoim czolgu     - czytane z descriptora, aktywowane po 3s postoju
-- Tryby siege (CS-63/S-Conq)   - opisuje silnik gry, mod uzywa wlasciwego descriptora
-- Kara za strzal               - hook na shoot, czytane invisibilityFactorAtShot z gun-u
+CO JEST AUTOMATYCZNE (auto-czytane z descriptora wroga)
+--------------------------------------------------------
+- Coated Optics (basic 1.10 / deluxe 1.135 / etc.) - z miscAttrs.circularVisionRadiusFactor
+- Stereoscope (lornetka, fallback 1.25)            - z optionalDevices
+- Hull/turret/gun/engine/radio                     - z compactDescr
+- Tryby siege (CS-63/S-Conq i in.)                  - silnik gry sam podmienia descriptor
+- Kara za strzal (po wystrzale)                     - hook na shoot
+- Camo net wlasnego czolgu po 3s postoju           - wlasny descriptor
 
-CO JEST MANUALNE (toggles na numpadzie)
-----------------------------------------
-- Skille zalogi (BIA/Recon/SitAware) - bo serwer nie wysyla skilli enemy
-- Consumablesy (rations/vents) - bo serwer nie wysyla aktywnego stanu
-- Dyrektywy w slotach equipment - juz w descriptor.miscAttrs, auto-detected (zero toggles)
+CO JEST MANUALNE (toggles)
+---------------------------
+- Racje bojowe (Rations)                  - server-private; default ON (zakladamy aktywne)
+- Crew perks (BIA+Recon+SitAware razem)  - server-private; default ON
+- Dyrektywy na wyposazenie               - server-private; default OFF (rzadsze)
+- Ulepszenia polowe wp\lywajace na VR    - server-private; default OFF (rzadsze)
 
 
 WERYFIKACJA / DEBUG
