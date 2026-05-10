@@ -22,7 +22,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '5.5.0'
+MOD_VERSION = '5.6.0'
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
@@ -64,15 +64,26 @@ DEFAULT_CONFIG = {
     'pickerNextKey': 'KEY_NUMPAD2',
     'pickerPrevKey': 'KEY_NUMPAD8',
     'pickerClearKey': 'KEY_NUMPAD5',
-    # Bundled toggle keys (one for many)
-    'pickerRationsKey':       'KEY_NUMPAD7',  # default ON  (toggle to OFF)
-    'pickerCrewPerksKey':     'KEY_NUMPAD4',  # default ON  - BIA+Recon+SitAware bundled
-    'pickerDirectivesKey':    'KEY_NUMPAD1',  # default OFF - boost auto-detected equipment
-    'pickerFieldUpgradesKey': 'KEY_NUMPAD0',  # default OFF - VR-related field upgrades
-    # Picker VR multipliers. Game-UI-matching additive model.
-    'pickerVRBonusRations':       1.0430,
-    'pickerVRBonusCrewPerks':     1.0953,
-    'pickerVRBonusDirective':     1.0250,
+    # Toggle keys. v5.6 split BIA out of the perks bundle because BIA is
+    # mathematically a "crew amplifier" (acts on base_vr, like Rations),
+    # while Recon and SitAware are skills that scale with the amplified
+    # crew level (act on crew_amplified = base_vr * (1+rations+BIA)).
+    'pickerRationsKey':         'KEY_NUMPAD7',  # default ON  - Combat Rations (crew amp from base_vr)
+    'pickerBIAKey':             'KEY_NUMPAD3',  # default ON  - Brothers in Arms (crew amp from base_vr)
+    'pickerReconSitAwareKey':   'KEY_NUMPAD4',  # default ON  - Recon + SitAware (skills from amplified)
+    'pickerDirectivesKey':      'KEY_NUMPAD1',  # default OFF - boost auto-detected equipment by 1.025
+    'pickerFieldUpgradesKey':   'KEY_NUMPAD0',  # default OFF - VR-related field upgrades (per-tank)
+    # Picker VR multipliers. Two-stage model:
+    #   crew_amplified = base_vr * (1 + (rations? 0.0430 : 0) + (BIA? 0.0253 : 0))
+    #   final = crew_amplified
+    #         + crew_amplified * (optics_factor * directive_factor - 1)   # auto from descriptor
+    #         + crew_amplified * (stereo_factor * directive_factor - 1)   # auto from descriptor
+    #         + crew_amplified * (reconSitAware_factor - 1)               # 1 + 0.0288 + 0.0451
+    # Empirical calibration on user's 340m base VR tank.
+    'pickerVRBonusRations':         1.0430,  # +4.30% from base_vr
+    'pickerVRBonusBIA':             1.0253,  # +2.53% from base_vr
+    'pickerVRBonusReconSitAware':   1.0739,  # +7.39% from amplified (= 1 + 0.0288 Recon + 0.0451 SitAware)
+    'pickerVRBonusDirective':       1.0250,
     # Field upgrades on VR are tank-specific (BETA). Server doesn't
     # transmit vehPostProgression for enemies, so this is a manual
     # lookup. Cap at 445 m (VISIBILITY.MAX_RADIUS) is applied to the
@@ -115,9 +126,10 @@ _LAST_SHOT_TIME = 0.0
 _LAST_MOVEMENT_TIME = 0.0
 _PICKED_VID = None
 _PICKER_TOGGLES = {
-    'rations': True,         # default ON: assume enemy has Combat Rations active
-    'crewPerks': True,       # default ON: assume enemy has BIA + Recon + SitAware
-    'directives': False,     # default OFF: assume no directives on equipment slots
+    'rations':       True,   # default ON:  assume enemy has Combat Rations active
+    'BIA':           True,   # default ON:  assume enemy has Brothers in Arms
+    'reconSitAware': True,   # default ON:  assume enemy has Recon + Sit. Awareness
+    'directives':    False,  # default OFF: assume no directives on equipment slots
     'fieldUpgrades': False,  # default OFF: assume no VR field upgrades
 }
 _LIVE_MODE_ENABLED = False  # default OFF - user enables via Numpad9 if they want auto-refreshing block
@@ -363,38 +375,55 @@ def _picker_vr(plugin):
     except Exception:
         return None
     misc = getattr(descr, 'miscAttrs', None) or {}
-    # Game-UI-matching additive model.
+    # Two-stage VR model (v5.6+, per user-corrected mechanic):
     #
-    # 1. Apply field upgrade on base_vr (per-tank %, capped at 445 m).
-    #    Per WoT mechanics, the upgrade goes onto the BASE turret VR.
-    # 2. baseline = base_vr_effective * rations_factor (Rations ON, default)
-    #               or base_vr_effective (OFF)
-    # 3. Each bonus adds baseline * (factor - 1) to final VR.
-    #    - Optics, Stereoscope: auto-detected from descriptor.
-    #    - Crew perks (BIA + Recon + SitAware bundled): toggle Numpad 4.
-    #    - Directives: toggle Numpad 1 multiplies equipment factors by 1.025.
+    # Stage 1: amplify the BASE VR by crew-level boosters. Combat Rations
+    #          (+4.30%) and BIA (+2.53%) raise the effective crew level,
+    #          which mathematically translates to a flat % on base_vr.
+    #          They DO NOT compound on each other - both compute against
+    #          the unamplified base_vr.
+    #
+    #            crew_amplified = base_vr * (1 + rations_pct + BIA_pct)
+    #
+    # Stage 2: equipment (optics, stereo) and crew skills (Recon, SitAware)
+    #          all compute their bonus against the AMPLIFIED baseline.
+    #          This reflects the in-game reality that a higher effective
+    #          crew level makes those skills/equipment deliver more raw VR.
+    #
+    #            final = crew_amplified
+    #                  + crew_amplified * (optics_factor * directive - 1)
+    #                  + crew_amplified * (stereo_factor * directive - 1)
+    #                  + crew_amplified * (reconSitAware - 1)
+    #
+    # Field upgrade applies to base_vr BEFORE stage 1 (capped at 445 m),
+    # which means the upgrade then naturally compounds through both stages.
+
+    # Field upgrade on base_vr (per-tank table, capped).
     if _PICKER_TOGGLES.get('fieldUpgrades', False):
         upgrade_pct = _lookup_field_upgrade_vr(
             (vinfo.vehicleType.shortName or ''))
         if upgrade_pct > 0:
             cap = float(_CFG.get('pickerFieldUpgradeCap', 445.0))
             base_vr = min(base_vr * (1.0 + upgrade_pct), cap)
-    rations_factor = float(_CFG.get('pickerVRBonusRations', 1.043))
-    if _PICKER_TOGGLES.get('rations', True):
-        baseline = base_vr * rations_factor
-    else:
-        baseline = base_vr
-    final = baseline
 
-    # Directive multiplier on auto-detected equipment.
+    # Stage 1: crew amplifier (Rations + BIA, both from base_vr).
+    crew_amp = 1.0
+    if _PICKER_TOGGLES.get('rations', True):
+        crew_amp += float(_CFG.get('pickerVRBonusRations', 1.0430)) - 1.0
+    if _PICKER_TOGGLES.get('BIA', True):
+        crew_amp += float(_CFG.get('pickerVRBonusBIA', 1.0253)) - 1.0
+    crew_amplified = base_vr * crew_amp
+    final = crew_amplified
+
+    # Stage 2: equipment + crew-skill bonuses, additive against crew_amplified.
     directive_active = _PICKER_TOGGLES.get('directives', False)
     directive_factor = float(_CFG.get('pickerVRBonusDirective', 1.025)) if directive_active else 1.0
 
-    # Optics from descriptor (Coated Optics, deluxe, etc).
+    # Optics from descriptor (Coated Optics basic 1.10, deluxe 1.135, etc).
     optics_factor = float(misc.get('circularVisionRadiusFactor', 1.0)) or 1.0
     if optics_factor > 1.001:
         optics_total = optics_factor * directive_factor
-        final += baseline * (optics_total - 1.0)
+        final += crew_amplified * (optics_total - 1.0)
 
     # Stereoscope from descriptor (gated by pickerAssumeStereoscope config).
     if _CFG.get('pickerAssumeStereoscope', True):
@@ -403,16 +432,12 @@ def _picker_vr(plugin):
             stereo_factor = float(_CFG.get('pickerStereoscopeFallback', 1.25))
         if stereo_factor > 1.001:
             stereo_total = stereo_factor * directive_factor
-            final += baseline * (stereo_total - 1.0)
+            final += crew_amplified * (stereo_total - 1.0)
 
-    # Crew perks bundle (BIA + Recon + SitAware combined).
-    if _PICKER_TOGGLES.get('crewPerks', True):
-        perks_factor = float(_CFG.get('pickerVRBonusCrewPerks', 1.0953))
-        final += baseline * (perks_factor - 1.0)
-
-    # Field upgrades on VR are applied to base_vr at the top of this
-    # function (with cap), so all subsequent baseline-relative bonuses
-    # already incorporate the upgrade. Nothing else to do here.
+    # Recon + SitAware bundle (commander + radio op skills).
+    if _PICKER_TOGGLES.get('reconSitAware', True):
+        rs_factor = float(_CFG.get('pickerVRBonusReconSitAware', 1.0739))
+        final += crew_amplified * (rs_factor - 1.0)
 
     return final
 
@@ -789,12 +814,13 @@ def _enemy_iterator(plugin):
 
 def _active_perk_tags():
     tag_map = {
-        'rations': 'rations',
-        'crewPerks': 'crew',
-        'directives': 'dyrektywy',
+        'rations':       'rations',
+        'BIA':           'BIA',
+        'reconSitAware': 'reconSit',
+        'directives':    'dyrektywy',
         'fieldUpgrades': 'ulepsz.polowe',
     }
-    order = ('rations', 'crewPerks', 'directives', 'fieldUpgrades')
+    order = ('rations', 'BIA', 'reconSitAware', 'directives', 'fieldUpgrades')
     return [tag_map[k] for k in order if _PICKER_TOGGLES.get(k, False)]
 
 
@@ -1059,12 +1085,14 @@ def _format_status_block(plugin):
         summary = _format_picker_summary(plugin) or '?'
         lines.append('picker: %s' % summary)
 
-    # Toggle status - show all four with +/- prefix
+    # Toggle status - show all five with +/- prefix.
+    # Order: crew amplifiers (rations, BIA) first, then skills/equipment.
     def _tag(name, on):
         return ('+' if on else '-') + name
     lines.append('toggle: %s' % '  '.join([
         _tag('rations',    _PICKER_TOGGLES.get('rations', True)),
-        _tag('crewPerks',  _PICKER_TOGGLES.get('crewPerks', True)),
+        _tag('BIA',        _PICKER_TOGGLES.get('BIA', True)),
+        _tag('reconSit',   _PICKER_TOGGLES.get('reconSitAware', True)),
         _tag('directives', _PICKER_TOGGLES.get('directives', False)),
         _tag('fieldUpgr',  _PICKER_TOGGLES.get('fieldUpgrades', False)),
     ]))
@@ -1222,8 +1250,10 @@ def _install_reload_hotkey():
         _bind('pickerClearKey', _clear_picker, 'picker-clear')
         _bind('pickerRationsKey',
               lambda: _toggle_perk('rations'), 'rations')
-        _bind('pickerCrewPerksKey',
-              lambda: _toggle_perk('crewPerks'), 'crew-perks')
+        _bind('pickerBIAKey',
+              lambda: _toggle_perk('BIA'), 'BIA')
+        _bind('pickerReconSitAwareKey',
+              lambda: _toggle_perk('reconSitAware'), 'recon-sitaware')
         _bind('pickerDirectivesKey',
               lambda: _toggle_perk('directives'), 'directives')
         _bind('pickerFieldUpgradesKey',

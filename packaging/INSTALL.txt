@@ -50,11 +50,20 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     8 / 2  - poprzedni / nastepny przeciwnik
     5      - wyczysc picker (wraca do useOwnViewRange / fallback)
 
-  TOGGLE'i WP\LYWAJACE NA OBLICZONY VR PRZECIWNIKA:
-    7      - racje bojowe              (default ON - wylacz jesli enemy nie ma)
-    4      - perki zalogi (BIA+Recon+SitAware bundled)  (default ON)
-    1      - dyrektywy na wyposazenie  (default OFF - 1.025 boost na auto-wykryte sprzety)
-    0      - ulepszenia polowe na VR   (default OFF - BETA, per-czolg tabelka w configu)
+  TOGGLE'i WP\LYWAJACE NA OBLICZONY VR PRZECIWNIKA (v5.6 dwustopniowy model):
+
+  Stage 1 - amplifiery zalogi (liczone OD base_vr):
+    7      - racje bojowe              (default ON, +4.30%)
+    3      - braterstwo (BIA)          (default ON, +2.53%)
+
+  Stage 2 - skille / sprzet (liczone OD amplified = base_vr * (1+rations+BIA)):
+    4      - zwiad+rozeznanie (Recon+SitAware bundled)  (default ON, +7.39%)
+    1      - dyrektywy na wyposazenie  (default OFF, x1.025 na auto-wykryte sprzety)
+    0      - ulepszenia polowe na VR   (default OFF, BETA, per-czolg tabelka)
+
+  Auto-detected equipment z descriptora (zawsze, niezaleznie od toggle):
+    - Coated Optics:  *1.10 (basic) / *1.135 (deluxe) / *1.14+ (bond) - liczone OD amplified
+    - Stereoscope:    *1.25 (basic) - liczone OD amplified, gated przez pickerAssumeStereoscope
 
   OVERLAY / DIAG (v5.5 - bez spamu na zmiany!):
     9      - toggle LIVE MODE (default OFF). Gdy ON, bloczek z 4 wartosciami
