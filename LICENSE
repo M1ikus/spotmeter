@@ -22,5 +22,5 @@ SOFTWARE.
 
 This mod is an unofficial fan project. World of Tanks is a registered
 trademark of Wargaming.net. This project does not redistribute Wargaming's
-copyrighted material; the build artefact (mod_spot_circle.pyc) contains only
+copyrighted material; the build artefact (mod_spotmeter.pyc) contains only
 this project's own source code compiled to Python 2.7 bytecode.

@@ -292,8 +292,10 @@ Wymaga Python 2.7 (do kompilacji `.pyc` zgodnego z silnikiem WoT-a, Anaconda env
 ### Kompilacja .pyc
 
 ```sh
-"C:/Users/23120/miniforge3/envs/py27/python.exe" -c "import py_compile; py_compile.compile('src/mod_spotmeter.py', cfile='build/mod_spotmeter.pyc', doraise=True)"
+<python2.7> -c "import py_compile; py_compile.compile('src/mod_spotmeter.py', cfile='build/mod_spotmeter.pyc', dfile='mod_spotmeter.py', doraise=True)"
 ```
+
+Gdzie `<python2.7>` to ścieżka do Pythona 2.7 (np. `python2.7` na systemach gdzie jest w PATH, albo pełna ścieżka do `python.exe` z conda/miniforge env-u o Python 2.7). Parametr `dfile='mod_spotmeter.py'` jest ważny — bez niego ścieżka source (zawierająca lokalną strukturę katalogów) zostaje zaszyta w `.pyc` i jest widoczna po unzipowaniu `.wotmod`.
 
 ### Pakowanie .wotmod (release)
 
@@ -312,8 +314,8 @@ Wersja jest czytana z `packaging/meta.xml` — zaktualizuj tam przed kolejnym bu
 ### Hot-test podczas devu
 
 ```sh
-cp build/mod_spotmeter.pyc "D:/Gry/World_of_Tanks_EU/res_mods/2.2.1.2/scripts/client/gui/mods/"
-cp src/spotmeter.json "D:/Gry/World_of_Tanks_EU/mods/configs/"
+cp build/mod_spotmeter.pyc "<WoT>/res_mods/2.2.1.2/scripts/client/gui/mods/"
+cp src/spotmeter.json "<WoT>/mods/configs/"
 ```
 
 `res_mods/` ma priorytet nad `mods/<wersja>/*.wotmod` więc lokalna zmiana w `res_mods/` wygrywa nad zainstalowaną wersją release'ową.
