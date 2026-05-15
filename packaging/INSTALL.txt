@@ -2,7 +2,7 @@ SpotMeter — instalacja
 =======================
 
 Wersja: {{VERSION}}
-Wersja gry WoT: 2.2.1.2  (sprawdz w ~/version.xml jesli inna)
+Wersja gry WoT: 2.2.1.3  (sprawdz w ~/version.xml jesli inna)
 Pythona w grze: 2.7  (Wargaming nadal trzyma sie tej wersji)
 
 Co potrzeba:
@@ -13,12 +13,12 @@ Co potrzeba:
 KROK 1: Wrzuc .wotmod do gry
 -----------------------------
 Skopiuj  spotmeter-v{{VERSION}}.wotmod
-Do       <katalog gry>\mods\2.2.1.2\
+Do       <katalog gry>\mods\2.2.1.3\
 
 Przyklad sciezki:
-   D:\Gry\World_of_Tanks_EU\mods\2.2.1.2\spotmeter-v{{VERSION}}.wotmod
+   D:\Gry\World_of_Tanks_EU\mods\2.2.1.3\spotmeter-v{{VERSION}}.wotmod
 
-Jesli folder mods\2.2.1.2 nie istnieje, gra go zrobi po pierwszym uruchomieniu.
+Jesli folder mods\2.2.1.3 nie istnieje, gra go zrobi po pierwszym uruchomieniu.
 
 Game auto-laduje wszystkie .wotmod z tego katalogu po starcie.
 
@@ -141,7 +141,7 @@ co tick — w logu beda linie:
 
 JAK ODINSTALOWAC
 -----------------
-Usun spotmeter-v{{VERSION}}.wotmod z mods\2.2.1.2\.
+Usun spotmeter-v{{VERSION}}.wotmod z mods\2.2.1.3\.
 (Plik configu w mods\configs\spotmeter.json mozna zostawic albo skasowac.)
 
 

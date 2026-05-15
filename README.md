@@ -118,7 +118,7 @@ Server NIE wysyła `vehPostProgression` przeciwnika (jest to `MY_VEHICLE` scope)
 
 Pobierz `spotmeter-v<wersja>.zip` z [GitHub Releases](https://github.com/M1ikus/spotmeter/releases). W środku:
 
-- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.2.1.2/`
+- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.2.1.3/`
 - `spotmeter.json` (opcjonalny) → wrzuć do `<WoT>/mods/configs/`
 - `INSTALL.txt` — szczegółowa instrukcja krok po kroku
 
@@ -314,7 +314,7 @@ Wersja jest czytana z `packaging/meta.xml` — zaktualizuj tam przed kolejnym bu
 ### Hot-test podczas devu
 
 ```sh
-cp build/mod_spotmeter.pyc "<WoT>/res_mods/2.2.1.2/scripts/client/gui/mods/"
+cp build/mod_spotmeter.pyc "<WoT>/res_mods/2.2.1.3/scripts/client/gui/mods/"
 cp src/spotmeter.json "<WoT>/mods/configs/"
 ```
 
