@@ -19,6 +19,13 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_PYC = os.path.join(ROOT, 'build', 'mod_spotmeter.pyc')
 SRC_JSON = os.path.join(ROOT, 'src', 'spotmeter.json')
+SRC_SWF_BUTTON = os.path.join(ROOT, 'swf', 'spotmeter_button.swf')
+SRC_SWF_MENU   = os.path.join(ROOT, 'swf', 'spotmeter_menu.swf')
+SRC_SWF_BATTLE = os.path.join(ROOT, 'swf', 'spotmeter_battle.swf')
+SRC_SWF_GF     = os.path.join(ROOT, 'swf', 'spotmeter_guiflash.swf')
+SRC_GF_INIT    = os.path.join(ROOT, 'build', 'spotmeter_gf', '__init__.pyc')
+SRC_GF_FLASH   = os.path.join(ROOT, 'build', 'spotmeter_gf', 'flash.pyc')
+SRC_GF_UTILS   = os.path.join(ROOT, 'build', 'spotmeter_gf', 'utils.pyc')
 META_XML = os.path.join(ROOT, 'packaging', 'meta.xml')
 INSTALL_TXT = os.path.join(ROOT, 'packaging', 'INSTALL.txt')
 DIST = os.path.join(ROOT, 'dist')
@@ -63,6 +70,21 @@ def main():
     #      archive but the gui mods loader's ResMgr.openSection() does
     #      not see it - the .wotmod 'loads' but the python module is
     #      never imported. (This is the bug v5.1.1 hit.)
+    # v6.0.0 MVP2: our LEGACY custom SWFs (button/menu/battle) are not
+    # shipped - they were rejected by WG's IView contract on WoT 2.x.
+    # We ship the forked GUIFlash (spotmeter_guiflash.swf) which IS a
+    # valid IView, plus its private Python wrapper at gui.mods.spotmeter_gf.
+    # The mod's own UI (mod_spotmeter.py) renders into the forked GUIFlash
+    # at runtime via g_smGuiFlash.createComponent.
+    gf_swf_present = os.path.exists(SRC_SWF_GF)
+    gf_py_present  = all(os.path.exists(p) for p in (SRC_GF_INIT, SRC_GF_FLASH, SRC_GF_UTILS))
+    if not gf_swf_present:
+        print('error: %s missing - run python swf/build.py first' % SRC_SWF_GF, file=sys.stderr)
+        return 1
+    if not gf_py_present:
+        print('error: build/spotmeter_gf/*.pyc missing - compile the wrapper first', file=sys.stderr)
+        return 1
+
     payload_entries = [
         ('res/', None),
         ('res/scripts/', None),
@@ -70,6 +92,13 @@ def main():
         ('res/scripts/client/gui/', None),
         ('res/scripts/client/gui/mods/', None),
         ('res/scripts/client/gui/mods/mod_spotmeter.pyc', SRC_PYC),
+        ('res/scripts/client/gui/mods/spotmeter_gf/', None),
+        ('res/scripts/client/gui/mods/spotmeter_gf/__init__.pyc', SRC_GF_INIT),
+        ('res/scripts/client/gui/mods/spotmeter_gf/flash.pyc',    SRC_GF_FLASH),
+        ('res/scripts/client/gui/mods/spotmeter_gf/utils.pyc',    SRC_GF_UTILS),
+        ('res/gui/', None),
+        ('res/gui/flash/', None),
+        ('res/gui/flash/spotmeter_guiflash.swf', SRC_SWF_GF),
     ]
     with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_STORED) as z:
         z.write(META_XML, 'meta.xml')

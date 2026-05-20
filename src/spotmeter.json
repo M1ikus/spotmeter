@@ -1,6 +1,9 @@
 {
     "_comment": "SpotMeter mod - configuration. Place at <WoT>/mods/configs/spotmeter.json (or one of the legacy paths). NumLock-on, NumpadPeriod (or Delete) reloads this file in-battle.",
 
+    "_comment_schema": "Schema version. v1 (no field) = pre-v6 flat config; v2 = v6.0+ with defaultToggles + auto-pick. Loader auto-migrates v1 -> v2 in memory; this file is only rewritten when you save via the v6 in-garage menu.",
+    "configVersion": 2,
+
     "enabled": true,
 
     "_comment_view_mode": "If true (default), use the player's own view range as the assumed enemy VR. If false, use enemyViewRangeFallback. Picker (when active) overrides both.",
@@ -66,6 +69,43 @@
     "overlayPrintNowKey": "KEY_NUMPADENTER",
     "liveModeIntervalSec": 3.0,
     "reloadKey": "KEY_NUMPADPERIOD",
+
+    "_comment_auto_pick": "v6.0: continuously track the closest visible enemy as VR target. Default OFF. Toggle in-battle with NumpadSlash. Manual pick (Numpad 2/8) overrides; Numpad 5 clears manual and (when auto on) restores auto. Position cache holds last-known fix for autoPickCacheTimeoutSec so the target doesn't flicker when a spotter blinks. Range is 2D ground distance from your tank.",
+    "autoPickEnabled": false,
+    "autoPickRangeMeters": 445.0,
+    "autoPickCacheTimeoutSec": 5.0,
+    "autoPickToggleKey": "KEY_NUMPADSLASH",
+    "autoPickMarker": "○ ",
+
+    "_comment_defaults": "v6.0: which picker bonuses start ON at the beginning of each battle. Applied ONCE at WoT startup; in-battle Numpad toggles change the live state without altering these defaults. Hot-reload of this file does NOT re-apply (so a Numpad7 mid-session won't get flipped back). Restart WoT to pick up changes.",
+    "defaultToggles": {
+        "rations":       true,
+        "BIA":           true,
+        "reconSitAware": true,
+        "directives":    false,
+        "fieldUpgrades": false
+    },
+
+    "_comment_menu_button": "v6.0: floating SpotMeter menu button in the hangar. Drag with the mouse to reposition; position persists here. Coords are absolute pixels from screen top-left and are clamped to the visible area at load, so changing resolution won't make it disappear. Defaults aim at the bottom-of-hangar area to the right of the customization brush icon at 1920x1080.",
+    "menuButtonEnabled": false,
+    "menuButtonX": 720,
+    "menuButtonY": 850,
+    "menuButtonW": 90,
+    "menuButtonH": 28,
+
+    "_comment_battle_panel": "v6.0.0 MVP1: in-battle SpotMeter status panel rendered via the gambiter.guiflash library. Requires gambiter.guiflash_*.wotmod installed alongside this mod (drop into mods/<version>/). Drag the panel to reposition; coords persist here. Display-only in MVP1 (use Numpad 2/8 to pick enemy, 5 to clear, 1/3/4/7/0 for toggles, NumpadSlash for auto-pick); MVP2 will add click interactivity.",
+    "battlePanelEnabled": true,
+    "battlePanelX": 10,
+    "battlePanelY": 400,
+    "battlePanelW": 320,
+    "battlePanelH": 380,
+
+    "_comment_garage_panel": "v6.0.0: read-only garage settings/info panel rendered via the bundled GUIFlash fork. Shows current toggle state, battle-panel position, Numpad hotkey reference. Drag to move (position persists here). Edit defaultToggles below + restart WoT to change what's ON at battle start - the in-battle Numpad keys change the live session state without rewriting defaults.",
+    "garagePanelEnabled": true,
+    "garagePanelX": 1500,
+    "garagePanelY": 320,
+    "garagePanelW": 380,
+    "garagePanelH": 320,
 
     "_comment_debug": "logCalcDetails=true logs camo/radius/state each tick to python.log.",
     "logCalcDetails": false
