@@ -1,19 +1,22 @@
 <!--
-WG Mods portal (wgmods.net) submission template for SpotMeter.
+Release listing texts for SpotMeter, per distribution channel.
+Content in the code blocks is the CURRENT (v6.0.0) copy - paste it straight in.
 
-Three fields, each with a HARD character limit enforced by the portal.
-The content in the code blocks below is the CURRENT (v6.0.0) listing - copy it
-straight into the form.
+Channels:
+  1. WG Mods portal (wgmods.net) - ENGLISH. Three fields with HARD char limits.
+  2. Aslain's modpack - POLISH. Short per-version changelog (no hard limit).
 
 Per release:
-  - ALWAYS rewrite "Version changes" (it is per-version).
+  - ALWAYS rewrite the "Version changes" blocks (WG EN + Aslain PL).
   - Update "Mod description" / "Installation" only when features or the target
     WoT version actually change.
-  - Keep each block under its limit (counts noted in the headings).
-  - Language: English, to match meta.xml <description>.
+  - Keep the WG blocks under their limits (counts noted in the headings).
+  - WG portal = English (matches meta.xml <description>); Aslain = Polish.
 -->
 
-# WG Mods portal listing — SpotMeter
+# Release listing texts — SpotMeter
+
+# WG Mods portal (wgmods.net) — English
 
 ## Version changes  (max 1000 characters)
 
@@ -88,4 +91,36 @@ The game auto-loads every .wotmod in mods\<version>\ at startup.
 To uninstall: delete the .wotmod from mods\2.3.0.0\.
 
 Requires WoT 2.3.0.0. No other mods needed - the GUIFlash library is bundled.
+```
+
+# Aslain's modpack — Polish
+
+Mod jest w paczce Aslaina, ktora ma wlasny changelog po polsku (bez twardego
+limitu znakow - Aslain lubi zwiezle wpisy). Dwie formy do wyboru.
+
+## Zmiany wersji — jedna linia (kompaktowy changelog Aslaina)
+
+```
+SpotMeter zaktualizowany do v6.0.0 (WoT 2.3.0.0) — panele w bitwie i garażu, auto-dobieranie celu, klawisz PageDown, interfejs PL/EN. (autor: ISEDR_Mikus)
+```
+
+## Zmiany wersji — pełne
+
+```
+SpotMeter v6.0.0 — pod WoT 2.3.0.0.
+
+Duża aktualizacja — oprócz okręgu na minimapie pokazującego dystans wykrycia doszły panele i automatyka:
+
+NOWE
+- Panel w bitwie: lista przeciwników z zasięgiem widzenia (VR); identyczne czołgi grupowane w jeden wiersz. Pokazuje dystans spotu wybranego celu (albo Twojego czołgu, gdy nic nie wybrane). Wybór klikiem albo Numpad 2/8. Przeciągalny.
+- Panel w garażu: konfiguracja perków/sprzętu przed bitwą, z podglądem na żywo.
+- PageDown: pokaż/ukryj panel (bitwa + garaż); zostaje ukryty aż do ponownego wciśnięcia.
+- Auto-dobieranie (Numpad /): automatycznie celuje w najbliższego przeciwnika, presety per klasa.
+- Optyka / Wentylacja / CVS jako ręczne, cyklowane poziomy (Numpad 6 / + / −).
+- Auto-ukrywanie przy trzymaniu TAB/N oraz po otwarciu okien w garażu.
+- Interfejs po polsku i angielsku (wykrywany automatycznie z języka klienta).
+
+POPRAWKI
+- Panel nie włącza się już sam po ukryciu przez PageDown.
+- Optymalizacja wydajności w garażu.
 ```
