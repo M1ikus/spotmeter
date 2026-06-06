@@ -16,6 +16,16 @@ Per release:
 
 # Release listing texts — SpotMeter
 
+## Dependencies / wymagania (both channels)
+
+NONE - SpotMeter is fully self-contained in the single .wotmod:
+- bundles mod_spotmeter.pyc + a private GUIFlash fork (gui.mods.spotmeter_gf + its SWF)
+- does NOT require gambiter.guiflash, XVM, XFW or any shared library
+- spotmeter.json config is optional (built-in defaults if absent)
+- requires WoT 2.3.0.0; no special load order
+- coexists with other mods: own namespace, replaces no WG UI files, every game
+  hook is a wrapper that calls the original, hotkeys are never consumed
+
 # WG Mods portal (wgmods.net) — English
 
 ## Version changes  (max 1000 characters)
