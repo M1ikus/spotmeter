@@ -6,6 +6,9 @@
 
     "enabled": true,
 
+    "_comment_language": "UI language: 'auto' reads the WoT client language (pl -> Polish, anything else -> English). Force with 'pl' or 'en'.",
+    "language": "auto",
+
     "_comment_view_mode": "If true (default), use the player's own view range as the assumed enemy VR. If false, use enemyViewRangeFallback. Picker (when active) overrides both.",
     "useOwnViewRange": true,
     "enemyViewRangeFallback": 445.0,
@@ -41,6 +44,9 @@
     "pickerRationsKey":       "KEY_NUMPAD7",
     "pickerBIAKey":           "KEY_NUMPAD3",
     "pickerReconSitAwareKey": "KEY_NUMPAD4",
+    "pickerOpticsKey":        "KEY_NUMPAD6",
+    "pickerVentsKey":         "KEY_ADD",
+    "pickerCvsKey":           "KEY_NUMPADMINUS",
     "pickerDirectivesKey":    "KEY_NUMPAD1",
     "pickerFieldUpgradesKey": "KEY_NUMPAD0",
     "pickerDiagDumpKey":      "KEY_NUMPADSTAR",
@@ -60,6 +66,11 @@
     "pickerFieldUpgradeCap": 445.0,
     "pickerAssumeStereoscope": true,
     "pickerStereoscopeFallback": 1.25,
+
+    "_comment_optics_vents_cvs_levels": "WoT 2.x server doesn't transmit enemy optionalDevices, so optics / vents / CVS never show up in the decoded descriptor. Optics + vents are 5-level cyclable presets (0=OFF, 1=basic, 2=basic in specialty slot, 3=Bonds (red), 4=Deluxe (purple)); CVS is 3-level (0=OFF, 1=zwykly, 2=na slocie) because CVS has no Bonds/Deluxe grade. Numpad 6 cycles opticsLevel, Numpad + cycles ventsLevel, Numpad - cycles cvsLevel. Optics percentages: +10% / +11.5% / +12.5% / +13.5% (VR multiplier). Vents percentages: +5% / +6.25% / +7.5% / +8.5% (multiplies the additive crew bonuses rations / BIA / recon+SitA). CVS factors below 1.0 reduce OUR moving camo when the picked enemy has CVS: zwykly 0.900 (-10%), na slocie 0.875 (-12.5%). Tune any of the three arrays if needed.",
+    "pickerOpticsFactors": [1.0, 1.10, 1.115, 1.125, 1.135],
+    "pickerVentsFactors":  [1.0, 1.05, 1.0625, 1.075, 1.085],
+    "pickerCvsFactors":    [1.0, 0.900, 0.875],
     "pickerMarker": "● ",
     "pickerIncludeDeadEnemies": false,
 
@@ -76,6 +87,12 @@
     "autoPickCacheTimeoutSec": 5.0,
     "autoPickToggleKey": "KEY_NUMPADSLASH",
     "autoPickMarker": "○ ",
+    "_comment_auto_presets": "Per-class presets applied ONLY while auto-pick is ON. Set ONCE when you ENABLE auto (toggle off+on to re-apply), based on the class of the tank auto picks at that moment - does NOT re-apply as auto retargets. Numpad presses override live. Keyed by WoT class tag (lightTank/mediumTank/heavyTank/AT-SPG/SPG); 'default' is the fallback for classes without their own entry. Levels 0..4 (0=OFF 1=basic 2=slot 3=bonds 4=deluxe). Default: lights = optics+CVS on slot + rations/BIA/recon ON; everyone else = optics+CVS OFF + rations/BIA/recon ON.",
+    "autoPresetsEnabled": true,
+    "autoPresets": {
+        "lightTank": {"rations": true, "BIA": true, "reconSitAware": true, "directives": false, "fieldUpgrades": false, "optics": 2, "vents": 0, "cvs": 2},
+        "default":   {"rations": true, "BIA": true, "reconSitAware": true, "directives": false, "fieldUpgrades": false, "optics": 0, "vents": 0, "cvs": 0}
+    },
 
     "_comment_defaults": "v6.0: which picker bonuses start ON at the beginning of each battle. Applied ONCE at WoT startup; in-battle Numpad toggles change the live state without altering these defaults. Hot-reload of this file does NOT re-apply (so a Numpad7 mid-session won't get flipped back). Restart WoT to pick up changes.",
     "defaultToggles": {
@@ -85,6 +102,12 @@
         "directives":    false,
         "fieldUpgrades": false
     },
+    "_comment_default_levels": "Multi-level cyclable controls: opticsLevel + ventsLevel + cvsLevel. Each 0..4 indexing into the matching pickerXxxFactors array. Defaults: optics=4 (Deluxe, what most high-tier players run), vents=0 (OFF, less universal), cvs=0 (OFF, CVS is rare). Numpad 6 / Numpad + / Numpad - cycles them in battle; they reset to these defaults at the start of each battle.",
+    "defaultLevels": {
+        "optics": 4,
+        "vents":  0,
+        "cvs":    0
+    },
 
     "_comment_menu_button": "v6.0: floating SpotMeter menu button in the hangar. Drag with the mouse to reposition; position persists here. Coords are absolute pixels from screen top-left and are clamped to the visible area at load, so changing resolution won't make it disappear. Defaults aim at the bottom-of-hangar area to the right of the customization brush icon at 1920x1080.",
     "menuButtonEnabled": false,
@@ -93,12 +116,21 @@
     "menuButtonW": 90,
     "menuButtonH": 28,
 
-    "_comment_battle_panel": "v6.0.0 MVP1: in-battle SpotMeter status panel rendered via the gambiter.guiflash library. Requires gambiter.guiflash_*.wotmod installed alongside this mod (drop into mods/<version>/). Drag the panel to reposition; coords persist here. Display-only in MVP1 (use Numpad 2/8 to pick enemy, 5 to clear, 1/3/4/7/0 for toggles, NumpadSlash for auto-pick); MVP2 will add click interactivity.",
+    "_comment_panel_toggle": "Hotkey to show/hide the SpotMeter panel - works BOTH in battle (battle panel) and in the garage (garage panel) as one context-aware key. Default PageDown (KEY_PGDN). This frees KEY_PGDN from being the NumLock-off alias of Numpad3/BIA (Numpad3 still does BIA). battlePanelEnabled / garagePanelEnabled below set STARTUP visibility; this key flips visibility live and can summon a panel even when its Enabled flag is false. Set to \"\" to disable the hotkey.",
+    "panelToggleKey": "KEY_PGDN",
+
+    "_comment_battle_panel": "v6.0.0: in-battle SpotMeter picker panel rendered via the bundled GUIFlash fork (spotmeter_gf - shipped INSIDE this .wotmod, NO external gambiter.guiflash needed). Lists enemies (grouped if battlePanelGroupSameTanks), shows target spot-distance + AUTO state + toggle/level state. Pick with Numpad 2/8 or by clicking a row; 5 clears; 1/3/4/7/0 + 6/+/- for toggles & levels; NumpadSlash for auto-pick. Drag to reposition (coords persist here). PageDown shows/hides it.",
     "battlePanelEnabled": true,
     "battlePanelX": 10,
     "battlePanelY": 400,
     "battlePanelW": 320,
     "battlePanelH": 380,
+    "_comment_group_same_tanks": "If true (default), identical enemy tanks collapse into ONE panel row and ONE Numpad 2/8 cycle stop, labelled 'Name xN' (same model = same view range = same spot circle, so listing each separately just means cycling through identical circles). Set false to list every enemy individually.",
+    "battlePanelGroupSameTanks": true,
+    "_comment_auto_hide": "Auto-hide the panel when any WG window opens (research/depot/dialogs in the garage, TAB-style overlays in battle) and restore it when the last window closes. false = panel always on top.",
+    "autoHidePanelOnWindow": true,
+    "_comment_battle_hide_keys": "In battle, hide the panel while one of these keys is held (TAB/N show the team-stats overlays); released -> panel returns. WoT Keys names.",
+    "battleHidePanelKeys": ["KEY_TAB", "KEY_N"],
 
     "_comment_garage_panel": "v6.0.0: read-only garage settings/info panel rendered via the bundled GUIFlash fork. Shows current toggle state, battle-panel position, Numpad hotkey reference. Drag to move (position persists here). Edit defaultToggles below + restart WoT to change what's ON at battle start - the in-battle Numpad keys change the live session state without rewriting defaults.",
     "garagePanelEnabled": true,

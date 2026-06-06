@@ -2,7 +2,7 @@ SpotMeter — instalacja
 =======================
 
 Wersja: {{VERSION}}
-Wersja gry WoT: 2.2.1.3  (sprawdz w ~/version.xml jesli inna)
+Wersja gry WoT: 2.3.0.0  (sprawdz w ~/version.xml jesli inna)
 Pythona w grze: 2.7  (Wargaming nadal trzyma sie tej wersji)
 
 Co potrzeba:
@@ -13,12 +13,12 @@ Co potrzeba:
 KROK 1: Wrzuc .wotmod do gry
 -----------------------------
 Skopiuj  spotmeter-v{{VERSION}}.wotmod
-Do       <katalog gry>\mods\2.2.1.3\
+Do       <katalog gry>\mods\2.3.0.0\
 
 Przyklad sciezki:
-   D:\Gry\World_of_Tanks_EU\mods\2.2.1.3\spotmeter-v{{VERSION}}.wotmod
+   D:\Gry\World_of_Tanks_EU\mods\2.3.0.0\spotmeter-v{{VERSION}}.wotmod
 
-Jesli folder mods\2.2.1.3 nie istnieje, gra go zrobi po pierwszym uruchomieniu.
+Jesli folder mods\2.3.0.0 nie istnieje, gra go zrobi po pierwszym uruchomieniu.
 
 Game auto-laduje wszystkie .wotmod z tego katalogu po starcie.
 
@@ -61,9 +61,15 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     1      - dyrektywy na wyposazenie  (default OFF, x1.025 na auto-wykryte sprzety)
     0      - ulepszenia polowe na VR   (default OFF, BETA, per-czolg tabelka)
 
-  Auto-detected equipment z descriptora (zawsze, niezaleznie od toggle):
-    - Coated Optics:  *1.10 (basic) / *1.135 (deluxe) / *1.14+ (bond) - liczone OD amplified
-    - Stereoscope:    *1.25 (basic) - liczone OD amplified, gated przez pickerAssumeStereoscope
+  POZIOMY CYKLOWANE (serwer 2.x nie wysyla optionalDevices przeciwnika):
+    6      - optyka:      poziom 0-4 (OFF / zwykla / na slocie / Z nagrod / Ulepszona)
+    +      - wentylacja:  poziom 0-4 (mnozy bonusy zalogi rations/BIA/recon)
+    -      - CVS:         poziom 0-2 (OFF / zwykly / na slocie) - obniza NASZE camo w ruchu
+    Stereoscope *1.25 - auto z descriptora jesli wykryta (pickerAssumeStereoscope)
+
+  AUTO-DOBIERANIE:
+    /      - toggle auto-pick (default OFF) - najblizszy przeciwnik jako cel.
+             Wlaczenie stosuje preset per-klasa; reczny wybor 2/8 nadpisuje auto.
 
   OVERLAY / DIAG (v5.5 - bez spamu na zmiany!):
     9      - toggle LIVE MODE (default OFF). Gdy ON, bloczek z 4 wartosciami
@@ -72,14 +78,22 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     *      - dump descriptora wybranego enemy do python.log (diagnostyka)
     .      - reload configu
 
+  PANEL (v6.0):
+    PageDown - pokaz/ukryj panel (kontekstowy: bitwa = panel bitewny,
+               garaz = panel garazowy). Chowa sie tez na TAB/N w bitwie
+               i przy oknach WG w garazu; wraca sam.
+
+  JEZYK: pole "language" w configu - "auto" (jezyk klienta WoT, pl->PL,
+  reszta->EN), albo wymus "pl" / "en".
+
   CO POKAZUJE BLOK STATUSU:
-    [SpotMeter v5.5.0] vs VR=445m (own)
+    [SpotMeter v6.0.0] vs VR=445m (own)
       ruch:         287m
       postoj:       295m  <-- AKTUALNY
       siatka 3s+:   275m
       po strzale:   320m
     picker: -- (using own VR)
-    toggle: +rations  +crewPerks  -directives  -fieldUpgr
+    toggle: +rations  +BIA  +recon  -directives  -fieldUpgr
     own:    base_vr=410m * factor=1.103, camo_add=0.025, live=off
 
     Wszystkie 4 wartosci VR-spot widzisz na raz. Strzalka pokazuje
@@ -127,7 +141,7 @@ WERYFIKACJA / DEBUG
 Logi: <katalog gry>\python.log
 
 Po starcie gry powinien byc tam wpis:
-   SpotMeter: initialised (version=5.2.0, ...)
+   SpotMeter: initialised (version=6.0.0, ...)
 
 Jesli nie ma — mod sie nie zaladowal. Najczestsze przyczyny:
 - zla wersja gry (sprawdz numer w sciezce mods\<wersja>\)
@@ -141,7 +155,7 @@ co tick — w logu beda linie:
 
 JAK ODINSTALOWAC
 -----------------
-Usun spotmeter-v{{VERSION}}.wotmod z mods\2.2.1.3\.
+Usun spotmeter-v{{VERSION}}.wotmod z mods\2.3.0.0\.
 (Plik configu w mods\configs\spotmeter.json mozna zostawic albo skasowac.)
 
 

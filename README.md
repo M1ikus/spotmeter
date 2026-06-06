@@ -1,6 +1,8 @@
 # SpotMeter — WoT minimap mod
 
-Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój czołg może zostać zauważony przez przeciwnika.
+Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój czołg może zostać zauważony przez przeciwnika. Od **v6.0** dochodzą dwa przeciągalne panele GUIFlash: **panel bitewny** (lista przeciwników + picker celu) i **panel garażowy** (pre-konfiguracja przed bitwą), plus **auto-dobieranie** celu i pełne **PL/EN** UI. Panele pokazujesz/ukrywasz klawiszem **PageDown**.
+
+> Build pod **WoT 2.3.0.0** · wersja moda **6.0.0**.
 
 ## Co automatycznie / co ręcznie
 
@@ -23,6 +25,29 @@ Granica jest prosta: wszystko co jest w **descriptorze pojazdu** (transmitowanym
 W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + Stereoscope (jeśli są na tym czołgu — odczytane z descriptora). Toggle perków / consumables / dyrektyw / field-upgradów nakładasz tylko gdy zakładasz że enemy je faktycznie ma.
 
 > **Weryfikacja własnych field upgrades:** naciśnij **NumpadEnter** (status snapshot) — w chacie pojawi się m.in. linia `myVR: base=410m * factor=1.103` i `myCamo: base(...) + add=0.025`. Jeśli `factor>1.0` lub `add>0.0`, ulepszenia polowe są naliczone w descriptorze.
+
+## Panel SpotMeter (v6.0)
+
+Dwa przeciągalne panele renderowane przez wbudowany fork GUIFlash (`spotmeter_gf` — własny namespace, **nie wymaga** i nie koliduje z `gambiter.guiflash`). Jeden klawisz **PageDown** pokazuje/ukrywa panel — kontekstowo (w bitwie panel bitewny, w garażu garażowy).
+
+### Panel bitewny
+Stale widoczna lista przeciwników. Każdy wiersz: `[klasa] Nazwa xN  T<tier>  VR=XXXm`. Identyczne czołgi są grupowane w jeden wiersz (`battlePanelGroupSameTanks`, np. `Dravec x5`) — jeden przystanek w cyklu Numpad 2/8, bo ten sam model = ten sam VR = ten sam okrąg.
+- **Linia „Cel:"** — pokazuje odległość spotu (`spot=XXXm`) dla wybranego przeciwnika. Gdy nic nie wybrane i auto OFF — pokazuje **Twój własny** czołg.
+- **Linia AUTO** — stan auto-dobierania (ON/OFF).
+- **Toggle / poziomy** — bieżący stan rations / BIA / recon / optyki / wentylacji / CVS.
+- Wybór celu: **Numpad 2/8** lub klik na wierszu.
+- **Auto-hide**: panel chowa się gdy trzymasz **TAB/N** (tablica wyników) i wraca po puszczeniu; chowa się też gdy otwierasz okna WG (jeśli `autoHidePanelOnWindow`). Stopka pod listą podpowiada `Naciśnij PgDn żeby ukryć panel`.
+
+### Panel garażowy
+Konfiguracja **przed** bitwą. Te same Numpady przełączają opcje na żywo i panel od razu to odzwierciedla. Widać stan AUTO. Auto-chowa się przy wejściu w zakładki (Badania / wyposażenie / amunicja / materiały eksploatacyjne).
+
+### Auto-dobieranie (NumpadSlash) — „najświeższa akcja wygrywa"
+- Włączenie AUTO → stosuje **preset per-klasa** (`autoPresets`) wg klasy aktualnie namierzonego czołgu. Lekkie: optyka+CVS na slocie + rations/BIA/recon ON; reszta (MT/HT/TD/SPG): optyka+CVS OFF + rations/BIA/recon ON. Preset stosuje się raz przy włączeniu auto (off→on by zaaplikować ponownie).
+- Ręczny wybór (Numpad 2/8) **nadpisuje** auto; włączenie auto **nadpisuje** ręczny wybór (symetrycznie).
+- Numpad 5 czyści ręczny wybór (przy auto ON wraca do auto).
+
+### Język (i18n)
+`language: "auto"` czyta język klienta WoT — `pl` → polski, cokolwiek innego → angielski. Wymuś przez `"pl"` / `"en"`.
 
 ## Kolory okręgu
 
@@ -54,46 +79,43 @@ spot_distance ∈ [50 m, 445 m]
 
 Trzy źródła w kolejności priorytetu:
 
-1. **Picker aktywny** — bierzemy descriptor wybranego enemy (`strCompactDescr`), liczymy bazowy VR z wieży, dodajemy auto-wykryte (Optics, Stereoscope) i opcjonalnie zaznaczone toggle (Rations, Crew Perks, Directives, Field Upgrades).
+1. **Picker aktywny** — bierzemy descriptor wybranego enemy (`strCompactDescr`), liczymy bazowy VR z wieży, dodajemy Stereoscope (auto z descriptora jeśli wykryta), ręcznie ustawiony poziom optyki / wentylacji / CVS oraz zaznaczone toggle (Rations, BIA, Recon+SitAware, Directives, Field Upgrades).
 2. **`useOwnViewRange: true`** (default, picker nieaktywny) — bierzemy własny VR z `feedback.getVehicleAttrs()['circularVisionRadius']`. Serwer go syncuje (`VEHICLE_ATTRS_TO_SYNC`). Ten VR ma już naliczoną załogę, optykę, lornę itd.
 3. **`useOwnViewRange: false`** — używamy `enemyViewRangeFallback` (domyślnie 445 m = max w grze).
 
-## Model picker VR (v5.3+, game-UI matching)
-
-Gra w UI dodaje wszystkie bonusy **addytywnie** wobec baseline `(base_VR × rations)`. Mod robi tak samo:
+## Model picker VR (v5.6 — dwustopniowy)
 
 ```
 1. base_vr  ← descr.turret.circularVisionRadius
 2. JEŚLI Field Upgrades ON i czołg w tabelce:
        base_vr ← min(base_vr * (1 + upgrade%), 445m)
-3. baseline ← base_vr * (Rations ? 1.0430 : 1.0)
-4. final    ← baseline
-   + baseline * (optics_factor * directive_factor - 1)        # auto z descriptora
-   + baseline * (stereo_factor * directive_factor - 1)        # auto z descriptora (jeśli ma)
-   + baseline * (CrewPerks_factor - 1)                        # toggle, ON default
+3. Stage 1 — wzmacniacz załogi (liczony OD base_vr):
+       crew_amplified ← base_vr * (1 + (Rations? 0.0430) + (BIA? 0.0253))
+       (Rations i BIA liczone OD base_vr, nie od siebie; × ventsFactor gdy wentylacja > 0)
+4. Stage 2 — bonusy addytywne (liczone OD crew_amplified):
+       final ← crew_amplified
+             + crew_amplified * (optics_factor * directive_factor - 1)   # poziom optyki
+             + crew_amplified * (stereo_factor * directive_factor - 1)   # auto z descriptora (jeśli ma)
+             + crew_amplified * (ReconSitAware_factor - 1)               # toggle
 ```
 
-**Mnożniki** (skalibrowane empirycznie wobec UI gry):
+| toggle / poziom | klawisz | config | default |
+|---|---|---|---|
+| Rations | Numpad 7 | `pickerVRBonusRations` `1.0430` | **ON** (+4.30%) |
+| BIA | Numpad 3 | `pickerVRBonusBIA` `1.0253` | **ON** (+2.53%) |
+| Recon + SitAware (bundle) | Numpad 4 | `pickerVRBonusReconSitAware` `1.0739` | **ON** (+7.39%) |
+| Optyka — poziom 0–4 | Numpad 6 | `pickerOpticsFactors` | `4` (Ulepszona) |
+| Wentylacja — poziom 0–4 | Numpad + | `pickerVentsFactors` | `0` (OFF) |
+| CVS — poziom 0–2 | Numpad − | `pickerCvsFactors` | `0` (OFF) |
+| Directives na sprzęt | Numpad 1 | `pickerVRBonusDirective` `1.0250` | OFF |
+| Field Upgrades VR (BETA) | Numpad 0 | `pickerFieldUpgradeVR` | OFF |
 
-| toggle | klawisz | config | default | znaczenie |
-|---|---|---|---|---|
-| Rations | Numpad 7 | `pickerVRBonusRations` | `1.0430` | **default ON** — racje +4.30% |
-| CrewPerks bundled (BIA+Recon+SitAware) | Numpad 4 | `pickerVRBonusCrewPerks` | `1.0953` | **default ON** — łącznie +9.53% |
-| Directives na sprzęt | Numpad 1 | `pickerVRBonusDirective` | `1.0250` | **default OFF** — mnożnik na auto-wykryte (optics, stereo) |
-| Field Upgrades VR | Numpad 0 | `pickerFieldUpgradeVR` | per-czołg tabelka | **default OFF** — **BETA** |
+**Poziomy** (serwer w WoT 2.x nie wysyła `optionalDevices` przeciwnika, więc optyka / wentylacja / CVS są ręcznie cyklowane):
+- **Optyka** `[1.0, 1.10, 1.115, 1.125, 1.135]` = 0 OFF / 1 zwykła / 2 na slocie / 3 Z nagród (czerwona) / 4 Ulepszona (fioletowa)
+- **Wentylacja** `[1.0, 1.05, 1.0625, 1.075, 1.085]` — mnoży addytywne bonusy załogi (rations / BIA / recon)
+- **CVS** `[1.0, 0.900, 0.875]` = 0 OFF / 1 zwykły / 2 na slocie. CVS przeciwnika obniża **NASZE** camo w ruchu (mocniej nas widzi), więc mnożniki < 1.0.
 
-Plus auto-detekcja z descriptora przeciwnika (zawsze, niezależnie od toggle):
-- Coated Optics (basic): ×1.10
-- Coated Optics (deluxe / fioletowa): ×1.135
-- Coated Optics (bond / improved): ~×1.14 (tank-zależne)
-- Stereoscope (basic): ×1.25 (założenie: zawsze aktywna; toggle przez `pickerAssumeStereoscope`)
-
-Verifikacja na czołgu z bazowym VR 340m, 100% załoga:
-- BIA alone: +8.6m ✓
-- Recon: +9.79m ≈ +9.81 (gra) ✓
-- SitAware: +15.33m ≈ +15.34 (gra) ✓
-- Rations: +14.6m ✓
-- Optyka deluxe: +47.87m (liczona z `(340+rations)*0.135`) ✓
+Plus **Stereoscope** ×1.25 z descriptora, jeśli wykryta (założenie: zawsze aktywna; `pickerAssumeStereoscope` / `pickerStereoscopeFallback`).
 
 ## Field Upgrades VR — BETA (v5.4.1)
 
@@ -118,7 +140,7 @@ Server NIE wysyła `vehPostProgression` przeciwnika (jest to `MY_VEHICLE` scope)
 
 Pobierz `spotmeter-v<wersja>.zip` z [GitHub Releases](https://github.com/M1ikus/spotmeter/releases). W środku:
 
-- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.2.1.3/`
+- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.3.0.0/`
 - `spotmeter.json` (opcjonalny) → wrzuć do `<WoT>/mods/configs/`
 - `INSTALL.txt` — szczegółowa instrukcja krok po kroku
 
@@ -128,33 +150,41 @@ Gra automatycznie ładuje wszystkie `.wotmod` z `mods/<wersja>/` po starcie. Bez
 
 ```
 +-----+-----+-----+-----+
-|     |  /  |  *  |  -  |    *=dump descryptor enemy do log
+|     |  /  |  *  |  -  |   /=auto-pick  *=dump enemy  -=CVS poziom
 +-----+-----+-----+-----+
-|  7  |  8  |  9  |  +  |    7=rations  8=prev    9=overlay-toggle
+|  7  |  8  |  9  |  +  |   7=rations  8=prev  9=live-mode  +=wentylacja poziom
 +-----+-----+-----+-----+
-|  4  |  5  |  6  |     |    4=crew-perks  5=clear-picker
+|  4  |  5  |  6  |     |   4=recon+sitaware  5=clear  6=optyka poziom
 +-----+-----+-----+-----+
-|  1  |  2  |  3  |Enter|    1=directives  2=next  Enter=full-status
+|  1  |  2  |  3  |Enter|   1=directives  2=next  3=BIA  Enter=snapshot
 +-----+-----+-----+-----+
-|     0     |  .  |          0=field-upgrades   .=reload-config
+|     0     |  .  |         0=field-upgrades(BETA)  .=reload-config
 +-----+-----+-----+-----+
+
+   PageDown = pokaż/ukryj panel (bitwa + garaż)
 ```
 
-| akcja | klawisz | config | default state |
+| akcja | klawisz | config | default |
 |---|---|---|---|
 | następny przeciwnik | Numpad 2 | `pickerNextKey` | — |
 | poprzedni przeciwnik | Numpad 8 | `pickerPrevKey` | — |
 | wyczyść picker | Numpad 5 | `pickerClearKey` | — |
 | toggle Rations | Numpad 7 | `pickerRationsKey` | **ON** |
-| toggle Crew Perks (BIA+Recon+SitAware) | Numpad 4 | `pickerCrewPerksKey` | **ON** |
-| toggle Directives na sprzęt | Numpad 1 | `pickerDirectivesKey` | OFF |
-| toggle Field Upgrades VR (BETA) | Numpad 0 | `pickerFieldUpgradesKey` | OFF |
-| toggle overlay tekstu (auto) | Numpad 9 | `overlayToggleKey` | (config) |
-| pełen status snapshot | NumpadEnter | `overlayPrintNowKey` | — |
+| toggle BIA | Numpad 3 | `pickerBIAKey` | **ON** |
+| toggle Recon + SitAware | Numpad 4 | `pickerReconSitAwareKey` | **ON** |
+| cykl poziomu **optyki** (0–4) | Numpad 6 | `pickerOpticsKey` | 4 |
+| cykl poziomu **wentylacji** (0–4) | Numpad + | `pickerVentsKey` | 0 |
+| cykl poziomu **CVS** (0–2) | Numpad − | `pickerCvsKey` | 0 |
+| toggle Directives | Numpad 1 | `pickerDirectivesKey` | OFF |
+| toggle Field Upgrades (BETA) | Numpad 0 | `pickerFieldUpgradesKey` | OFF |
+| **auto-dobieranie celu** | Numpad / | `autoPickToggleKey` | OFF |
+| toggle live-mode overlay | Numpad 9 | `overlayToggleKey` | OFF |
+| status snapshot | NumpadEnter | `overlayPrintNowKey` | — |
 | dump descriptor enemy do logu | Numpad **\*** | `pickerDiagDumpKey` | — |
 | reload configu | NumpadPeriod | `reloadKey` | — |
+| **pokaż/ukryj panel** (bitwa + garaż) | **PageDown** | `panelToggleKey` | — |
 
-Działa przy **NumLock włączonym i wyłączonym**.
+Działa przy **NumLock włączonym i wyłączonym**. **PageDown** jest poza numpadem — `KEY_PGDN` został zwolniony z aliasu Numpad3/BIA (Numpad3 dalej robi BIA), więc służy jako kontekstowy pokaż/ukryj panelu.
 
 ## Konfiguracja (`spotmeter.json`)
 
@@ -178,7 +208,8 @@ Działa przy **NumLock włączonym i wyłączonym**.
 | `camoNetFallbackBonus` | `0.05` | bonus jeśli odczyt z descriptora padnie |
 | `pickerEnabled` | `true` | włącza picker przeciwnika |
 | `pickerVRBonusRations` | `1.0430` | mnożnik gdy toggle Rations ON |
-| `pickerVRBonusCrewPerks` | `1.0953` | mnożnik gdy toggle Crew Perks ON (BIA+Recon+SitAware bundled) |
+| `pickerVRBonusBIA` | `1.0253` | mnożnik gdy toggle BIA ON (stage 1) |
+| `pickerVRBonusReconSitAware` | `1.0739` | mnożnik gdy toggle Recon+SitAware ON (stage 2) |
 | `pickerVRBonusDirective` | `1.0250` | mnożnik na auto-wykryte sprzęty gdy toggle Directives ON |
 | `pickerFieldUpgradeVR` | per-tank dict | **BETA**, mapuje `shortName` → % VR upgrade |
 | `pickerFieldUpgradeCap` | `445.0` | cap na `base_vr` po zastosowaniu upgrade'u (m) |
@@ -193,7 +224,8 @@ Działa przy **NumLock włączonym i wyłączonym**.
 | `pickerPrevKey` | `KEY_NUMPAD8` | poprzedni przeciwnik |
 | `pickerClearKey` | `KEY_NUMPAD5` | wyczyść picker |
 | `pickerRationsKey` | `KEY_NUMPAD7` | toggle Rations |
-| `pickerCrewPerksKey` | `KEY_NUMPAD4` | toggle Crew Perks (BIA+Recon+SitAware) |
+| `pickerBIAKey` | `KEY_NUMPAD3` | toggle BIA |
+| `pickerReconSitAwareKey` | `KEY_NUMPAD4` | toggle Recon + SitAware |
 | `pickerDirectivesKey` | `KEY_NUMPAD1` | toggle Directives |
 | `pickerFieldUpgradesKey` | `KEY_NUMPAD0` | toggle Field Upgrades (BETA) |
 | `pickerDiagDumpKey` | `KEY_NUMPADSTAR` | dump enemy descriptor do `python.log` |
@@ -203,6 +235,35 @@ Działa przy **NumLock włączonym i wyłączonym**.
 | `logCalcDetails` | `false` | wypisuje camo/radius/state do `python.log` |
 
 Nazwy klawiszy: nazwy z modułu `Keys` (np. `KEY_F8`, `KEY_F7`, `KEY_HOME`, `KEY_INSERT`). Pusty string = bez hotkeya.
+
+### Konfiguracja v6.0 — panele, auto-dobieranie, język
+
+| pole | default | opis |
+|---|---|---|
+| `language` | `"auto"` | `auto` = język klienta WoT (`pl`→PL, reszta→EN); wymuś `"pl"` / `"en"` |
+| `panelToggleKey` | `KEY_PGDN` | pokaż/ukryj panel (bitwa + garaż), kontekstowy |
+| `battlePanelEnabled` | `true` | widoczność panelu bitewnego na starcie |
+| `battlePanelX/Y/W/H` | `10 / 400 / 320 / 380` | pozycja i rozmiar panelu bitewnego (przeciągalny, zapisuje się) |
+| `battlePanelGroupSameTanks` | `true` | grupuje identyczne czołgi w jeden wiersz (`Nazwa xN`) |
+| `autoHidePanelOnWindow` | `true` | chowa panel gdy otwarte okno WG; wraca po zamknięciu |
+| `battleHidePanelKeys` | `["KEY_TAB","KEY_N"]` | trzymanie któregoś chowa panel w bitwie |
+| `garagePanelEnabled` | `true` | widoczność panelu garażowego |
+| `garagePanelX/Y/W/H` | `1500 / 320 / 380 / 320` | pozycja i rozmiar panelu garażowego |
+| `autoPickEnabled` | `false` | auto-dobieranie najbliższego przeciwnika |
+| `autoPickToggleKey` | `KEY_NUMPADSLASH` | klawisz auto-dobierania |
+| `autoPickRangeMeters` | `445.0` | maks. zasięg auto-dobierania |
+| `autoPickCacheTimeoutSec` | `5.0` | jak długo trzymać ostatnią pozycję gdy spotter mrugnie |
+| `autoPickMarker` | `"○ "` | prefix nazwy auto-wybranego |
+| `autoPresetsEnabled` | `true` | stosuje preset per-klasa przy włączeniu AUTO |
+| `autoPresets` | per-klasa | rations/BIA/recon/directives/fieldUpgrades + optics/vents/cvs wg klasy |
+| `defaultToggles` | rations/BIA/recon ON | które toggle są ON na starcie bitwy |
+| `defaultLevels` | optics 4, vents 0, cvs 0 | startowe poziomy optyki / wentylacji / CVS |
+| `pickerOpticsKey` | `KEY_NUMPAD6` | cykl poziomu optyki (0–4) |
+| `pickerVentsKey` | `KEY_ADD` | cykl poziomu wentylacji (0–4) |
+| `pickerCvsKey` | `KEY_NUMPADMINUS` | cykl poziomu CVS (0–2) |
+| `pickerOpticsFactors` | `[1.0, 1.10, 1.115, 1.125, 1.135]` | mnożniki VR per poziom optyki |
+| `pickerVentsFactors` | `[1.0, 1.05, 1.0625, 1.075, 1.085]` | mnożniki bonusów załogi per poziom wentylacji |
+| `pickerCvsFactors` | `[1.0, 0.900, 0.875]` | mnożniki NASZEGO camo w ruchu gdy enemy ma CVS |
 
 ## Co serwer faktycznie wysyła do klienta?
 
@@ -239,8 +300,21 @@ W bitwie naciśnij `NumpadPeriod` (lub klawisz z `reloadKey`) — config wczytuj
    - liczy camo i radius spotu
    - wywołuje na Flashu `as_addDynamicViewRange` / `as_updateDynRange` z (color, alpha, radius)
 5. Sprząta entry i callbacki w `_hideMarkup`, `__onPostMortemSwitched`, `stop`.
+6. **Panele v6.0** renderuje przez forka GUIFlash (`gui.mods.spotmeter_gf` — własny namespace + SWF) jako niezależny overlay; **nie modyfikuje plików UI Wargamingu**. Patchuje dodatkowo `Avatar.shoot/shootDualGun` (kara za strzał) i `PlayerFullNameFormatter.format` (marker `●`/`○` przy nicku celu) — **wszystkie patche wrapperem wołającym oryginał** + try/except, więc komponują się z innymi modami (np. XVM) i nie crashują.
 
 ## Roadmap
+
+### v6.0 — panele GUIFlash + auto-dobieranie ✅
+
+- **Panel bitewny** — stała lista przeciwników z VR, grupowanie identycznych czołgów, linia „Cel" ze spot-distance, stan AUTO; wybór Numpad 2/8 lub klik na wierszu
+- **Panel garażowy** — pre-konfiguracja toggli/poziomów przed bitwą, podgląd na żywo, stan AUTO; auto-hide przy zakładkach
+- **PageDown** — kontekstowy pokaż/ukryj panelu (bitwa + garaż)
+- **Auto-dobieranie** (Numpad /) — najbliższy przeciwnik jako cel; model „najświeższa akcja wygrywa"; presety per-klasa
+- **Optyka / Wentylacja / CVS jako cyklowane poziomy** (Numpad 6 / + / −) — serwer 2.x nie wysyła `optionalDevices` przeciwnika
+- **BIA wydzielone** na Numpad 3 (Recon+SitAware zostaje na Numpad 4)
+- **Auto-hide panelu** — TAB/N w bitwie + okna WG w garażu
+- **i18n** — angielski + polski, auto-detekcja z języka klienta
+- Fork GUIFlash (`spotmeter_gf`) — własny namespace, koegzystuje z `gambiter.guiflash`
 
 ### v5.4 — field upgrades BETA ✅
 
@@ -314,7 +388,7 @@ Wersja jest czytana z `packaging/meta.xml` — zaktualizuj tam przed kolejnym bu
 ### Hot-test podczas devu
 
 ```sh
-cp build/mod_spotmeter.pyc "<WoT>/res_mods/2.2.1.3/scripts/client/gui/mods/"
+cp build/mod_spotmeter.pyc "<WoT>/res_mods/2.3.0.0/scripts/client/gui/mods/"
 cp src/spotmeter.json "<WoT>/mods/configs/"
 ```
 

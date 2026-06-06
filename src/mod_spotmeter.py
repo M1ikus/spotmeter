@@ -24,7 +24,107 @@ _logger = logging.getLogger('SpotMeter')
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
 MOD_VERSION = '6.0.0'
+# Short "major.minor" form shown in panel titles ("6.0.0" -> "6.0"); the
+# full MOD_VERSION still drives logs / version reporting / meta.xml. Bumping
+# the patch (6.0.1) keeps the panel at "6.0"; a minor bump (6.1.0) -> "6.1".
+MOD_VERSION_SHORT = '.'.join(MOD_VERSION.split('.')[:2])
+MOD_AUTHOR = 'ISEDR_Mikus'  # small credit line shown in the panels
 _logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
+
+
+# ---------------------------------------------------------------------------
+# i18n: UI strings in English (default) + Polish, auto-picked from the WoT
+# client language via helpers.getClientLanguage(): a 'pl' client gets Polish,
+# anything else English. Override with "language": "pl"/"en"/"auto" in config.
+# ---------------------------------------------------------------------------
+_LANG = None
+
+
+def _detect_lang():
+    forced = (_CFG.get('language') or 'auto').lower()
+    if forced in ('pl', 'en'):
+        return forced
+    try:
+        from helpers import getClientLanguage
+        return 'pl' if (getClientLanguage() or '').lower() == 'pl' else 'en'
+    except Exception:
+        return 'en'
+
+
+def _t(key):
+    """UI string for `key` in the detected language (English fallback)."""
+    global _LANG
+    if _LANG is None:
+        _LANG = _detect_lang()
+    return (_STRINGS.get(_LANG, _STRINGS['en']).get(key)
+            or _STRINGS['en'].get(key)
+            or key)
+
+
+_STRINGS = {
+    'en': {
+        'garage_title_suffix': '- garage, settings',
+        'garage_loadout_header': 'Loadout (session):',
+        'garage_battle_panel': 'Battle panel:',
+        'garage_footer': 'To change defaults: edit mods/configs/spotmeter.json + restart WoT',
+        'garage_hotkeys': (
+            '<font size="11" color="#88AABB"><b>Keyboard shortcuts:</b></font><br>'
+            '<font size="10" color="#CCCCCC">'
+            '  <b>N 2 / N 8</b> &#8212; next / previous enemy<br>'
+            '  <b>N 5</b>       &#8212; clear pick (back to auto)<br>'
+            '  <b>N /</b>       &#8212; auto-pick (nearest visible)<br>'
+            '  <b>N 7 / N 3 / N 4</b> &#8212; rations / BIA / recon+SitA<br>'
+            '  <b>N 6</b>       &#8212; cycle optics level (OFF/basic/slot/bonds/deluxe)<br>'
+            '  <b>N +</b>       &#8212; cycle ventilation level<br>'
+            '  <b>N -</b>       &#8212; cycle enemy CVS (lowers our moving camo)<br>'
+            '  <b>N 1 / N 0</b>    &#8212; directives / field upgrades<br>'
+            '  <b>N *</b>       &#8212; dump enemy descriptor to python.log<br>'
+            '  <b>N Enter</b>   &#8212; snapshot spot-distance to chat<br>'
+            '  <b>N .</b>       &#8212; hot-reload spotmeter.json<br>'
+            '  <b>PageDown</b>  &#8212; show/hide panel (battle + garage)'
+            '</font>'),
+        'chat_live_on': 'live mode: ON (refresh every %.1fs - Numpad9 to turn off)',
+        'tl_rations': 'rations', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'recon+SitA',
+        'tl_directives': 'directives', 'tl_fieldUpgrades': 'field upg.',
+        'tl_optics': 'optics', 'tl_vents': 'vents', 'tl_cvs': 'CVS', 'tl_auto': 'auto',
+        'lv_0': 'OFF', 'lv_1': 'basic', 'lv_2': 'slot', 'lv_3': 'bonds', 'lv_4': 'deluxe',
+        'battle_target': 'Target:', 'battle_target_hint': '(Numpad 2/8 or click the list)',
+        'battle_auto_hint': 'click / Numpad /',
+        'battle_hide_hint': 'Press PgDn to hide panel',
+        'battle_target_own': 'own',
+    },
+    'pl': {
+        'garage_title_suffix': '- garaz, ustawienia',
+        'garage_loadout_header': 'Ulepszacze (sesja):',
+        'garage_battle_panel': 'Panel w bitwie:',
+        'garage_footer': 'Zmiany defaultow: edytuj mods/configs/spotmeter.json + restart WoT',
+        'garage_hotkeys': (
+            '<font size="11" color="#88AABB"><b>Skroty klawiszowe:</b></font><br>'
+            '<font size="10" color="#CCCCCC">'
+            '  <b>N 2 / N 8</b> &#8212; nastepny / poprzedni przeciwnik<br>'
+            '  <b>N 5</b>       &#8212; wyczysc wybor (powrot do auto)<br>'
+            '  <b>N /</b>       &#8212; auto-pick (najblizszy widoczny)<br>'
+            '  <b>N 7 / N 3 / N 4</b> &#8212; racje / BIA / Zwiad+Rozezn.<br>'
+            '  <b>N 6</b>       &#8212; cykl poziomow optyki (WYL/zwykla/na slocie/Z nagrod/Ulepszone)<br>'
+            '  <b>N +</b>       &#8212; cykl poziomow wentylacji<br>'
+            '  <b>N -</b>       &#8212; cykl CVS przeciwnika (zmniejsza nasze camo w ruchu)<br>'
+            '  <b>N 1 / N 0</b>    &#8212; dyrektywy / ulepszenia polowe<br>'
+            '  <b>N *</b>       &#8212; zrzut deskryptora wroga do python.log<br>'
+            '  <b>N Enter</b>   &#8212; zrzut dystansu spot do czatu<br>'
+            '  <b>N .</b>       &#8212; przeladuj spotmeter.json<br>'
+            '  <b>PageDown</b>  &#8212; pokaz/ukryj panel (bitwa + garaz)'
+            '</font>'),
+        'chat_live_on': 'live mode: ON (refresh co %.1fs - Numpad9 zeby wylaczyc)',
+        'tl_rations': 'racje', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'Zwiad+Rozezn.',
+        'tl_directives': 'dyrektywy', 'tl_fieldUpgrades': 'ulepsz.pol',
+        'tl_optics': 'optyka', 'tl_vents': 'wentyl.', 'tl_cvs': 'CVS', 'tl_auto': 'auto',
+        'lv_0': 'WYL', 'lv_1': 'zwykla', 'lv_2': 'na slocie', 'lv_3': 'Z nagrod', 'lv_4': 'Ulepszone',
+        'battle_target': 'Cel:', 'battle_target_hint': '(Numpad 2/8 lub klik na liscie)',
+        'battle_auto_hint': 'klik / Numpad /',
+        'battle_hide_hint': 'Nacisnij PgDn zeby ukryc panel',
+        'battle_target_own': 'wlasny',
+    },
+}
 
 _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
 _C_NAME = _mm_settings.CONTAINER_NAME
@@ -44,6 +144,9 @@ _CONFIG_CANDIDATES = (
 DEFAULT_CONFIG = {
     'enabled': True,
     'useOwnViewRange': True,
+    # UI language: 'auto' reads the WoT client language (pl -> Polish, any
+    # other -> English); force with 'pl' or 'en'.
+    'language': 'auto',
     'enemyViewRangeFallback': 445.0,
     'crewCamoBonus': 1.05,
     'colorMoving': 0xFF6347,
@@ -72,8 +175,16 @@ DEFAULT_CONFIG = {
     'pickerRationsKey':         'KEY_NUMPAD7',  # default ON  - Combat Rations (crew amp from base_vr)
     'pickerBIAKey':             'KEY_NUMPAD3',  # default ON  - Brothers in Arms (crew amp from base_vr)
     'pickerReconSitAwareKey':   'KEY_NUMPAD4',  # default ON  - Recon + SitAware (skills from amplified)
+    'pickerOpticsKey':          'KEY_NUMPAD6',     # cycles opticsLevel 0..4
+    'pickerVentsKey':           'KEY_ADD',         # cycles ventsLevel 0..4 (WoT calls numpad+ "KEY_ADD")
+    'pickerCvsKey':             'KEY_NUMPADMINUS', # cycles cvsLevel 0..2 (CVS reduces OUR moving camo)
     'pickerDirectivesKey':      'KEY_NUMPAD1',  # default OFF - boost auto-detected equipment by 1.025
     'pickerFieldUpgradesKey':   'KEY_NUMPAD0',  # default OFF - VR-related field upgrades (per-tank)
+    # Panel visibility toggle (PageDown). Context-aware: garage panel in
+    # the garage, battle panel in battle. Deliberately NOT a numpad key -
+    # the whole numpad + nav cluster is taken (see _key_aliases below), so
+    # KEY_PGDN is freed from the Numpad3/BIA alias and reused here.
+    'panelToggleKey':           'KEY_PGDN',
     # Picker VR multipliers. Two-stage model:
     #   crew_amplified = base_vr * (1 + (rations? 0.0430 : 0) + (BIA? 0.0253 : 0))
     #   final = crew_amplified
@@ -99,6 +210,30 @@ DEFAULT_CONFIG = {
     'pickerFieldUpgradeCap': 445.0,
     'pickerAssumeStereoscope': True,
     'pickerStereoscopeFallback': 1.25,
+    # WoT 2.x server doesn't transmit enemy optionalDevices, so optics
+    # and vents never show up in the decoded descriptor. We model them
+    # as 5-level cyclable presets via Numpad 6 / Numpad +.
+    #
+    # opticsLevel: 0=OFF, 1=Coated Optics basic (+10%), 2=basic in
+    #              optics slot (+11.5%), 3=Bonds/red (+12.5%),
+    #              4=Deluxe/purple (+13.5%). Factor = VR multiplier.
+    # ventsLevel:  0=OFF, 1=Improved Ventilation basic (+5% crew),
+    #              2=basic in vents slot (+6.25%), 3=Bonds/red (+7.5%),
+    #              4=Deluxe/purple (+8.5%). Factor multiplies the
+    #              additive crew bonuses (rations / BIA / recon).
+    # cvsLevel:    0=OFF, 1=zwykly, 2=na slocie. CVS has no Bonds/Deluxe
+    #              grade, so only two real levels (unlike optics/vents).
+    #              When the picked ENEMY has CVS, OUR moving camo is
+    #              multiplied by the factor (<1.0) - making us more
+    #              visible while we move toward that target.
+    #
+    # Tune these in spotmeter.json if WG patches the exact percentages.
+    'pickerOpticsFactors': [1.0, 1.10, 1.115, 1.125, 1.135],
+    'pickerVentsFactors':  [1.0, 1.05, 1.0625, 1.075, 1.085],
+    # CVS calibration from user (CVS only exists as zwykly + na slocie):
+    #   L1 (zwykly):   -10%   = factor 0.900
+    #   L2 (na slocie):-12.5% = factor 0.875
+    'pickerCvsFactors':    [1.0, 0.900, 0.875],
     'pickerMarker': u'● ',
     'pickerIncludeDeadEnemies': False,
     'pickerDiagDumpKey': 'KEY_NUMPADSTAR',
@@ -127,6 +262,21 @@ DEFAULT_CONFIG = {
     'autoPickCacheTimeoutSec': 5.0,
     'autoPickToggleKey': 'KEY_NUMPADSLASH',  # numpad /
     'autoPickMarker': u'○ ',  # white circle - distinct from manual pickerMarker
+    # Per-class auto presets. ONLY active while auto-pick is ON. Applied
+    # ONCE when you ENABLE auto (toggle off+on to re-apply), based on the
+    # class of the tank auto picks at that moment - it does NOT re-apply as
+    # auto retargets. Numpad presses override live. Keyed by WoT class tag;
+    # 'default' is the fallback for any class without its own entry (here
+    # MT/HT/TD/SPG). Levels 0..4 (0=OFF 1=basic 2=slot 3=bonds 4=deluxe).
+    'autoPresetsEnabled': True,
+    'autoPresets': {
+        'lightTank': {'rations': True, 'BIA': True, 'reconSitAware': True,
+                      'directives': False, 'fieldUpgrades': False,
+                      'optics': 2, 'vents': 0, 'cvs': 2},
+        'default':   {'rations': True, 'BIA': True, 'reconSitAware': True,
+                      'directives': False, 'fieldUpgrades': False,
+                      'optics': 0, 'vents': 0, 'cvs': 0},
+    },
     # v6.0 schema versioning. v1 = pre-v6 flat config (no version field).
     # v2 adds defaultToggles section. _migrate_config() auto-bumps in memory
     # when an old file is loaded; the file on disk is NOT rewritten until
@@ -144,6 +294,11 @@ DEFAULT_CONFIG = {
         'reconSitAware': True,
         'directives':    False,
         'fieldUpgrades': False,
+    },
+    'defaultLevels': {
+        'optics': 4,  # 0=OFF 1=basic 2=basicInSlot 3=Bonds 4=Deluxe
+        'vents':  0,
+        'cvs':    0,
     },
     # v6.0 in-garage menu button. Floating Scaleform overlay on the hangar
     # view; drag with mouse to reposition. Coords are absolute pixels from
@@ -170,6 +325,17 @@ DEFAULT_CONFIG = {
     'battlePanelY': 400,
     'battlePanelW': 320,
     'battlePanelH': 380,
+    # Collapse identical enemy tanks into one panel row + one cycle stop
+    # (same model = same view range = same circle). Numpad 2/8 then steps
+    # types, not individuals. False = list every enemy separately.
+    'battlePanelGroupSameTanks': True,
+    # Auto-hide the panel when any WG window opens (research/depot/dialogs in
+    # the garage, TAB-style overlays in battle); restore it when the last one
+    # closes. False = panel always stays on top.
+    'autoHidePanelOnWindow': True,
+    # In battle, hide the panel while one of these keys is held (TAB / N show
+    # the team-stats overlays); released -> panel returns. WoT Keys names.
+    'battleHidePanelKeys': ['KEY_TAB', 'KEY_N'],
     # v6.0.0 garage settings readout panel. Same GUIFlash plumbing as
     # the in-battle panel - draggable, position persists, components
     # tagged lobby=True so they only render in the garage. Display-only
@@ -182,7 +348,7 @@ DEFAULT_CONFIG = {
     'garagePanelX': 1500,
     'garagePanelY': 320,
     'garagePanelW': 380,
-    'garagePanelH': 320,
+    'garagePanelH': 340,
 }
 
 def _fresh_cfg():
@@ -206,6 +372,7 @@ _HOTKEYS_INSTALLED = False  # v5.6.4: guards _install_reload_hotkey against doub
 _STATE = weakref.WeakKeyDictionary()
 _LAST_SHOT_TIME = 0.0
 _LAST_MOVEMENT_TIME = 0.0
+_LAST_SPOT_RADIUS = None  # last spot-circle radius from _tick (m); shown on the panel target line
 _PICKED_VID = None
 # v5.6.4 perf fix: cache the expensive VehicleDescr decode per vid. The
 # entries hold (base_vr, optics_factor, stereo_factor, has_stereo_fallback,
@@ -218,6 +385,15 @@ _PICKER_TOGGLES = {
     'reconSitAware': True,   # default ON:  assume enemy has Recon + Sit. Awareness
     'directives':    False,  # default OFF: assume no directives on equipment slots
     'fieldUpgrades': False,  # default OFF: assume no VR field upgrades
+}
+# v6.0.0: multi-level states. Different from _PICKER_TOGGLES because each
+# has more than 2 states. opticsLevel + ventsLevel are 0..4 indexes into
+# the matching pickerOpticsFactors / pickerVentsFactors lists in _CFG.
+# Numpad 6 cycles opticsLevel, Numpad + cycles ventsLevel.
+_PICKER_LEVELS = {
+    'optics': 4,  # default Deluxe (purple) Coated Optics
+    'vents':  0,  # default OFF - vents are less universal than optics
+    'cvs':    0,  # default OFF - CVS is rare on most enemies
 }
 _LIVE_MODE_ENABLED = False  # default OFF - user enables via Numpad9 if they want auto-refreshing block
 _LIVE_MODE_CALLBACK_ID = None  # BigWorld.callback handle for the periodic poster
@@ -286,12 +462,27 @@ def _migrate_config(payload):
                 'rations':       True,
                 'BIA':           True,
                 'reconSitAware': True,
+                'optics':        True,
                 'directives':    False,
                 'fieldUpgrades': False,
             }
         payload['configVersion'] = 2
         migrated = True
         _logger.info('SpotMeter: migrated config v1 -> v2 in memory')
+    # v2 -> v2.1: optics + vents promoted from binary toggle to a 5-level
+    # cyclable state (OFF/basic/slot/bonds/deluxe). Patch legacy configs
+    # in-memory so existing JSON files keep working without manual edits.
+    defaults = payload.get('defaultToggles')
+    if isinstance(defaults, dict) and 'optics' in defaults:
+        # Old binary `optics` toggle leaked through — strip it; the new
+        # level controls live under defaultLevels instead.
+        del defaults['optics']
+        migrated = True
+        _logger.info('SpotMeter: removed obsolete `optics` from defaultToggles (moved to defaultLevels)')
+    if 'defaultLevels' not in payload:
+        payload['defaultLevels'] = {'optics': 4, 'vents': 0}
+        migrated = True
+        _logger.info('SpotMeter: added defaultLevels section to in-memory config')
     return migrated
 
 
@@ -307,6 +498,27 @@ def _apply_default_toggles():
     for key in list(_PICKER_TOGGLES.keys()):
         if key in defaults:
             _PICKER_TOGGLES[key] = bool(defaults[key])
+
+
+def _apply_default_levels():
+    """Same idea as _apply_default_toggles but for multi-level states
+    (opticsLevel, ventsLevel). Clamps to the valid range 0..len(factors)-1
+    so a bad JSON value can't crash _picker_vr_for via index-out-of-range.
+    """
+    defaults = _CFG.get('defaultLevels') or {}
+    for key in list(_PICKER_LEVELS.keys()):
+        if key not in defaults:
+            continue
+        try:
+            v = int(defaults[key])
+        except (TypeError, ValueError):
+            continue
+        # Range guard: each level enum has 5 entries (0..4).
+        if v < 0:
+            v = 0
+        elif v > 4:
+            v = 4
+        _PICKER_LEVELS[key] = v
 
 
 def _reset_battle_state():
@@ -338,10 +550,13 @@ def _reset_battle_state():
     _LAST_MOVEMENT_TIME = 0.0
     _LIVE_MODE_ENABLED = False
     _apply_default_toggles()
+    _apply_default_levels()
     _BATTLE_RESET_DONE = True
     _logger.info(
-        'SpotMeter: battle state reset (toggles -> defaults, picks cleared, '
-        'autoPick=%s)', _DEFAULT_AUTO_PICK_ENABLED)
+        'SpotMeter: battle state reset (toggles+levels -> defaults, picks '
+        'cleared, autoPick=%s, opticsLvl=%s, ventsLvl=%s)',
+        _DEFAULT_AUTO_PICK_ENABLED,
+        _PICKER_LEVELS.get('optics'), _PICKER_LEVELS.get('vents'))
 
 
 def _write_config(path=None):
@@ -396,6 +611,7 @@ def init():
             _logger.warning('SpotMeter: disabled by config')
             return
         _apply_default_toggles()
+        _apply_default_levels()
         # Capture user's preferred auto-pick state once at WoT startup so
         # _reset_battle_state can restore it cleanly between battles.
         _DEFAULT_AUTO_PICK_ENABLED = bool(_CFG.get('autoPickEnabled', False))
@@ -552,6 +768,10 @@ def _is_after_shot():
 
 
 def _compute_camo(vehicle, is_moving, after_shot, camo_net_active):
+    # TODO(verify, flagged 2026-06): spot-distance output runs slightly HIGH
+    # (we over-estimate the range we get spotted from). User prefers over- to
+    # under-estimate, so left as-is for v6.0.0. Revisit this + _compute_spot_radius
+    # and the crew/equipment camo factors to calibrate someday. Not a blocker.
     # Mirrors scripts/common/items/utils.py:getInvisibility. The
     # CompositeVehicleDescriptor wrapper handles siege mode automatically:
     # vehicle.typeDescriptor.type.invisibility and miscAttrs already reflect
@@ -566,6 +786,17 @@ def _compute_camo(vehicle, is_moving, after_shot, camo_net_active):
     crew_bonus = float(_CFG.get('crewCamoBonus', 1.0))
     base = inv_moving if is_moving else inv_still
     base = base * veh_factor * crew_bonus
+    # CVS: if the enemy currently picked has CVS equipped, our moving
+    # camo gets multiplied by the level's factor (<1.0). Effect only
+    # applies when WE are moving. Server hides enemy CVS the same way it
+    # hides optics/vents, so this is a manual cyclable level (Numpad -).
+    if is_moving:
+        cvs_factors = _CFG.get('pickerCvsFactors') or [1.0]
+        cvs_lvl = int(_PICKER_LEVELS.get('cvs', 0))
+        cvs_lvl = max(0, min(cvs_lvl, len(cvs_factors) - 1))
+        cvs_factor = float(cvs_factors[cvs_lvl])
+        if cvs_factor < 0.999:
+            base = base * cvs_factor
     additive = base_additive + additive_term
     if camo_net_active:
         # CamouflageNet contributes to factors['invisibility'][0], summed into
@@ -711,12 +942,21 @@ def _picker_vr_for(plugin, vid):
             cap = float(_CFG.get('pickerFieldUpgradeCap', 445.0))
             base_vr = min(base_vr * (1.0 + upgrade_pct), cap)
 
-    # Stage 1: crew amplifier (Rations + BIA, both from base_vr).
+    # v6.0.0: Vents scales the additive crew bonuses (rations / BIA /
+    # recon+SitA) multiplicatively. The factor lookup is into a 5-entry
+    # list in _CFG: [OFF, basic, basicInSlot, Bonds, Deluxe].
+    vents_factors = _CFG.get('pickerVentsFactors') or [1.0]
+    vents_lvl = max(0, min(int(_PICKER_LEVELS.get('vents', 0)),
+                           len(vents_factors) - 1))
+    vents_mult = float(vents_factors[vents_lvl])
+
+    # Stage 1: crew amplifier (Rations + BIA, both from base_vr,
+    # scaled by vents).
     crew_amp = 1.0
     if _PICKER_TOGGLES.get('rations', True):
-        crew_amp += float(_CFG.get('pickerVRBonusRations', 1.0430)) - 1.0
+        crew_amp += (float(_CFG.get('pickerVRBonusRations', 1.0430)) - 1.0) * vents_mult
     if _PICKER_TOGGLES.get('BIA', True):
-        crew_amp += float(_CFG.get('pickerVRBonusBIA', 1.0253)) - 1.0
+        crew_amp += (float(_CFG.get('pickerVRBonusBIA', 1.0253)) - 1.0) * vents_mult
     crew_amplified = base_vr * crew_amp
     final = crew_amplified
 
@@ -724,7 +964,18 @@ def _picker_vr_for(plugin, vid):
     directive_active = _PICKER_TOGGLES.get('directives', False)
     directive_factor = float(_CFG.get('pickerVRBonusDirective', 1.025)) if directive_active else 1.0
 
-    optics_factor = facts['optics_factor']
+    # Optics: server hides enemy optionalDevices in WoT 2.x, so we use
+    # opticsLevel (cyclable via Numpad 6) to pick from a preset table.
+    # If the descriptor DID happen to expose a real optics factor we'd
+    # prefer that over the preset, but in practice descr factor stays 1.0
+    # for enemies and we just read the level table.
+    descr_optics = facts['optics_factor']
+    optics_factors = _CFG.get('pickerOpticsFactors') or [1.0]
+    optics_lvl = max(0, min(int(_PICKER_LEVELS.get('optics', 0)),
+                            len(optics_factors) - 1))
+    optics_factor = (descr_optics
+                     if descr_optics > 1.001
+                     else float(optics_factors[optics_lvl]))
     if optics_factor > 1.001:
         optics_total = optics_factor * directive_factor
         final += crew_amplified * (optics_total - 1.0)
@@ -738,8 +989,8 @@ def _picker_vr_for(plugin, vid):
             final += crew_amplified * (stereo_total - 1.0)
 
     if _PICKER_TOGGLES.get('reconSitAware', True):
-        rs_factor = float(_CFG.get('pickerVRBonusReconSitAware', 1.0739))
-        final += crew_amplified * (rs_factor - 1.0)
+        rs_bonus = (float(_CFG.get('pickerVRBonusReconSitAware', 1.0739)) - 1.0) * vents_mult
+        final += crew_amplified * rs_bonus
 
     return final
 
@@ -861,20 +1112,73 @@ def _select_auto_pick(plugin):
     _AUTO_PICKED_VID = best_vid
 
 
+def _apply_auto_preset(plugin, vid):
+    """Write the per-class auto preset into the live toggle/level state.
+
+    Looks up the auto-picked tank's class tag, picks autoPresets[<class>]
+    (falling back to autoPresets['default']) and sets rations / BIA /
+    reconSitAware / directives / fieldUpgrades + optics/vents/cvs levels in
+    _PICKER_TOGGLES / _PICKER_LEVELS. Called ONLY from the auto-enable path,
+    so presets are an auto-mode-only behaviour; later Numpad presses just
+    mutate the same dicts (override). No-op on any lookup failure.
+    """
+    presets = _CFG.get('autoPresets') or {}
+    if not presets:
+        return
+    tags = ()
+    try:
+        arenaDP = plugin.sessionProvider.getArenaDP()
+        vinfo = arenaDP.getVehicleInfo(vid) if arenaDP is not None else None
+        if vinfo is not None and vinfo.vehicleType is not None:
+            tags = getattr(vinfo.vehicleType, 'tags', None) or ()
+    except Exception:
+        _logger.exception('SpotMeter: auto-preset class lookup failed')
+        return
+    key = None
+    for k in ('lightTank', 'mediumTank', 'heavyTank', 'AT-SPG', 'SPG'):
+        if k in tags:
+            key = k
+            break
+    preset = presets.get(key) or presets.get('default')
+    if not isinstance(preset, dict):
+        return
+    for t in ('rations', 'BIA', 'reconSitAware', 'directives', 'fieldUpgrades'):
+        if t in preset and t in _PICKER_TOGGLES:
+            _PICKER_TOGGLES[t] = bool(preset[t])
+    for lv in ('optics', 'vents', 'cvs'):
+        if lv in preset and lv in _PICKER_LEVELS:
+            _PICKER_LEVELS[lv] = int(preset[lv])
+    _logger.info('SpotMeter: auto-preset applied (class=%s)', key or 'default')
+
+
 def _toggle_auto_pick():
     """Runtime ON/OFF for auto-pick. When turning ON, do an immediate
     cache+pick pass so the spot circle reflects the change without
     waiting for the next 0.2 s tick. When turning OFF, drop the stale
-    _AUTO_PICKED_VID so the marker disappears from the panel.
+    _AUTO_PICKED_VID. Either way clears any manual pick (Numpad 2/8) so the
+    auto toggle is the most-recent action that decides the mode.
     """
-    global _AUTO_PICKED_VID
+    global _AUTO_PICKED_VID, _DEFAULT_AUTO_PICK_ENABLED, _PICKED_VID
     _CFG['autoPickEnabled'] = not _CFG.get('autoPickEnabled', False)
+    # "Most recent action wins": toggling auto is a fresh mode choice, so it
+    # supersedes a sticky manual pick (Numpad 2/8) - ON => auto drives the
+    # circle, OFF => own tank. Drop the manual pick either way. (Symmetric
+    # with _cycle_picker, where pressing 2/8 overrides an active auto pick.)
+    _PICKED_VID = None
+    # Garage-time toggle: also update the "default state at battle
+    # start" so _reset_battle_state doesn't flip it back. In-memory
+    # only; spotmeter.json on disk is unchanged.
+    if _is_in_garage():
+        _DEFAULT_AUTO_PICK_ENABLED = _CFG['autoPickEnabled']
     plugin = _get_picker_plugin()
     if _CFG['autoPickEnabled']:
         if plugin is not None:
             try:
                 _update_enemy_pos_cache(plugin)
                 _select_auto_pick(plugin)
+                # Per-class preset, ONCE at enable time (off+on to re-apply).
+                if _CFG.get('autoPresetsEnabled', True) and _AUTO_PICKED_VID is not None:
+                    _apply_auto_preset(plugin, _AUTO_PICKED_VID)
             except Exception:
                 _logger.exception('SpotMeter: auto-pick initial scan failed')
     else:
@@ -885,6 +1189,7 @@ def _toggle_auto_pick():
         except Exception:
             _logger.exception('SpotMeter: tick after auto-pick toggle failed')
     _post_chat_line('auto-pick: %s' % ('ON' if _CFG['autoPickEnabled'] else 'OFF'))
+    _refresh_garage_if_active()
 
 
 def _lookup_field_upgrade_vr(short_name):
@@ -1023,7 +1328,7 @@ def _color_for_state(state_name):
 
 
 def _tick(plugin):
-    global _LAST_MOVEMENT_TIME
+    global _LAST_MOVEMENT_TIME, _LAST_SPOT_RADIUS
     state = _STATE.get(plugin)
     if state is None:
         return
@@ -1056,6 +1361,7 @@ def _tick(plugin):
     camo = _compute_camo(veh, is_moving, after_shot, camo_net_active)
     enemy_vr = _resolve_enemy_view_range(plugin)
     radius = _compute_spot_radius(camo, enemy_vr)
+    _LAST_SPOT_RADIUS = radius
     color = _color_for_state(new_state)
     if _CFG.get('logCalcDetails'):
         _logger.info('SpotMeter: state=%s camo=%.3f vr=%.1fm radius=%.1fm net=%s shot=%s',
@@ -1294,6 +1600,39 @@ def _enemy_iterator(plugin):
     return items
 
 
+def _veh_type_key(vt):
+    """Stable per-TYPE key for grouping + picked-highlight: same model =>
+    same key. Uses vehicleType.name (e.g. 'germany:G89_Dravec') or shortName."""
+    if vt is None:
+        return None
+    return getattr(vt, 'name', None) or vt.shortName or None
+
+
+def _grouped_enemies(plugin):
+    """Collapse _enemy_iterator() by vehicle type so identical tanks form a
+    single entry: same model => same view range => same spot circle, so
+    listing 5x the same tank as 5 rows just means cycling through identical
+    circles. Returns [(rep_vid, vinfo, count), ...] preserving the
+    _enemy_iterator sort order; the representative is the first (lowest-id)
+    alive instance of each type. Honours battlePanelGroupSameTanks (set it
+    False to fall back to one entry per enemy)."""
+    enemies = _enemy_iterator(plugin)
+    if not _CFG.get('battlePanelGroupSameTanks', True):
+        return [(vid, vinfo, 1) for vid, vinfo in enemies]
+    groups = []          # [rep_vid, vinfo, count]
+    index = {}           # type key -> position in `groups`
+    for vid, vinfo in enemies:
+        vt = vinfo.vehicleType
+        key = _veh_type_key(vt) or vid
+        pos = index.get(key)
+        if pos is None:
+            index[key] = len(groups)
+            groups.append([vid, vinfo, 1])
+        else:
+            groups[pos][2] += 1
+    return [(g[0], g[1], g[2]) for g in groups]
+
+
 def _active_perk_tags():
     tag_map = {
         'rations':       'rations',
@@ -1413,20 +1752,29 @@ def _dump_picker_descriptor(plugin):
         lines.append('  + fieldUpgrades skipped (%s)             -> base_vr stays %.2fm'
                      % (reason, base_vr))
 
-    # Stage 1: crew amplifier (rations + BIA)
+    # Vents multiplier (shared by all crew bonuses)
+    vents_factors = _CFG.get('pickerVentsFactors') or [1.0]
+    vents_lvl = max(0, min(int(_PICKER_LEVELS.get('vents', 0)),
+                           len(vents_factors) - 1))
+    vents_mult = float(vents_factors[vents_lvl])
+    vents_name = _LEVEL_NAMES[vents_lvl] if vents_lvl < len(_LEVEL_NAMES) else 'L%d' % vents_lvl
+    lines.append('  + vents      (level %d=%s, x%.4f scales crew bonuses)'
+                 % (vents_lvl, vents_name, vents_mult))
+
+    # Stage 1: crew amplifier (rations + BIA), each scaled by vents
     crew_amp = 1.0
     if _PICKER_TOGGLES.get('rations', True):
-        r = float(_CFG.get('pickerVRBonusRations', 1.0430)) - 1.0
+        r = (float(_CFG.get('pickerVRBonusRations', 1.0430)) - 1.0) * vents_mult
         crew_amp += r
-        lines.append('  + rations    (toggle ON, +%.2f%%)        -> crew_amp = %.4f'
+        lines.append('  + rations    (toggle ON, +%.2f%% after vents) -> crew_amp = %.4f'
                      % (r * 100, crew_amp))
     else:
         lines.append('  + rations    (toggle OFF)                  -> crew_amp = %.4f'
                      % crew_amp)
     if _PICKER_TOGGLES.get('BIA', True):
-        b = float(_CFG.get('pickerVRBonusBIA', 1.0253)) - 1.0
+        b = (float(_CFG.get('pickerVRBonusBIA', 1.0253)) - 1.0) * vents_mult
         crew_amp += b
-        lines.append('  + BIA        (toggle ON, +%.2f%%)        -> crew_amp = %.4f'
+        lines.append('  + BIA        (toggle ON, +%.2f%% after vents) -> crew_amp = %.4f'
                      % (b * 100, crew_amp))
     else:
         lines.append('  + BIA        (toggle OFF)                  -> crew_amp = %.4f'
@@ -1439,16 +1787,26 @@ def _dump_picker_descriptor(plugin):
     directive_active = _PICKER_TOGGLES.get('directives', False)
     directive_factor = (float(_CFG.get('pickerVRBonusDirective', 1.025))
                         if directive_active else 1.0)
-    optics_factor = facts['optics_factor']
+    descr_optics = facts['optics_factor']
+    optics_factors = _CFG.get('pickerOpticsFactors') or [1.0]
+    optics_lvl = max(0, min(int(_PICKER_LEVELS.get('optics', 0)),
+                            len(optics_factors) - 1))
+    optics_name = _LEVEL_NAMES[optics_lvl] if optics_lvl < len(_LEVEL_NAMES) else 'L%d' % optics_lvl
+    if descr_optics > 1.001:
+        optics_factor = descr_optics
+        optics_source = 'descr (%.3f)' % descr_optics
+    else:
+        optics_factor = float(optics_factors[optics_lvl])
+        optics_source = 'preset L%d=%s (%.3f)' % (optics_lvl, optics_name, optics_factor)
     if optics_factor > 1.001:
         optics_total = optics_factor * directive_factor
         add = crew_amplified * (optics_total - 1.0)
         final += add
-        lines.append('  + optics     (factor %.3f from descr * directive %.3f) -> +%.2fm = %.2fm'
-                     % (optics_factor, directive_factor, add, final))
+        lines.append('  + optics     (%s * directive %.3f) -> +%.2fm = %.2fm'
+                     % (optics_source, directive_factor, add, final))
     else:
-        lines.append('  + optics     (no optics in descriptor, factor=1.0)         -> +0.00m = %.2fm'
-                     % final)
+        lines.append('  + optics     (level %d=OFF, no descr optics)         -> +0.00m = %.2fm'
+                     % (optics_lvl, final))
 
     stereo_assume = _CFG.get('pickerAssumeStereoscope', True)
     stereo_factor = facts['stereo_factor']
@@ -1465,10 +1823,10 @@ def _dump_picker_descriptor(plugin):
                      % (stereo_factor, stereo_assume, facts['has_stereo_fallback'], final))
 
     if _PICKER_TOGGLES.get('reconSitAware', True):
-        rs = float(_CFG.get('pickerVRBonusReconSitAware', 1.0739)) - 1.0
+        rs = (float(_CFG.get('pickerVRBonusReconSitAware', 1.0739)) - 1.0) * vents_mult
         add = crew_amplified * rs
         final += add
-        lines.append('  + recon+SitA (toggle ON, +%.2f%% from crew_amp) -> +%.2fm = %.2fm'
+        lines.append('  + recon+SitA (toggle ON, +%.2f%% after vents) -> +%.2fm = %.2fm'
                      % (rs * 100, add, final))
     else:
         lines.append('  + recon+SitA (toggle OFF)                                  -> +0.00m = %.2fm'
@@ -1503,12 +1861,15 @@ def _cycle_picker(direction):
     plugin = _get_picker_plugin()
     if plugin is None:
         return
-    enemies = _enemy_iterator(plugin)
-    if not enemies:
+    # Cycle over GROUP representatives so identical tanks count as one stop
+    # (Numpad 2/8 steps types, not every individual). With grouping off,
+    # _grouped_enemies yields one group per enemy = the old behaviour.
+    groups = _grouped_enemies(plugin)
+    if not groups:
         _PICKED_VID = None
         _on_picker_changed(plugin, set())
         return
-    vids = [vid for vid, _ in enemies]
+    vids = [rep_vid for rep_vid, _, _ in groups]
     affected = set()
     if _PICKED_VID is not None:
         affected.add(_PICKED_VID)
@@ -1532,13 +1893,84 @@ def _clear_picker():
     _on_picker_changed(plugin, affected)
 
 
+def _is_in_garage():
+    """True when the player is currently in the lobby/hangar (no arena
+    attached to the avatar). Used to decide whether a Numpad toggle
+    should also rewrite the in-memory `defaultToggles`/`defaultLevels`
+    so the change persists into the next battle's reset."""
+    try:
+        return not hasattr(BigWorld.player(), 'arena')
+    except Exception:
+        return False
+
+
 def _toggle_perk(name):
     if name not in _PICKER_TOGGLES:
         return
     _PICKER_TOGGLES[name] = not _PICKER_TOGGLES[name]
+    in_garage = _is_in_garage()
+    _logger.warning('SpotMeter: toggle %s -> %s (in_garage=%s)',
+                    name, _PICKER_TOGGLES[name], in_garage)
+    # In the garage, also update the in-memory defaults so that the
+    # next battle's _reset_battle_state picks up the new state instead
+    # of clobbering it back to JSON. (We don't persist to disk - this
+    # is a session-only override; restarting WoT reloads JSON values.)
+    if in_garage:
+        defaults = _CFG.setdefault('defaultToggles', {})
+        defaults[name] = _PICKER_TOGGLES[name]
     plugin = _get_picker_plugin()
     _on_picker_changed(plugin, set())
     _post_chat_line('%s: %s' % (name, 'ON' if _PICKER_TOGGLES[name] else 'OFF'))
+    _refresh_garage_if_active()
+
+
+# Human-readable labels for level slots - keeps panel + log messages
+# in sync. Index aligns with pickerOpticsFactors / pickerVentsFactors.
+_LEVEL_NAMES = ['OFF', 'basic', 'slot', 'bonds', 'deluxe']
+
+
+def _level_name_loc(lvl):
+    """Localized level-value name (OFF/basic/slot/bonds/deluxe) for the panels.
+    _LEVEL_NAMES stays English for logs/chat; this is the display version."""
+    if 0 <= lvl < 5:
+        return _t('lv_%d' % lvl)
+    return 'L%d' % lvl
+
+
+def _cycle_level(name):
+    """Advance a multi-level picker state by one (wraps 0->1->2->3->4->0).
+    Used by Numpad 6 (optics) and Numpad + (vents). Pulls the factor
+    table from _CFG so a custom spotmeter.json table changes the wrap
+    width without code changes.
+    """
+    if name not in _PICKER_LEVELS:
+        return
+    if name == 'optics':
+        table = _CFG.get('pickerOpticsFactors') or [1.0]
+    elif name == 'vents':
+        table = _CFG.get('pickerVentsFactors') or [1.0]
+    elif name == 'cvs':
+        table = _CFG.get('pickerCvsFactors') or [1.0]
+    else:
+        table = [1.0]
+    n = len(table)
+    if n <= 1:
+        return
+    _PICKER_LEVELS[name] = (int(_PICKER_LEVELS.get(name, 0)) + 1) % n
+    in_garage = _is_in_garage()
+    _logger.warning('SpotMeter: cycle %s -> L%d (in_garage=%s)',
+                    name, _PICKER_LEVELS[name], in_garage)
+    # Same garage-side defaults sync as _toggle_perk - so cycling in the
+    # lobby actually configures the next battle's starting level.
+    if in_garage:
+        defaults = _CFG.setdefault('defaultLevels', {})
+        defaults[name] = _PICKER_LEVELS[name]
+    plugin = _get_picker_plugin()
+    _on_picker_changed(plugin, set())
+    lvl = _PICKER_LEVELS[name]
+    label = _LEVEL_NAMES[lvl] if lvl < len(_LEVEL_NAMES) else 'L%d' % lvl
+    _post_chat_line('%s: L%d (%s, x%.3f)' % (name, lvl, label, table[lvl]))
+    _refresh_garage_if_active()
 
 
 def _toggle_live_mode():
@@ -1550,7 +1982,7 @@ def _toggle_live_mode():
     _LIVE_MODE_ENABLED = not _LIVE_MODE_ENABLED
     plugin = _get_picker_plugin()
     if _LIVE_MODE_ENABLED:
-        _post_chat_line('live mode: ON (refresh co %.1fs - Numpad9 zeby wylaczyc)'
+        _post_chat_line(_t('chat_live_on')
                         % float(_CFG.get('liveModeIntervalSec', 3.0)))
         # Post immediately, then schedule the loop.
         if plugin is not None:
@@ -1812,6 +2244,279 @@ def _patch_player_name_formatter():
     _logger.info('SpotMeter: PlayerFullNameFormatter hooked for marker')
 
 
+# ----- Auto-hide the panel when a WG window opens (research/depot/dialogs in
+# the garage, TAB-style overlays in battle) and restore it when the last one
+# closes. Hooks the modern wulf windows_system (windowsManager.onWindowStatus
+# Changed) - the system these windows ACTUALLY use - and re-evaluates the open
+# window list on every status change (stateless). Pure subscription + our
+# existing hide/show, all try/except, NO view-layer changes, so it can never
+# hang load like the SUB_VIEW experiment did. -----
+SPOTMETER_GF_ALIAS = 'SpotMeterGuiFlashView'  # our own GUIFlash view - never hide on it
+_PANEL_AUTO_HIDDEN = False   # True when WE hid the panel because a window is open
+_PANEL_USER_HIDDEN = False   # True when the USER explicitly hid the panel via the
+                             # toggle key (PgDn). Blocks the auto-show paths
+                             # (invalidateMarkup / space-entered) from reviving it.
+                             # PERSISTS across battles + garage/battle transitions;
+                             # cleared ONLY when the user presses PgDn again to show
+                             # (initialised False at game launch -> panel shown).
+_WW_ROUTE_BUSY = False        # True when the lobby route is a hangar loadout sub-state
+_WW_HELD_HIDE_KEYS = set()    # battle overlay keys (TAB/N) currently held down
+_WW_HIDE_KEY_IDS = None       # cached resolved key codes for battleHidePanelKeys
+_WW_KEY_POLL_CB = None        # BigWorld.callback handle for the key-release poll
+# Persistent base views that must NOT trigger a hide; everything else the
+# player opens (techtree/depot/dialogs/menu/stronghold/...) does.
+_WW_IGNORE_ALIASES = frozenset((
+    SPOTMETER_GF_ALIAS,
+    'hangar', 'HangarWindow', 'RandomHangar', 'MainWindow',
+    'lobby', 'login', 'lobbyVehicleMarkerView', 'waiting',
+    'crosshair', 'battle',
+))
+
+
+def _ww_window_alias(window):
+    """View alias parsed from the window repr (it reliably contains 'alias=X'
+    for SFWindows - direct attribute access returns None here); falls back to
+    the window class name (e.g. HangarWindow / TechTreeWindow)."""
+    try:
+        s = str(window)
+        i = s.find('alias=')
+        if i >= 0:
+            j = i + 6
+            k = j
+            while k < len(s) and s[k] not in ', ]':
+                k += 1
+            a = s[j:k].strip()
+            if a:
+                return a
+    except Exception:
+        pass
+    return type(window).__name__
+
+
+def _ww_is_real_window(window):
+    """True if `window` is a player-opened window/overlay that should hide the
+    panel: not the hangar, not us, not a tooltip/context-menu. No isHidden /
+    status check - during the status event those read True for everything, and
+    findWindows already excludes destroyed windows."""
+    try:
+        cls = type(window).__name__
+        cls_l = cls.lower()
+        if 'tooltip' in cls_l or 'contextmenu' in cls_l:
+            return False
+        alias = _ww_window_alias(window)
+        return alias not in _WW_IGNORE_ALIASES and cls not in _WW_IGNORE_ALIASES
+    except Exception:
+        return False
+
+
+def _ww_windows_manager():
+    """The wulf windows manager - lives on the IGuiLoader dependency (NOT on
+    the app, which only exposes the legacy containerManager)."""
+    try:
+        from helpers import dependency
+        from skeletons.gui.impl import IGuiLoader
+        loader = dependency.instance(IGuiLoader)
+        return getattr(loader, 'windowsManager', None) if loader is not None else None
+    except Exception:
+        return None
+
+
+def _ww_lobby_sm():
+    """The lobby state machine (for hangar sub-state routes like loadout).
+    getLobbyStateMachine lives in gui.Scaleform.lobby_entry."""
+    try:
+        from gui.Scaleform.lobby_entry import getLobbyStateMachine
+        return getLobbyStateMachine()
+    except Exception:
+        return None
+
+
+def _ww_reeval():
+    """Lobby: hide for a real window or a hangar loadout route. Battle: hide
+    ONLY while a configured overlay key (TAB/N) is held - battle HUD windows
+    (strongholdBattlePage, etc.) are always present and must NOT hide the
+    panel, so we ignore windows entirely in battle."""
+    try:
+        if _is_in_garage():
+            wm = _ww_windows_manager()
+            real = []
+            if wm is not None:
+                try:
+                    real = wm.findWindows(_ww_is_real_window) or []
+                except Exception:
+                    real = []
+            hide = bool(real) or _WW_ROUTE_BUSY
+        else:
+            hide = bool(_WW_HELD_HIDE_KEYS)
+        if hide:
+            _ww_hide_panel()
+        else:
+            _ww_show_panel()
+    except Exception:
+        _logger.exception('SpotMeter: window-watch reeval failed')
+
+
+def _ww_on_window_status(uniqueID, newStatus):
+    # Skip tooltip/context-menu churn - they fire constantly on hover and never
+    # hide the panel, so re-evaluating the whole window list each time is waste.
+    try:
+        wm = _ww_windows_manager()
+        w = wm.getWindow(uniqueID) if wm is not None else None
+        if w is not None:
+            cls = type(w).__name__.lower()
+            if 'tooltip' in cls or 'contextmenu' in cls:
+                return
+    except Exception:
+        pass
+    _ww_reeval()
+
+
+def _ww_on_route_changed(*args):
+    """Lobby visible-route changed. Loadout sub-states (equipment/shells/
+    consumables) render inside the hangar WITHOUT opening a window, so the
+    windowsManager hook can't see them - catch them by route here. Other tabs
+    already open windows and are handled by windowsManager."""
+    global _WW_ROUTE_BUSY
+    try:
+        sm = _ww_lobby_sm()
+        state = getattr(sm, 'visibleState', None) if sm is not None else None
+        _WW_ROUTE_BUSY = ('loadout' in str(state).lower()) if state is not None else False
+    except Exception:
+        _WW_ROUTE_BUSY = False
+    _ww_reeval()
+
+
+def _ww_hide_key_ids():
+    """Resolved key codes for battleHidePanelKeys (TAB / N by default)."""
+    global _WW_HIDE_KEY_IDS
+    if _WW_HIDE_KEY_IDS is None:
+        ids = set()
+        try:
+            import Keys
+            for name in (_CFG.get('battleHidePanelKeys') or ()):
+                kid = getattr(Keys, name, None)
+                if kid is not None:
+                    ids.add(kid)
+        except Exception:
+            pass
+        _WW_HIDE_KEY_IDS = ids
+    return _WW_HIDE_KEY_IDS
+
+
+def _ww_battle_key(key, is_down):
+    """While a configured battle-overlay key (TAB / N) is held, hide the panel;
+    show it on release. Battle only - in the garage these keys do nothing here
+    (the window/route watchers cover the garage)."""
+    try:
+        if not _CFG.get('autoHidePanelOnWindow', True):
+            return
+        if _is_in_garage():
+            if _WW_HELD_HIDE_KEYS:
+                _WW_HELD_HIDE_KEYS.clear()
+            return
+        if key not in _ww_hide_key_ids():
+            return
+        if is_down:
+            _WW_HELD_HIDE_KEYS.add(key)
+            _ww_reeval()
+            _ww_start_key_poll()  # TAB's key-UP isn't delivered to us - poll the real state
+        else:
+            _WW_HELD_HIDE_KEYS.discard(key)
+            _ww_reeval()
+    except Exception:
+        _logger.exception('SpotMeter: battle key-hide failed')
+
+
+def _ww_start_key_poll():
+    """Start (once) a light poll that watches the real key state, since some
+    games consume the key-UP for TAB so we never get a release event."""
+    global _WW_KEY_POLL_CB
+    if _WW_KEY_POLL_CB is not None:
+        return
+    try:
+        _WW_KEY_POLL_CB = BigWorld.callback(0.1, _ww_key_poll_tick)
+    except Exception:
+        _WW_KEY_POLL_CB = None
+
+
+def _ww_key_poll_tick():
+    global _WW_KEY_POLL_CB
+    _WW_KEY_POLL_CB = None
+    try:
+        still = set()
+        for kid in list(_WW_HELD_HIDE_KEYS):
+            try:
+                if BigWorld.isKeyDown(kid):
+                    still.add(kid)
+            except Exception:
+                pass
+        _WW_HELD_HIDE_KEYS.clear()
+        _WW_HELD_HIDE_KEYS.update(still)
+        if _WW_HELD_HIDE_KEYS:
+            _WW_KEY_POLL_CB = BigWorld.callback(0.1, _ww_key_poll_tick)
+        else:
+            _ww_reeval()  # all release keys up -> restore the panel
+    except Exception:
+        _logger.exception('SpotMeter: key-poll failed')
+
+
+def _ww_on_space_entered(spaceID):
+    """Reset state for the new space and (re)subscribe to its windowsManager -
+    lobby and battle each have their own."""
+    global _PANEL_AUTO_HIDDEN, _WW_ROUTE_BUSY
+    _PANEL_AUTO_HIDDEN = False
+    _WW_ROUTE_BUSY = False
+    if not _CFG.get('autoHidePanelOnWindow', True):
+        return
+    try:
+        wm = _ww_windows_manager()
+        if wm is not None:
+            try:
+                wm.onWindowStatusChanged -= _ww_on_window_status
+            except Exception:
+                pass
+            wm.onWindowStatusChanged += _ww_on_window_status
+    except Exception:
+        _logger.exception('SpotMeter: window-watch subscribe failed')
+    # Lobby state machine - catches hangar loadout sub-states (equipment / ammo
+    # / consumables) which switch route WITHOUT opening a window.
+    try:
+        sm = _ww_lobby_sm()
+        if sm is not None and hasattr(sm, 'onVisibleRouteChanged'):
+            try:
+                sm.onVisibleRouteChanged -= _ww_on_route_changed
+            except Exception:
+                pass
+            sm.onVisibleRouteChanged += _ww_on_route_changed
+    except Exception:
+        _logger.exception('SpotMeter: route-watch subscribe failed')
+
+
+def _ww_hide_panel():
+    global _PANEL_AUTO_HIDDEN
+    if _is_in_garage():
+        if _GARAGE_PANEL_ACTIVE:
+            _hide_garage_panel()
+            _PANEL_AUTO_HIDDEN = True
+    elif _BATTLE_PANEL_ACTIVE:
+        _hide_battle_view()
+        _PANEL_AUTO_HIDDEN = True
+
+
+def _ww_show_panel():
+    global _PANEL_AUTO_HIDDEN
+    if not _PANEL_AUTO_HIDDEN:
+        return
+    _PANEL_AUTO_HIDDEN = False
+    try:
+        if _is_in_garage():
+            _show_garage_panel(force=True)
+        else:
+            _show_battle_view(force=True)
+    except Exception:
+        _logger.exception('SpotMeter: window-watch show failed')
+
+
 def _patch_hangar_lifecycle():
     """Subscribe to the appLoader's GUI-space-change events so we know when
     the player enters / leaves the garage and when they enter / leave a
@@ -1843,6 +2548,7 @@ def _patch_hangar_lifecycle():
                 _show_garage_panel()
             elif spaceID == SPACE_ID.BATTLE:
                 _show_battle_view()
+            _ww_on_space_entered(spaceID)
         except Exception:
             _logger.exception('SpotMeter: onGUISpaceEntered handler failed')
 
@@ -2601,8 +3307,9 @@ _LAYOUT = {
     'target_y':      24,
     'auto_y':        46,
     'toggles_row1_y': 72,
-    'toggles_row2_y': 96,
-    'enemies_y0':    124,
+    'toggles_row2_y': 94,
+    'toggles_row3_y': 116,
+    'enemies_y0':    142,
     'enemies_step':  18,
 }
 
@@ -2617,8 +3324,30 @@ _TOGGLE_ROWS = [
     ('fieldUpgrades', 'tog_fieldUpgr',  'N0',  'fieldUpgr'),
 ]
 
+# Multi-level cycling controls. Same cell shape as toggles but with
+# level state read from _PICKER_LEVELS instead of _PICKER_TOGGLES.
+_LEVEL_ROWS = [
+    ('optics', 'lvl_optics', 'N6', 'optics'),
+    ('vents',  'lvl_vents',  'N+', 'vents'),
+    ('cvs',    'lvl_cvs',    'N-', 'CVS'),
+]
 
-def _show_battle_view():
+# Battle-panel grid order: binary toggles for the "always-relevant"
+# crew items first, then the three level-cyclers (assumed enemy gear),
+# then the rare-case binary toggles. 8 cells total in a 3+3+2 grid.
+_PANEL_CELLS = [
+    ('toggle', _TOGGLE_ROWS[0]),   # rations
+    ('toggle', _TOGGLE_ROWS[1]),   # BIA
+    ('toggle', _TOGGLE_ROWS[2]),   # reconSitAware
+    ('level',  _LEVEL_ROWS[0]),    # optics
+    ('level',  _LEVEL_ROWS[1]),    # vents
+    ('level',  _LEVEL_ROWS[2]),    # cvs
+    ('toggle', _TOGGLE_ROWS[3]),   # directives
+    ('toggle', _TOGGLE_ROWS[4]),   # fieldUpgrades
+]
+
+
+def _show_battle_view(force=False):
     """Build the in-battle SpotMeter panel using our private forked
     GUIFlash. Components are individually clickable:
       - .auto              -> toggle auto-pick
@@ -2631,8 +3360,10 @@ def _show_battle_view():
     .drag=true prop on the root; drag-end persists battlePanelX/Y.
     """
     global _BATTLE_PANEL_ACTIVE
-    if not _CFG.get('battlePanelEnabled', True):
+    if not force and not _CFG.get('battlePanelEnabled', True):
         return
+    if not force and _PANEL_USER_HIDDEN:
+        return  # user hid it with PgDn - don't let invalidateMarkup revive it
     if _BATTLE_PANEL_ACTIVE:
         return
 
@@ -2662,8 +3393,16 @@ def _show_battle_view():
         # Title is non-clickable, just identification.
         g_smGuiFlash.createComponent(SPOTMETER_PANEL_ROOT + '.title', 'Label', {
             'x': 8, 'y': _LAYOUT['title_y'],
-            'text': '<font size="14" color="#FFFFFF"><b>SpotMeter v%s</b></font>'
-                    % MOD_VERSION,
+            'text': '<font size="14" color="#FFFFFF"><b>SpotMeter v%s</b></font> '
+                    '<font size="9" color="#888888">by %s</font>'
+                    % (MOD_VERSION_SHORT, MOD_AUTHOR),
+            'isHtml': True, 'shadow': None,
+            'autoSize': True,
+        })
+        # Bottom hint: how to hide the panel (PageDown by default).
+        g_smGuiFlash.createComponent(SPOTMETER_PANEL_ROOT + '.hint', 'Label', {
+            'x': 8, 'y': _LAYOUT['enemies_y0'],
+            'text': '<font size="9" color="#666666"><i>%s</i></font>' % _t('battle_hide_hint'),
             'isHtml': True, 'shadow': None,
             'autoSize': True,
         })
@@ -2686,19 +3425,32 @@ def _show_battle_view():
                 'thickness': 1, 'margin': 3, 'ellipseWidth': 4,
             },
         })
-        # Five toggle cells, each CLICKABLE. Layout: row1 has 3 toggles,
-        # row2 has 2.
-        for i, (key, suffix, hotkey, dispname) in enumerate(_TOGGLE_ROWS):
-            row = 0 if i < 3 else 1
-            col = i if row == 0 else (i - 3)
-            cells_in_row = 3 if row == 0 else 2
-            cell_w = (w - 16) / cells_in_row
+        # Seven cells (5 binary toggles + 2 multi-level controls) in a
+        # 3+3+1 grid. _PANEL_CELLS holds them in display order with a
+        # kind discriminator so we can format toggles vs levels in the
+        # same loop.
+        cells_per_row = 3
+        cell_w = (w - 16) / cells_per_row
+        # Row Y baseline: keep existing row1/row2 spacing, add row3.
+        row_y = [
+            _LAYOUT['toggles_row1_y'],
+            _LAYOUT['toggles_row2_y'],
+            _LAYOUT['toggles_row3_y'],
+        ]
+        for i, (kind, item) in enumerate(_PANEL_CELLS):
+            row = i // cells_per_row
+            col = i % cells_per_row
+            key, suffix, hotkey, dispname = item
             cx = 8 + col * cell_w
-            cy = _LAYOUT['toggles_row1_y'] if row == 0 else _LAYOUT['toggles_row2_y']
+            cy = row_y[row] if row < len(row_y) else row_y[-1]
+            if kind == 'toggle':
+                text = _fmt_toggle_label(key, dispname, hotkey)
+            else:  # level
+                text = _fmt_level_label(key, dispname, hotkey)
             g_smGuiFlash.createComponent(
                 SPOTMETER_PANEL_ROOT + '.' + suffix, 'Label', {
                     'x': cx, 'y': cy,
-                    'text': _fmt_toggle_label(key, dispname, hotkey),
+                    'text': text,
                     'isHtml': True, 'shadow': None,
                     'autoSize': True,
                     'customBackground': {
@@ -2739,9 +3491,12 @@ def _hide_battle_view():
                     SPOTMETER_PANEL_ROOT + '.enemy_' + str(vid))
             except Exception:
                 pass
-        # Then the fixed children.
-        for suffix in ('title', 'target', 'auto') + tuple(
-                row[1] for row in _TOGGLE_ROWS):
+        # Then the fixed children: title/target/auto + every cell in the
+        # panel grid (binary toggles + level cyclers).
+        fixed_suffixes = ['title', 'target', 'auto', 'hint']
+        for _kind, item in _PANEL_CELLS:
+            fixed_suffixes.append(item[1])  # item = (key, suffix, hotkey, dispname)
+        for suffix in fixed_suffixes:
             try:
                 g_smGuiFlash.deleteComponent(SPOTMETER_PANEL_ROOT + '.' + suffix)
             except Exception:
@@ -2790,6 +3545,10 @@ def _on_guiflash_component_clicked(alias):
     for key, suffix, _hotkey, _disp in _TOGGLE_ROWS:
         if leaf == suffix:
             _toggle_perk(key)
+            return
+    for key, suffix, _hotkey, _disp in _LEVEL_ROWS:
+        if leaf == suffix:
+            _cycle_level(key)
             return
     if leaf.startswith('enemy_'):
         try:
@@ -2879,9 +3638,12 @@ def _refresh_panel_state():
                         _fmt_target_label(plugin))
     _maybe_update_label(g_smGuiFlash, SPOTMETER_PANEL_ROOT + '.auto',
                         _fmt_auto_label())
-    for key, suffix, hotkey, dispname in _TOGGLE_ROWS:
-        _maybe_update_label(g_smGuiFlash, SPOTMETER_PANEL_ROOT + '.' + suffix,
-                            _fmt_toggle_label(key, dispname, hotkey))
+    for kind, (key, suffix, hotkey, dispname) in _PANEL_CELLS:
+        if kind == 'toggle':
+            text = _fmt_toggle_label(key, dispname, hotkey)
+        else:
+            text = _fmt_level_label(key, dispname, hotkey)
+        _maybe_update_label(g_smGuiFlash, SPOTMETER_PANEL_ROOT + '.' + suffix, text)
 
     _refresh_enemy_rows(g_smGuiFlash, plugin)
 
@@ -2904,19 +3666,32 @@ def _refresh_enemy_rows(g_smGuiFlash, plugin):
         # No plugin -> remove anything stale
         _purge_enemy_rows(g_smGuiFlash, keep=set())
         return
-    enemies = _enemy_iterator(plugin)
-    listing = enemies[:SPOTMETER_MAX_ENEMY_ROWS]
-    desired_vids = set(vid for vid, _ in listing)
+    groups = _grouped_enemies(plugin)
+    listing = groups[:SPOTMETER_MAX_ENEMY_ROWS]
+    desired_vids = set(rep_vid for rep_vid, _, _ in listing)
     _purge_enemy_rows(g_smGuiFlash, keep=desired_vids)
 
     eff_vid, src = _effective_picked_vid()
+    # Resolve the picked tank's TYPE so a group row still highlights when the
+    # picked vid is a non-representative member (e.g. an auto-picked instance).
+    picked_key = None
+    if eff_vid is not None:
+        try:
+            arenaDP = plugin.sessionProvider.getArenaDP()
+            ev = arenaDP.getVehicleInfo(eff_vid) if arenaDP is not None else None
+            if ev is not None:
+                picked_key = _veh_type_key(ev.vehicleType)
+        except Exception:
+            picked_key = None
     y0 = _LAYOUT['enemies_y0']
     step = _LAYOUT['enemies_step']
     panel_w = float(_CFG.get('battlePanelW', 320))
 
-    for idx, (vid, vinfo) in enumerate(listing):
+    for idx, (vid, vinfo, count) in enumerate(listing):
         alias = SPOTMETER_PANEL_ROOT + '.enemy_' + str(vid)
-        text = _fmt_enemy_row(plugin, vid, vinfo, vid == eff_vid, src)
+        is_picked = (vid == eff_vid) or (picked_key is not None
+                     and _veh_type_key(vinfo.vehicleType) == picked_key)
+        text = _fmt_enemy_row(plugin, vid, vinfo, is_picked, src, count)
         if vid not in _BATTLE_PANEL_ENEMY_VIDS:
             # Create a new clickable row.
             try:
@@ -2928,8 +3703,8 @@ def _refresh_enemy_rows(g_smGuiFlash, plugin):
                     'width': panel_w - 16,
                     'height': step,
                     'customBackground': {
-                        'color': (0x4A6378 if vid == eff_vid else 0x1A2230),
-                        'alpha': (0.85 if vid == eff_vid else 0.40),
+                        'color': (0x4A6378 if is_picked else 0x1A2230),
+                        'alpha': (0.85 if is_picked else 0.40),
                         'border': False,
                         'thickness': 0,
                         'margin': 1,
@@ -2947,8 +3722,8 @@ def _refresh_enemy_rows(g_smGuiFlash, plugin):
                 g_smGuiFlash.updateComponent(alias, {
                     'y': y0 + idx * step,
                     'customBackground': {
-                        'color': (0x4A6378 if vid == eff_vid else 0x1A2230),
-                        'alpha': (0.85 if vid == eff_vid else 0.40),
+                        'color': (0x4A6378 if is_picked else 0x1A2230),
+                        'alpha': (0.85 if is_picked else 0.40),
                         'border': False,
                         'thickness': 0,
                         'margin': 1,
@@ -2957,6 +3732,14 @@ def _refresh_enemy_rows(g_smGuiFlash, plugin):
                 })
             except Exception:
                 _logger.exception('SpotMeter: failed to reposition enemy row %s', alias)
+
+    # Keep the "press PgDn to hide" hint right under the enemy list (adapts to
+    # the tank count) instead of pinned at the panel bottom.
+    try:
+        g_smGuiFlash.updateComponent(SPOTMETER_PANEL_ROOT + '.hint',
+                                     {'y': y0 + len(listing) * step + 6})
+    except Exception:
+        pass
 
 
 def _purge_enemy_rows(g_smGuiFlash, keep):
@@ -2974,11 +3757,41 @@ def _purge_enemy_rows(g_smGuiFlash, keep):
 
 # ----- label formatters -----
 
+def _own_vehicle_short_name(plugin):
+    """shortName of the player's own tank (for the 'own VR' target readout)."""
+    try:
+        vid = getattr(BigWorld.player(), 'playerVehicleID', 0)
+        if not vid:
+            return ''
+        arenaDP = plugin.sessionProvider.getArenaDP()
+        if arenaDP is None:
+            return ''
+        vinfo = arenaDP.getVehicleInfo(vid)
+        if vinfo is not None and vinfo.vehicleType is not None:
+            return vinfo.vehicleType.shortName or ''
+    except Exception:
+        pass
+    return ''
+
+
 def _fmt_target_label(plugin):
     eff_vid, src = _effective_picked_vid()
     if eff_vid is None or plugin is None:
-        return ('<font size="12" color="#888888">Target: '
-                '<i>--  (Numpad 2/8 lub klik na liscie)</i></font>')
+        # Nothing picked + no auto -> the circle uses our OWN view range; show
+        # our own tank instead of just "--".
+        own_name = (_own_vehicle_short_name(plugin)
+                    if plugin is not None and _CFG.get('useOwnViewRange', True) else '')
+        if own_name:
+            spot = _LAST_SPOT_RADIUS
+            spot_str = ('%.0fm' % spot) if spot else '--m'
+            return ('<font size="12" color="#FFCC66">%s <b>%s</b>  '
+                    '<font color="#FFFFFF">spot=%s</font> '
+                    '<font color="#88AABB">(%s)</font></font>'
+                    % (_t('battle_target'), _html_escape(own_name), spot_str,
+                       _t('battle_target_own')))
+        return ('<font size="12" color="#888888">%s '
+                '<i>--  %s</i></font>'
+                % (_t('battle_target'), _t('battle_target_hint')))
     name = ''
     try:
         arenaDP = plugin.sessionProvider.getArenaDP()
@@ -2988,12 +3801,14 @@ def _fmt_target_label(plugin):
                 name = vinfo.vehicleType.shortName or ''
     except Exception:
         pass
-    vr = _picker_vr_for(plugin, eff_vid)
-    vr_str = ('%.0fm' % vr) if vr else '--m'
+    # Show the distance from which THIS target spots us (the live spot-circle
+    # radius for the current state) instead of the raw enemy VR.
+    spot = _LAST_SPOT_RADIUS
+    spot_str = ('%.0fm' % spot) if spot else '--m'
     src_str = ' <font color="#88AABB">(auto)</font>' if src == 'auto' else ''
-    return ('<font size="12" color="#FFCC66">Target: <b>%s</b>  '
-            '<font color="#FFFFFF">VR=%s</font>%s</font>'
-            % (_html_escape(name), vr_str, src_str))
+    return ('<font size="12" color="#FFCC66">%s <b>%s</b>  '
+            '<font color="#FFFFFF">spot=%s</font>%s</font>'
+            % (_t('battle_target'), _html_escape(name), spot_str, src_str))
 
 
 def _fmt_auto_label():
@@ -3002,8 +3817,8 @@ def _fmt_auto_label():
     color = '#88FF88' if auto_on else '#AAAAAA'
     label = 'ON, %dm' % range_m if auto_on else 'OFF'
     return ('<font size="11" color="%s">[Auto-pick: %s]</font>'
-            '<font size="10" color="#555555"> klik / Numpad /</font>'
-            % (color, label))
+            '<font size="10" color="#555555"> %s</font>'
+            % (color, label, _t('battle_auto_hint')))
 
 
 def _fmt_toggle_label(key, dispname, hotkey):
@@ -3012,18 +3827,33 @@ def _fmt_toggle_label(key, dispname, hotkey):
     sym = '+' if on else '-'
     return ('<font size="11" color="%s">[%s%s]</font>'
             '<font size="9" color="#555555"> %s</font>'
-            % (color, sym, _html_escape(dispname), hotkey))
+            % (color, sym, _html_escape(_t('tl_' + key)), hotkey))
 
 
-def _fmt_enemy_row(plugin, vid, vinfo, is_picked, src):
+def _fmt_level_label(key, dispname, hotkey):
+    """Render a multi-level cell. Shows current level name (OFF/basic/
+    slot/bonds/deluxe). Color is dim when at level 0 (OFF), green when
+    at any positive level. Same cell shape as toggles so the 3-column
+    grid stays uniform."""
+    lvl = int(_PICKER_LEVELS.get(key, 0))
+    lvl = max(0, min(lvl, len(_LEVEL_NAMES) - 1))
+    name = _level_name_loc(lvl)
+    color = '#88FF88' if lvl > 0 else '#AAAAAA'
+    return ('<font size="11" color="%s">[%s:%s]</font>'
+            '<font size="9" color="#555555"> %s</font>'
+            % (color, _html_escape(_t('tl_' + key)), name, hotkey))
+
+
+def _fmt_enemy_row(plugin, vid, vinfo, is_picked, src, count=1):
     vt = vinfo.vehicleType
     if vt is None:
         return ''
     klass = _class_code_for(vt) or '??'
     short = _html_escape(vt.shortName or '?')
+    count_str = (' x%d' % count) if count > 1 else ''
     level = vt.level or 0
     vr_val = _picker_vr_for(plugin, vid)
-    vr_str = '%dm' % int(vr_val) if vr_val else '?'
+    vr_str = 'VR=%dm' % int(vr_val) if vr_val else 'VR=?'
     if is_picked:
         line_color = '#FFCC66'
         marker = '<font color="#FFCC66"><b>&#9654;</b></font> '
@@ -3032,8 +3862,8 @@ def _fmt_enemy_row(plugin, vid, vinfo, is_picked, src):
     else:
         line_color = '#CCCCCC'
         marker = '<font color="#444444">&nbsp;&nbsp;</font>'
-    return ('<font size="10" color="%s">%s[%s] %s T%d  %s</font>'
-            % (line_color, marker, klass, short, level, vr_str))
+    return ('<font size="10" color="%s">%s[%s] %s%s T%d  %s</font>'
+            % (line_color, marker, klass, short, count_str, level, vr_str))
 
 
 def _html_escape(s):
@@ -3054,15 +3884,17 @@ def _html_escape(s):
 # via the same COMPONENT_EVENT.UPDATED hook the battle panel uses.
 # ============================================================================
 
-def _show_garage_panel():
+def _show_garage_panel(force=False):
     """Build the garage info panel using GUIFlash. Components are tagged
     lobby=True, battle=False so they only render in the garage; the
     same GUIFlash view instance handles both the in-battle panel and
     this one without conflict.
     """
     global _GARAGE_PANEL_ACTIVE
-    if not _CFG.get('garagePanelEnabled', True):
+    if not force and not _CFG.get('garagePanelEnabled', True):
         return
+    if not force and _PANEL_USER_HIDDEN:
+        return  # user hid it with PgDn - don't let the hangar hooks revive it
     if _GARAGE_PANEL_ACTIVE:
         return
     try:
@@ -3086,8 +3918,9 @@ def _show_garage_panel():
         g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.title', 'Label', {
             'x': 8, 'y': 4,
             'text': '<font size="14" color="#FFFFFF"><b>SpotMeter v%s</b></font> '
-                    '<font size="10" color="#888888">- garaz, ustawienia</font>'
-                    % MOD_VERSION,
+                    '<font size="10" color="#888888">%s</font> '
+                    '<font size="9" color="#888888">by %s</font>'
+                    % (MOD_VERSION_SHORT, _t('garage_title_suffix'), MOD_AUTHOR),
             'isHtml': True, 'shadow': None,
             'autoSize': True,
         }, battle=False, lobby=True)
@@ -3099,14 +3932,14 @@ def _show_garage_panel():
             'multiline': True,
         }, battle=False, lobby=True)
         g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.battle_panel', 'Label', {
-            'x': 8, 'y': 96,
+            'x': 8, 'y': 84,
             'text': _fmt_garage_battle_panel(),
             'isHtml': True, 'shadow': None,
             'autoSize': True,
             'multiline': True,
         }, battle=False, lobby=True)
         g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.hotkeys', 'Label', {
-            'x': 8, 'y': 140,
+            'x': 8, 'y': 108,
             'text': _fmt_garage_hotkeys(),
             'isHtml': True, 'shadow': None,
             'autoSize': True,
@@ -3114,8 +3947,7 @@ def _show_garage_panel():
         }, battle=False, lobby=True)
         g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.footer', 'Label', {
             'x': 8, 'y': h - 24,
-            'text': '<font size="9" color="#666666"><i>'
-                    'Zmiany defaultow: edytuj mods/configs/spotmeter.json + restart WoT</i></font>',
+            'text': '<font size="9" color="#666666"><i>%s</i></font>' % _t('garage_footer'),
             'isHtml': True, 'shadow': None,
             'autoSize': True,
         }, battle=False, lobby=True)
@@ -3153,6 +3985,30 @@ def _hide_garage_panel():
     _GARAGE_PANEL_ACTIVE = False
     _GARAGE_PANEL_LAST.clear()
     _logger.info('SpotMeter: garage panel destroyed')
+
+
+def _toggle_panel():
+    """Show/hide the SpotMeter panel (PageDown by default). Context-aware:
+    flips the garage panel when in the garage, the battle panel otherwise.
+    Passes force=True so it can summon a panel even when its *PanelEnabled
+    flag is False - that flag only governs whether the panel auto-shows at
+    startup, while this key controls live visibility either way.
+    """
+    global _PANEL_USER_HIDDEN
+    if _is_in_garage():
+        if _GARAGE_PANEL_ACTIVE:
+            _hide_garage_panel()
+            _PANEL_USER_HIDDEN = True
+        else:
+            _PANEL_USER_HIDDEN = False
+            _show_garage_panel(force=True)
+    else:
+        if _BATTLE_PANEL_ACTIVE:
+            _hide_battle_view()
+            _PANEL_USER_HIDDEN = True
+        else:
+            _PANEL_USER_HIDDEN = False
+            _show_battle_view(force=True)
 
 
 def _schedule_garage_refresh():
@@ -3193,6 +4049,18 @@ def _refresh_garage_state():
     # Hotkeys are static, no refresh needed.
 
 
+def _refresh_garage_if_active():
+    """Repaint the garage panel immediately after a Numpad action so the
+    change shows at once instead of waiting for the ~2s tick. No-op in
+    battle (the garage panel is inactive there)."""
+    if not _GARAGE_PANEL_ACTIVE:
+        return
+    try:
+        _refresh_garage_state()
+    except Exception:
+        _logger.exception('SpotMeter: immediate garage refresh failed')
+
+
 def _maybe_update_garage_label(g_smGuiFlash, alias, html):
     if _GARAGE_PANEL_LAST.get(alias) == html:
         return
@@ -3210,14 +4078,15 @@ def _fmt_garage_defaults():
     in-session changes will reset."""
     defaults = _CFG.get('defaultToggles') or {}
     pairs = [
-        ('rations',       'rations',    'N7'),
-        ('BIA',           'BIA',        'N3'),
-        ('reconSitAware', 'recon+SitA', 'N4'),
-        ('directives',    'dyrektywy',  'N1'),
-        ('fieldUpgrades', 'fieldUpgr',  'N0'),
+        ('rations',       'N7'),
+        ('BIA',           'N3'),
+        ('reconSitAware', 'N4'),
+        ('directives',    'N1'),
+        ('fieldUpgrades', 'N0'),
     ]
     rows = []
-    for key, label, hotkey in pairs:
+    for key, hotkey in pairs:
+        label = _t('tl_' + key)
         default_on = bool(defaults.get(key, False))
         current_on = bool(_PICKER_TOGGLES.get(key, False))
         default_sym = '+' if default_on else '-'
@@ -3229,13 +4098,52 @@ def _fmt_garage_defaults():
                 '<font color="#555555">(%s)</font>'
                 % (color, current_sym, label, hotkey))
         else:
-            # Session differs from default - flag it.
             rows.append(
                 '<font color="#FFCC66">%s%s</font> '
                 '<font color="#555555">(%s, default %s)</font>'
                 % (current_sym, label, hotkey, default_sym))
-    return ('<font size="11" color="#88AABB"><b>Ulepszacze (sesja):</b></font><br>'
-            '<font size="11">  ' + '  '.join(rows) + '</font>')
+
+    # Auto-pick is a mode toggle with its own state vars (not _PICKER_TOGGLES).
+    auto_on = bool(_CFG.get('autoPickEnabled', False))
+    auto_def = bool(_DEFAULT_AUTO_PICK_ENABLED)
+    auto_sym = '+' if auto_on else '-'
+    if auto_on == auto_def:
+        auto_color = '#88FF88' if auto_on else '#888888'
+        rows.append('<font color="%s">%s%s</font> '
+                    '<font color="#555555">(N/)</font>'
+                    % (auto_color, auto_sym, _t('tl_auto')))
+    else:
+        rows.append('<font color="#FFCC66">%s%s</font> '
+                    '<font color="#555555">(N/, default %s)</font>'
+                    % (auto_sym, _t('tl_auto'), '+' if auto_def else '-'))
+
+    # Multi-level cells (optics + vents + cvs) go on their OWN second line
+    # so the on/off toggles above don't run off the panel width.
+    level_rows = []
+    default_levels = _CFG.get('defaultLevels') or {}
+    for key, hotkey in [('optics', 'N6'), ('vents', 'N+'), ('cvs', 'N-')]:
+        label = _t('tl_' + key)
+        cur_lvl = int(_PICKER_LEVELS.get(key, 0))
+        def_lvl = int(default_levels.get(key, 0))
+        cur_lvl = max(0, min(cur_lvl, len(_LEVEL_NAMES) - 1))
+        cur_name = _level_name_loc(cur_lvl)
+        if cur_lvl == def_lvl:
+            color = '#88FF88' if cur_lvl > 0 else '#888888'
+            level_rows.append(
+                '<font color="%s">%s:%s</font> '
+                '<font color="#555555">(%s)</font>'
+                % (color, label, cur_name, hotkey))
+        else:
+            def_name = _level_name_loc(def_lvl)
+            level_rows.append(
+                '<font color="#FFCC66">%s:%s</font> '
+                '<font color="#555555">(%s, default %s)</font>'
+                % (label, cur_name, hotkey, def_name))
+
+    # Two lines: line 1 = on/off toggles (+auto), line 2 = equipment levels.
+    return ('<font size="11" color="#88AABB"><b>' + _t('garage_loadout_header') + '</b></font><br>'
+            '<font size="11">  ' + '  '.join(rows) + '</font><br>'
+            '<font size="11">  ' + '  '.join(level_rows) + '</font>')
 
 
 def _fmt_garage_battle_panel():
@@ -3244,24 +4152,14 @@ def _fmt_garage_battle_panel():
     py = int(_CFG.get('battlePanelY', 400))
     color = '#88FF88' if on else '#888888'
     state = 'ON' if on else 'OFF'
-    return ('<font size="11" color="#88AABB"><b>Panel w bitwie:</b></font> '
+    return ('<font size="11" color="#88AABB"><b>%s</b></font> '
             '<font size="11" color="%s">%s</font> '
             '<font size="10" color="#888888">@ (%d, %d)</font>'
-            % (color, state, px, py))
+            % (_t('garage_battle_panel'), color, state, px, py))
 
 
 def _fmt_garage_hotkeys():
-    return ('<font size="11" color="#88AABB"><b>Hotkeys w bitwie:</b></font><br>'
-            '<font size="10" color="#CCCCCC">'
-            '  <b>N 2 / N 8</b> &#8212; nastepny / poprzedni przeciwnik<br>'
-            '  <b>N 5</b>       &#8212; wyczysc wybor (powrot do auto)<br>'
-            '  <b>N /</b>       &#8212; auto-pick (najblizszy widoczny)<br>'
-            '  <b>N 7 / N 3 / N 4</b> &#8212; rations / BIA / recon+SitA<br>'
-            '  <b>N 1 / N 0</b>    &#8212; dyrektywy / field upgrades<br>'
-            '  <b>N *</b>       &#8212; dump descriptor enemy do python.log<br>'
-            '  <b>N Enter</b>   &#8212; snapshot spot-distance do czatu<br>'
-            '  <b>N .</b>       &#8212; hot-reload spotmeter.json'
-            '</font>')
+    return _t('garage_hotkeys')
 
 
 # ---- battle-panel event handlers (Python side) ----
@@ -3320,23 +4218,28 @@ def _battle_panel_on_drag_end(new_x, new_y):
 # ---- battle-panel state payload helpers ----
 
 def _battle_panel_enemy_payload(plugin):
-    """Return (vids, labels, class_codes) for the current enemy listing.
-    Empty tuples if plugin is None or no enemies."""
+    """Return (vids, labels, class_codes) for the current enemy listing,
+    collapsed by vehicle type via _grouped_enemies (identical tanks share
+    one row, labelled "Name xN"). vids hold the group representative, so the
+    existing parallel-array AS3 protocol and the click->pick path stay
+    unchanged. Empty tuples if plugin is None or no enemies."""
     if plugin is None:
         return [], [], []
-    enemies = _enemy_iterator(plugin)
     vids = []
     labels = []
     classes = []
-    for vid, vinfo in enemies:
+    for rep_vid, vinfo, count in _grouped_enemies(plugin):
         vt = vinfo.vehicleType
         if vt is None:
             continue
         short = vt.shortName or '?'
         level = vt.level or 0
-        # Compose label "Obj. 907  T10" (class shown separately as code).
-        label = '%s  T%d' % (short, level)
-        vids.append(vid)
+        # "Obj. 907  T10", or "Obj. 907 x3  T10" when several are present.
+        if count > 1:
+            label = '%s x%d  T%d' % (short, count, level)
+        else:
+            label = '%s  T%d' % (short, level)
+        vids.append(rep_vid)
         labels.append(label)
         classes.append(_class_code_for(vt))
     return vids, labels, classes
@@ -3418,7 +4321,7 @@ def _install_reload_hotkey():
         'KEY_NUMPAD0': ['KEY_INSERT'],
         'KEY_NUMPAD1': ['KEY_END'],
         'KEY_NUMPAD2': ['KEY_DOWNARROW'],
-        'KEY_NUMPAD3': ['KEY_PGDN'],
+        'KEY_NUMPAD3': [],  # KEY_PGDN freed -> reused as panelToggleKey
         'KEY_NUMPAD4': ['KEY_LEFT'],
         'KEY_NUMPAD5': [],
         'KEY_NUMPAD6': ['KEY_RIGHT'],
@@ -3454,6 +4357,7 @@ def _install_reload_hotkey():
             bindings.append((key_id, action, label, key_name))
 
     _bind('reloadKey', _hot_reload, 'reload')
+    _bind('panelToggleKey', _toggle_panel, 'panel-toggle')
     if _CFG.get('pickerEnabled', True):
         _bind('pickerNextKey', lambda: _cycle_picker(+1), 'picker-next')
         _bind('pickerPrevKey', lambda: _cycle_picker(-1), 'picker-prev')
@@ -3464,6 +4368,12 @@ def _install_reload_hotkey():
               lambda: _toggle_perk('BIA'), 'BIA')
         _bind('pickerReconSitAwareKey',
               lambda: _toggle_perk('reconSitAware'), 'recon-sitaware')
+        _bind('pickerOpticsKey',
+              lambda: _cycle_level('optics'), 'optics-cycle')
+        _bind('pickerVentsKey',
+              lambda: _cycle_level('vents'), 'vents-cycle')
+        _bind('pickerCvsKey',
+              lambda: _cycle_level('cvs'), 'cvs-cycle')
         _bind('pickerDirectivesKey',
               lambda: _toggle_perk('directives'), 'directives')
         _bind('pickerFieldUpgradesKey',
@@ -3480,12 +4390,35 @@ def _install_reload_hotkey():
         _logger.warning('SpotMeter: no hotkeys registered (check Keys names in config)')
         return
 
+    # v6.0.0: dedupe state. We register the SAME handler on TWO key
+    # channels (see below) so hotkeys fire in both the garage and in
+    # battle. In battle both channels deliver the same press, which
+    # would toggle ON-then-OFF (net zero). The debounce drops a repeat
+    # of the same key within _KEY_DEBOUNCE_SEC.
+    import time as _time_mod
+    _last_key = {'id': None, 't': 0.0}
+    _KEY_DEBOUNCE_SEC = 0.12
+
     def _on_key_event(event):
-        if not event.isKeyDown():
+        try:
+            is_down = event.isKeyDown()
+        except Exception:
             return False
-        key = event.key
+        key = getattr(event, 'key', None)
+        if key is not None:
+            _ww_battle_key(key, is_down)   # battle TAB/N overlay auto-hide (down+up)
+        if not is_down:
+            return False
+        if key is None:
+            return False
+        now = _time_mod.time()
+        if (_last_key['id'] == key
+                and (now - _last_key['t']) < _KEY_DEBOUNCE_SEC):
+            return False  # duplicate from the other channel - ignore
         for key_id, action, label, _name in bindings:
             if key == key_id:
+                _last_key['id'] = key
+                _last_key['t'] = now
                 try:
                     action()
                 except Exception:
@@ -3493,33 +4426,30 @@ def _install_reload_hotkey():
                 return False  # don't consume - let other handlers see it too
         return False
 
-    # game.handleKeyEvent dispatches a single key event through BOTH
-    # InputHandler.g_instance.handleKeyEvent and the g_keyEventHandlers
-    # set. Registering in both fires our action twice per press (ON
-    # then immediately OFF for toggles). Pick exactly one channel:
-    # prefer g_keyEventHandlers because that's the standard catch-all
-    # mod hook iterated last, so it sees keys even when other handlers
-    # have already processed them. Fall back to InputHandler.onKeyDown
-    # only if g_keyEventHandlers is unavailable for some reason.
-    bound_via = None
+    # Register on BOTH key channels:
+    #   - gui.g_keyEventHandlers : the battle catch-all (fires in-battle
+    #     only - the garage routes keys elsewhere).
+    #   - InputHandler.g_instance.onKeyDown : fires in the garage/lobby
+    #     too, so Numpad pre-configuration works before a battle.
+    # The debounce above absorbs the double-delivery that happens in
+    # battle when both channels see the same press.
+    bound = []
     try:
         import gui as _gui_mod
         if hasattr(_gui_mod, 'g_keyEventHandlers'):
             _gui_mod.g_keyEventHandlers.add(_on_key_event)
-            bound_via = 'gui.g_keyEventHandlers'
+            bound.append('gui.g_keyEventHandlers')
     except Exception:
         _logger.exception('SpotMeter: failed to bind via gui.g_keyEventHandlers')
-
-    if bound_via is None:
-        try:
-            from gui import InputHandler as _IH
-            _IH.g_instance.onKeyDown += _on_key_event
-            bound_via = 'InputHandler.onKeyDown'
-        except Exception:
-            _logger.exception('SpotMeter: failed to bind via InputHandler.g_instance.onKeyDown')
+    try:
+        from gui import InputHandler as _IH
+        _IH.g_instance.onKeyDown += _on_key_event
+        bound.append('InputHandler.onKeyDown')
+    except Exception:
+        _logger.exception('SpotMeter: failed to bind via InputHandler.g_instance.onKeyDown')
 
     names = ', '.join('%s=%s' % (label, name) for _, _, label, name in bindings)
     _logger.warning('SpotMeter: hotkeys bound via [%s] - %d entries: %s',
-                    bound_via or 'NONE', len(bindings), names)
-    if bound_via is not None:
+                    ' + '.join(bound) or 'NONE', len(bindings), names)
+    if bound:
         _HOTKEYS_INSTALLED = True

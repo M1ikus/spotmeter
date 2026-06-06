@@ -58,12 +58,12 @@ def main():
     #
     #   1. ZIP_STORED (no compression). The engine mmaps entries
     #      directly; ZIP_DEFLATED triggers 'compression not supported'
-    #      at load time on at least WoT 2.2.1.3.
+    #      at load time on at least WoT 2.3.0.0.
     #
     #   2. Files live under a 'res/' prefix inside the archive AND
     #      every intermediate directory must be present as its own
     #      empty entry. paths.xml has
-    #         <Path mask="*.wotmod" mode="recursive" root="res">./mods/2.2.1.3</Path>
+    #         <Path mask="*.wotmod" mode="recursive" root="res">./mods/2.3.0.0</Path>
     #      and the engine's resource manager only finds files inside
     #      a 'res/' tree that it can walk top-down via real directory
     #      entries. Without the directory entries the file is in the
