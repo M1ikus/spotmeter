@@ -35,12 +35,15 @@ v6.0.1 - update for WoT 2.3.0.1.
 
 Maintenance release after live testing in a big modpack:
 
+NEW
+- Creates mods/configs/spotmeter.json with the defaults on first run, so there is always a config file to edit. Set battlePanelEnabled / garagePanelEnabled to false to start with the panel hidden - PageDown still shows it on demand.
+
 FIXED
-- Garage panel auto-hide: overlays from other mods (mod buttons, notifications, chat) no longer hide the panel. It hides only for real screens (research / depot / profile / loadout) and dialogs, and reliably comes back. Previously the panel could flicker or stay hidden in a modpack.
-- Removed the enemy-name marker (the dot prefix on the picked target's nickname) - it never rendered reliably and the battle panel already shows the target. The mod now hooks only two game classes (minimap circle + shot penalty), further reducing the chance of conflicts with other mods.
+- Garage panel auto-hide: overlays from other mods (mod buttons, notifications, chat) no longer hide the panel; it hides only for real screens and dialogs, and reliably comes back. Previously it could flicker or stay hidden in a modpack.
+- Removed the enemy-name marker (dot prefix on the picked target's nickname) - it never rendered reliably and the panel already shows the target. Only two game classes are hooked now (minimap circle + shot penalty), reducing conflict chances.
 
 COMPATIBILITY
-- Verified alongside gambiter.guiflash 0.6.3 and CHAMPi mods (expectedvehiclevalues, playerpanelpro, settingsgui) - no conflicts; the bundled UI library coexists with the original one.
+- Verified alongside gambiter.guiflash 0.6.3 and CHAMPi mods (expectedvehiclevalues, playerpanelpro, settingsgui) - no conflicts.
 ```
 
 ## Mod description  (max 3000 characters)
@@ -105,7 +108,7 @@ limitu znakow - Aslain lubi zwiezle wpisy). Dwie formy do wyboru.
 ## Zmiany wersji — jedna linia (kompaktowy changelog Aslaina)
 
 ```
-SpotMeter zaktualizowany do v6.0.1 (WoT 2.3.0.1) — naprawione auto-ukrywanie panelu w garażu obok innych modów, usunięty znacznik przy nicku celu (zbędny przy panelu). (autor: ISEDR_Mikus)
+SpotMeter zaktualizowany do v6.0.1 (WoT 2.3.0.1) — mod tworzy domyślny config przy pierwszym starcie (panel można domyślnie ukryć), naprawione auto-ukrywanie panelu w garażu obok innych modów, usunięty znacznik przy nicku celu. (autor: ISEDR_Mikus)
 ```
 
 ## Zmiany wersji — pełne
@@ -114,6 +117,9 @@ SpotMeter zaktualizowany do v6.0.1 (WoT 2.3.0.1) — naprawione auto-ukrywanie p
 SpotMeter v6.0.1 — pod WoT 2.3.0.1.
 
 Wydanie naprawcze po testach w dużej paczce modów:
+
+NOWE
+- Mod tworzy mods/configs/spotmeter.json z domyślnymi ustawieniami przy pierwszym starcie — zawsze jest plik do edycji. Ustaw battlePanelEnabled / garagePanelEnabled na false, żeby panel startował ukryty — PageDown nadal go przywołuje.
 
 POPRAWKI
 - Auto-ukrywanie panelu w garażu: nakładki innych modów (przyciski modów, powiadomienia, czat) nie chowają już panelu. Panel chowa się tylko przy prawdziwych ekranach (Badania / magazyn / profil / wyposażenie) i oknach dialogowych, i niezawodnie wraca — wcześniej w paczce modów potrafił migotać albo zostać schowany.

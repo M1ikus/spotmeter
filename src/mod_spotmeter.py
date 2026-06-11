@@ -436,6 +436,17 @@ def _read_config():
             return
     _CFG_PATH = None
     _logger.info('SpotMeter: no config file found, using defaults')
+    # v6.0.1: seed mods/configs/spotmeter.json with the defaults so there is
+    # always a file for users to edit. Modpack installs ship only the .wotmod
+    # and testers went looking for a config that did not exist. Non-fatal on
+    # failure (read-only dir etc.) - we just keep running on defaults.
+    try:
+        written = _write_config()
+        if written:
+            _CFG_PATH = written
+            _logger.info('SpotMeter: created default config at %s', written)
+    except Exception:
+        _logger.exception('SpotMeter: failed to seed default config')
 
 
 def _migrate_config(payload):
@@ -2491,15 +2502,22 @@ def _ww_show_panel():
     # user hasn't hidden it with PgDn - regardless of how the panel got hidden.
     # (The old `if not _PANEL_AUTO_HIDDEN: return` guard could leave the panel
     # stuck hidden if anything other than the window-watch had cleared it.)
+    # Only panels allowed to auto-show are restored: config-enabled ones, or a
+    # panel the window-watch itself just hid (covers PgDn-summoned panels with
+    # *PanelEnabled=false). Without this check a "panel off by default" config
+    # would get force-summoned by the first window open/close event.
     global _PANEL_AUTO_HIDDEN
+    was_auto_hidden = _PANEL_AUTO_HIDDEN
     _PANEL_AUTO_HIDDEN = False
     if _PANEL_USER_HIDDEN:
         return  # user hid it with PgDn - leave hidden until they toggle back
     try:
         if _is_in_garage():
-            if not _GARAGE_PANEL_ACTIVE:
+            if (not _GARAGE_PANEL_ACTIVE
+                    and (was_auto_hidden or _CFG.get('garagePanelEnabled', True))):
                 _show_garage_panel(force=True)
-        elif not _BATTLE_PANEL_ACTIVE:
+        elif (not _BATTLE_PANEL_ACTIVE
+                and (was_auto_hidden or _CFG.get('battlePanelEnabled', True))):
             _show_battle_view(force=True)
     except Exception:
         _logger.exception('SpotMeter: window-watch show failed')

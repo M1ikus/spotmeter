@@ -9,12 +9,22 @@ Built for **WoT 2.3.0.1** (client update needed no code changes — repackaged f
 the new mods folder). Maintenance release after live testing in an Aslain-style
 modpack.
 
+### Added
+- The mod now creates `mods/configs/spotmeter.json` with the defaults on first
+  run when no config exists — so there is always a file to edit (modpack
+  installs ship only the `.wotmod`). To start with the panel hidden, set
+  `battlePanelEnabled` / `garagePanelEnabled` to `false` — PageDown still
+  summons it on demand.
+
 ### Fixed
 - Garage panel auto-hide no longer reacts to other mods' overlays (mod-list
   button, notifications, chat, other GUIFlash views) — in a modpack the panel
   used to flicker and could stick hidden. It now hides only for real content
   screens (research / depot / profile / loadout) and modal dialogs, restores
   reliably, and still respects a manual PageDown hide.
+- The auto-restore path now honours `battlePanelEnabled` / `garagePanelEnabled`
+  — a "panel off by default" config is no longer force-summoned by window
+  open/close events.
 
 ### Removed
 - The enemy-name marker (the `●`/`○` prefix on the picked target's nickname) —
