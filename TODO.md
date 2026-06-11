@@ -17,7 +17,11 @@ Config quality-of-life after tester feedback via Aslain ("there's no config
 file to edit", "can the panel be off by default?"):
 - seeds `mods/configs/spotmeter.json` with defaults on first run,
 - auto-restore honours `battlePanelEnabled` / `garagePanelEnabled`, so a
-  "panel off by default" config actually stays hidden (PgDn still summons).
+  "panel off by default" config actually stays hidden (PgDn still summons),
+- GUIFlash fork: per-instance `_pushedAliases` mirror guards as_update/as_delete
+  (kills the AS3 #1009 spam from OldSkool's log — create skipped during a DAAPI
+  race left the cache believing in components the SWF never got) + a stale
+  `Flash_UI._dispose` no longer clears `g_guiViews.ui` set by a newer instance.
 
 Remaining before publishing:
 1. Smoke-test on the 2.3.0.1 client (config file appears; panel behaves).

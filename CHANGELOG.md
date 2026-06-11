@@ -19,6 +19,11 @@ to edit"). Still targets **WoT 2.3.0.1** — no other changes.
 - The panel auto-restore now honours `battlePanelEnabled` / `garagePanelEnabled`
   — a "panel off by default" config is no longer force-summoned by window
   open/close events.
+- No more AS3 `Error #1009` entries in `python.log` when the panel is hidden or
+  refreshed alongside many other mods (reported by a modpack tester). The
+  Python↔Flash component registries could desync across view load races —
+  update/delete calls are now mirrored per view instance, and a stale view
+  teardown no longer detaches a freshly loaded one.
 
 ## [6.0.1] — 2026-06-11
 

@@ -256,16 +256,26 @@ class Flash_Meta(View):
     def py_update(self, alias, props):
         self._printOverrideError('py_update')
 
+    # SpotMeter fork: `_pushedAliases` mirrors, per view instance, the aliases
+    # that were ACTUALLY handed to this AS3 FlashUI. A create silently skipped
+    # while DAAPI wasn't ready (view load race - seen in big modpacks) used to
+    # leave the Python cache believing in a component the SWF never got; the
+    # later delete/update then hit a null inside FlashUI and spammed AS3
+    # "Error #1009" into python.log. Update/delete now only reach AS3 for
+    # aliases this exact instance received.
     def as_createS(self, alias, compType, props):
         if self._isDAAPIInited():
+            self.__dict__.setdefault('_pushedAliases', set()).add(alias)
             return self.flashObject.as_create(alias, compType, props)
 
     def as_updateS(self, alias, props, params):
-        if self._isDAAPIInited():
+        if self._isDAAPIInited() and alias in self.__dict__.get('_pushedAliases', ()):
             return self.flashObject.as_update(alias, props, params)
 
     def as_deleteS(self, alias):
-        if self._isDAAPIInited():
+        pushed = self.__dict__.get('_pushedAliases')
+        if self._isDAAPIInited() and pushed and alias in pushed:
+            pushed.discard(alias)
             return self.flashObject.as_delete(alias)
 
     def as_resizeS(self, width, height):
@@ -287,7 +297,12 @@ class Flash_UI(Flash_Meta):
         g_guiViews.createAll()
 
     def _dispose(self):
-        g_guiViews.ui = None
+        # Only clear the singleton if WE still are the current view. On rapid
+        # space changes a NEW instance can _populate before the OLD one
+        # disposes; the old teardown must not orphan the fresh view (panel
+        # would silently stop rendering until the next space change).
+        if g_guiViews.ui is self:
+            g_guiViews.ui = None
         g_guiHooks._dispose()
         super(Flash_UI, self)._dispose()
 

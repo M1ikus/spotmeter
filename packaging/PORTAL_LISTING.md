@@ -41,6 +41,7 @@ NEW
 
 FIXED
 - A "panel hidden by default" config is now fully honored - window open/close events no longer bring the panel back on their own.
+- No more harmless AS3 "Error #1009" entries in python.log when hiding or refreshing the panel alongside many other mods.
 ```
 
 ## Mod description  (max 3000 characters)
@@ -121,4 +122,5 @@ NOWE
 
 POPRAWKI
 - Config z domyślnie ukrytym panelem jest teraz w pełni respektowany — otwieranie/zamykanie okien nie przywraca już panelu samo z siebie.
+- Koniec niegroźnych wpisów AS3 "Error #1009" w python.log przy ukrywaniu/odświeżaniu panelu obok wielu innych modów.
 ```
