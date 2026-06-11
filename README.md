@@ -2,7 +2,7 @@
 
 Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój czołg może zostać zauważony przez przeciwnika. Od **v6.0** dochodzą dwa przeciągalne panele GUIFlash: **panel bitewny** (lista przeciwników + picker celu) i **panel garażowy** (pre-konfiguracja przed bitwą), plus **auto-dobieranie** celu i pełne **PL/EN** UI. Panele pokazujesz/ukrywasz klawiszem **PageDown**.
 
-> Build pod **WoT 2.3.0.1** · wersja moda **6.0.1**.
+> Build pod **WoT 2.3.0.1** · wersja moda **6.0.2**.
 
 ## Co automatycznie / co ręcznie
 

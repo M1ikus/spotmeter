@@ -1,13 +1,12 @@
 # Changelog
 
 All notable changes to **SpotMeter**. Dates are ISO (YYYY-MM-DD). Full per-commit
-history is in the git tags (`v5.1.0` … `v6.0.1`).
+history is in the git tags (`v5.1.0` … `v6.0.2`).
 
-## [6.0.1] — 2026-06-11
+## [6.0.2] — 2026-06-11
 
-Built for **WoT 2.3.0.1** (client update needed no code changes — repackaged for
-the new mods folder). Maintenance release after live testing in an Aslain-style
-modpack.
+Config quality-of-life after modpack tester feedback ("there's no config file
+to edit"). Still targets **WoT 2.3.0.1** — no other changes.
 
 ### Added
 - The mod now creates `mods/configs/spotmeter.json` with the defaults on first
@@ -17,14 +16,22 @@ modpack.
   summons it on demand.
 
 ### Fixed
+- The panel auto-restore now honours `battlePanelEnabled` / `garagePanelEnabled`
+  — a "panel off by default" config is no longer force-summoned by window
+  open/close events.
+
+## [6.0.1] — 2026-06-11
+
+Built for **WoT 2.3.0.1** (client update needed no code changes — repackaged for
+the new mods folder). Maintenance release after live testing in an Aslain-style
+modpack.
+
+### Fixed
 - Garage panel auto-hide no longer reacts to other mods' overlays (mod-list
   button, notifications, chat, other GUIFlash views) — in a modpack the panel
   used to flicker and could stick hidden. It now hides only for real content
   screens (research / depot / profile / loadout) and modal dialogs, restores
   reliably, and still respects a manual PageDown hide.
-- The auto-restore path now honours `battlePanelEnabled` / `garagePanelEnabled`
-  — a "panel off by default" config is no longer force-summoned by window
-  open/close events.
 
 ### Removed
 - The enemy-name marker (the `●`/`○` prefix on the picked target's nickname) —

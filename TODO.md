@@ -4,19 +4,24 @@ Backlog of known follow-ups. Updated 2026-06-06 after live testing in an
 Aslain-style modpack (champi.expectedvehiclevalues + champi.settingsgui +
 gambiter.guiflash 0.6.3 + poliroid.modslistapi + openwg.gameface + izeberg).
 
-## v6.0.1 — prepared for WoT 2.3.0.1 (committed; awaiting in-game check + GH release)
+## Released
 
-Bundled in the v6.0.1 commit: garage auto-hide rewrite (layer-gated: hide only for
-content screens layer 5 + dialogs layer >= 10; other mods' layer-7 overlays no longer
-hide the panel; idempotent show-path), enemy-name-marker removal (only 2 WG classes
-patched now: `PersonalEntriesPlugin` + `Avatar.shoot`), refreshed `meta.xml`
-description, CHANGELOG `[6.0.1]`, new EN+PL version-changes in
-`packaging/PORTAL_LISTING.md`, repackaged for the 2.3.0.1 mods folder.
+- **v6.0.1** (WoT 2.3.0.1) — **published 2026-06-11** to wgmods.net + sent to
+  Aslain (by the author, outside git). Content = commit `8dbb2ca`: garage
+  auto-hide rewrite + enemy-name-marker removal + 2.3.0.1 repackage. Git tag
+  `v6.0.1` pinned to that commit; GH release carries artifacts rebuilt from it.
+
+## v6.0.2 — prepared (committed; awaiting in-game check + publish)
+
+Config quality-of-life after tester feedback via Aslain ("there's no config
+file to edit", "can the panel be off by default?"):
+- seeds `mods/configs/spotmeter.json` with defaults on first run,
+- auto-restore honours `battlePanelEnabled` / `garagePanelEnabled`, so a
+  "panel off by default" config actually stays hidden (PgDn still summons).
 
 Remaining before publishing:
-1. Smoke-test on the 2.3.0.1 client (battle + garage tabs; the rest of the test
-   pack still sits in `mods/2.3.0.0/` — copy it over if testing coexistence).
-2. `git tag v6.0.1` + GitHub release with `dist/spotmeter-v6.0.1.{wotmod,zip}`
+1. Smoke-test on the 2.3.0.1 client (config file appears; panel behaves).
+2. `git tag v6.0.2` + GH release with `dist/spotmeter-v6.0.2.{wotmod,zip}`
    (notes ready in PORTAL_LISTING / CHANGELOG) + send Aslain the PL note.
 
 ## Optional / low priority

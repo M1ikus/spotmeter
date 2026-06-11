@@ -1,6 +1,6 @@
 <root>
     <id>com.M1ikus.spotmeter</id>
-    <version>6.0.1</version>
+    <version>6.0.2</version>
     <name>SpotMeter</name>
     <description>Dynamic minimap circle showing the distance from which your tank can currently be spotted, plus draggable in-battle and garage panels: enemy list with view ranges, manual or automatic target picking with per-class presets, English/Polish UI. Numpad hotkeys; PageDown shows/hides the panel; configurable via spotmeter.json.</description>
 </root>

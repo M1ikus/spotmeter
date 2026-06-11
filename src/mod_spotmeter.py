@@ -23,7 +23,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '6.0.1'
+MOD_VERSION = '6.0.2'
 # Short "major.minor" form shown in panel titles ("6.0.0" -> "6.0"); the
 # full MOD_VERSION still drives logs / version reporting / meta.xml. Bumping
 # the patch (6.0.1) keeps the panel at "6.0"; a minor bump (6.1.0) -> "6.1".

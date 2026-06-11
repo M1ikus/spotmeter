@@ -31,19 +31,16 @@ NONE - SpotMeter is fully self-contained in the single .wotmod:
 ## Version changes  (max 1000 characters)
 
 ```
-v6.0.1 - update for WoT 2.3.0.1.
+v6.0.2 - for WoT 2.3.0.1.
 
-Maintenance release after live testing in a big modpack:
+Small follow-up to v6.0.1 based on modpack tester feedback:
 
 NEW
-- Creates mods/configs/spotmeter.json with the defaults on first run, so there is always a config file to edit. Set battlePanelEnabled / garagePanelEnabled to false to start with the panel hidden - PageDown still shows it on demand.
+- The mod now creates mods/configs/spotmeter.json with the default settings on first run, so there is always a config file to find and edit (previously, without the optional config, no file existed at all).
+- To start with the panel hidden: set battlePanelEnabled and garagePanelEnabled to false in the config - PageDown still shows the panel on demand. The minimap circle works independently of the panel.
 
 FIXED
-- Garage panel auto-hide: overlays from other mods (mod buttons, notifications, chat) no longer hide the panel; it hides only for real screens and dialogs, and reliably comes back. Previously it could flicker or stay hidden in a modpack.
-- Removed the enemy-name marker (dot prefix on the picked target's nickname) - it never rendered reliably and the panel already shows the target. Only two game classes are hooked now (minimap circle + shot penalty), reducing conflict chances.
-
-COMPATIBILITY
-- Verified alongside gambiter.guiflash 0.6.3 and CHAMPi mods (expectedvehiclevalues, playerpanelpro, settingsgui) - no conflicts.
+- A "panel hidden by default" config is now fully honored - window open/close events no longer bring the panel back on their own.
 ```
 
 ## Mod description  (max 3000 characters)
@@ -81,7 +78,7 @@ Hotkeys are on the numpad and work with NumLock on or off; everything is configu
 ## Installation  (max 1000 characters)
 
 ```
-1. Download spotmeter-v6.0.1.wotmod.
+1. Download spotmeter-v6.0.2.wotmod.
 
 2. Copy it into:  <WoT>\mods\2.3.0.1\
    Example:  D:\Games\World_of_Tanks_EU\mods\2.3.0.1\
@@ -108,23 +105,20 @@ limitu znakow - Aslain lubi zwiezle wpisy). Dwie formy do wyboru.
 ## Zmiany wersji — jedna linia (kompaktowy changelog Aslaina)
 
 ```
-SpotMeter zaktualizowany do v6.0.1 (WoT 2.3.0.1) — mod tworzy domyślny config przy pierwszym starcie (panel można domyślnie ukryć), naprawione auto-ukrywanie panelu w garażu obok innych modów, usunięty znacznik przy nicku celu. (autor: ISEDR_Mikus)
+SpotMeter zaktualizowany do v6.0.2 (WoT 2.3.0.1) — mod tworzy domyślny config przy pierwszym starcie; panel można domyślnie ukryć (battlePanelEnabled / garagePanelEnabled na false, PageDown przywołuje). (autor: ISEDR_Mikus)
 ```
 
 ## Zmiany wersji — pełne
 
 ```
-SpotMeter v6.0.1 — pod WoT 2.3.0.1.
+SpotMeter v6.0.2 — pod WoT 2.3.0.1.
 
-Wydanie naprawcze po testach w dużej paczce modów:
+Drobna poprawka po opiniach testerów paczki:
 
 NOWE
-- Mod tworzy mods/configs/spotmeter.json z domyślnymi ustawieniami przy pierwszym starcie — zawsze jest plik do edycji. Ustaw battlePanelEnabled / garagePanelEnabled na false, żeby panel startował ukryty — PageDown nadal go przywołuje.
+- Mod tworzy mods/configs/spotmeter.json z domyślnymi ustawieniami przy pierwszym starcie — zawsze jest plik do edycji (wcześniej, bez opcjonalnego configu, plik w ogóle nie istniał).
+- Panel można domyślnie ukryć: battlePanelEnabled i garagePanelEnabled na false w configu — PageDown nadal przywołuje panel, a okrąg na minimapie działa niezależnie od panelu.
 
 POPRAWKI
-- Auto-ukrywanie panelu w garażu: nakładki innych modów (przyciski modów, powiadomienia, czat) nie chowają już panelu. Panel chowa się tylko przy prawdziwych ekranach (Badania / magazyn / profil / wyposażenie) i oknach dialogowych, i niezawodnie wraca — wcześniej w paczce modów potrafił migotać albo zostać schowany.
-- Usunięty znacznik przy nicku wybranego celu — nigdy nie renderował się poprawnie, a panel bitewny i tak pokazuje cel. Mod hookuje teraz tylko dwie klasy gry (okrąg na minimapie + kara za strzał), więc ryzyko konfliktów z innymi modami jest jeszcze mniejsze.
-
-ZGODNOŚĆ
-- Potwierdzone działanie obok gambiter.guiflash 0.6.3 i modów CHAMPi (expectedvehiclevalues, playerpanelpro, settingsgui) — bez konfliktów.
+- Config z domyślnie ukrytym panelem jest teraz w pełni respektowany — otwieranie/zamykanie okien nie przywraca już panelu samo z siebie.
 ```
