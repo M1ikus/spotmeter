@@ -6,27 +6,17 @@ gambiter.guiflash 0.6.3 + poliroid.modslistapi + openwg.gameface + izeberg).
 
 ## Released
 
+- **v6.0.2** (WoT 2.3.0.1) — **released 2026-06-11**: tag `v6.0.2` @ `4c7de8d`
+  + GH release. Config auto-create on first run; auto-restore honours
+  `battlePanelEnabled`/`garagePanelEnabled` ("panel off by default" works, PgDn
+  still summons); GUIFlash fork hardened against Python↔AS3 registry desync
+  (per-instance `_pushedAliases` guard on update/delete + stale `_dispose` no
+  longer orphans a newer view) — kills the AS3 #1009 spam from OldSkool's log.
+  Pending follow-through: send to Aslain + update the wgmods.net listing.
 - **v6.0.1** (WoT 2.3.0.1) — **published 2026-06-11** to wgmods.net + sent to
   Aslain (by the author, outside git). Content = commit `8dbb2ca`: garage
   auto-hide rewrite + enemy-name-marker removal + 2.3.0.1 repackage. Git tag
   `v6.0.1` pinned to that commit; GH release carries artifacts rebuilt from it.
-
-## v6.0.2 — prepared (committed; awaiting in-game check + publish)
-
-Config quality-of-life after tester feedback via Aslain ("there's no config
-file to edit", "can the panel be off by default?"):
-- seeds `mods/configs/spotmeter.json` with defaults on first run,
-- auto-restore honours `battlePanelEnabled` / `garagePanelEnabled`, so a
-  "panel off by default" config actually stays hidden (PgDn still summons),
-- GUIFlash fork: per-instance `_pushedAliases` mirror guards as_update/as_delete
-  (kills the AS3 #1009 spam from OldSkool's log — create skipped during a DAAPI
-  race left the cache believing in components the SWF never got) + a stale
-  `Flash_UI._dispose` no longer clears `g_guiViews.ui` set by a newer instance.
-
-Remaining before publishing:
-1. Smoke-test on the 2.3.0.1 client (config file appears; panel behaves).
-2. `git tag v6.0.2` + GH release with `dist/spotmeter-v6.0.2.{wotmod,zip}`
-   (notes ready in PORTAL_LISTING / CHANGELOG) + send Aslain the PL note.
 
 ## Optional / low priority
 
