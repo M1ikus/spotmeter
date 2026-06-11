@@ -1,7 +1,33 @@
 # Changelog
 
 All notable changes to **SpotMeter**. Dates are ISO (YYYY-MM-DD). Full per-commit
-history is in the git tags (`v5.1.0` … `v6.0.0`).
+history is in the git tags (`v5.1.0` … `v6.0.1`).
+
+## [6.0.1] — 2026-06-11
+
+Built for **WoT 2.3.0.1** (client update needed no code changes — repackaged for
+the new mods folder). Maintenance release after live testing in an Aslain-style
+modpack.
+
+### Fixed
+- Garage panel auto-hide no longer reacts to other mods' overlays (mod-list
+  button, notifications, chat, other GUIFlash views) — in a modpack the panel
+  used to flicker and could stick hidden. It now hides only for real content
+  screens (research / depot / profile / loadout) and modal dialogs, restores
+  reliably, and still respects a manual PageDown hide.
+
+### Removed
+- The enemy-name marker (the `●`/`○` prefix on the picked target's nickname) —
+  it never rendered reliably and the battle panel already shows the target.
+  The mod now patches only two game classes (minimap circle + fire penalty),
+  shrinking the conflict surface with other mods. The `pickerMarker` /
+  `autoPickMarker` config keys are gone (leftover entries are ignored).
+
+### Compatibility
+- Verified alongside `gambiter.guiflash 0.6.3` + CHAMPi `expectedvehiclevalues`
+  / `playerpanelpro` / `settingsgui` + poliroid `modslistapi` + `openwg.gameface`
+  + izeberg `modssettingsapi` — no conflicts; the bundled GUIFlash fork coexists
+  with the upstream library.
 
 ## [6.0.0] — 2026-06-06
 

@@ -22,7 +22,7 @@ NONE - SpotMeter is fully self-contained in the single .wotmod:
 - bundles mod_spotmeter.pyc + a private GUIFlash fork (gui.mods.spotmeter_gf + its SWF)
 - does NOT require gambiter.guiflash, XVM, XFW or any shared library
 - spotmeter.json config is optional (built-in defaults if absent)
-- requires WoT 2.3.0.0; no special load order
+- requires WoT 2.3.0.1; no special load order
 - coexists with other mods: own namespace, replaces no WG UI files, every game
   hook is a wrapper that calls the original, hotkeys are never consumed
 
@@ -31,22 +31,16 @@ NONE - SpotMeter is fully self-contained in the single .wotmod:
 ## Version changes  (max 1000 characters)
 
 ```
-v6.0.0 - built for WoT 2.3.0.0.
+v6.0.1 - update for WoT 2.3.0.1.
 
-A major update on top of the minimap spot-distance circle:
-
-NEW
-- In-battle picker panel: lists every enemy with its view range; identical tanks group into one row. Shows the spot-distance of the picked target (or your own tank). Pick by clicking a row or with Numpad 2/8. Draggable.
-- Garage panel: pre-configure perk/equipment levels before battle, with a live preview.
-- PageDown: show/hide the panel (battle + garage); stays hidden until pressed again.
-- Auto-pick (Numpad /): auto-targets the nearest enemy, with per-class presets.
-- Optics / Vents / CVS as manual cyclable levels (Numpad 6 / + / -).
-- Auto-hide while holding TAB/N or when garage windows are open.
-- English + Polish interface, auto-detected from the client.
+Maintenance release after live testing in a big modpack:
 
 FIXED
-- Panel no longer reappears by itself after being hidden with PageDown.
-- Garage performance cleanup.
+- Garage panel auto-hide: overlays from other mods (mod buttons, notifications, chat) no longer hide the panel. It hides only for real screens (research / depot / profile / loadout) and dialogs, and reliably comes back. Previously the panel could flicker or stay hidden in a modpack.
+- Removed the enemy-name marker (the dot prefix on the picked target's nickname) - it never rendered reliably and the battle panel already shows the target. The mod now hooks only two game classes (minimap circle + shot penalty), further reducing the chance of conflicts with other mods.
+
+COMPATIBILITY
+- Verified alongside gambiter.guiflash 0.6.3 and CHAMPi mods (expectedvehiclevalues, playerpanelpro, settingsgui) - no conflicts; the bundled UI library coexists with the original one.
 ```
 
 ## Mod description  (max 3000 characters)
@@ -84,10 +78,10 @@ Hotkeys are on the numpad and work with NumLock on or off; everything is configu
 ## Installation  (max 1000 characters)
 
 ```
-1. Download spotmeter-v6.0.0.wotmod.
+1. Download spotmeter-v6.0.1.wotmod.
 
-2. Copy it into:  <WoT>\mods\2.3.0.0\
-   Example:  D:\Games\World_of_Tanks_EU\mods\2.3.0.0\
+2. Copy it into:  <WoT>\mods\2.3.0.1\
+   Example:  D:\Games\World_of_Tanks_EU\mods\2.3.0.1\
    (create the folder if it does not exist)
 
 3. (Optional) To change colours, multipliers or keys, copy spotmeter.json into:
@@ -98,9 +92,9 @@ Hotkeys are on the numpad and work with NumLock on or off; everything is configu
 
 The game auto-loads every .wotmod in mods\<version>\ at startup.
 
-To uninstall: delete the .wotmod from mods\2.3.0.0\.
+To uninstall: delete the .wotmod from mods\2.3.0.1\.
 
-Requires WoT 2.3.0.0. No other mods needed - the GUIFlash library is bundled.
+Requires WoT 2.3.0.1. No other mods needed - the GUIFlash library is bundled.
 ```
 
 # Aslain's modpack — Polish
@@ -111,26 +105,20 @@ limitu znakow - Aslain lubi zwiezle wpisy). Dwie formy do wyboru.
 ## Zmiany wersji — jedna linia (kompaktowy changelog Aslaina)
 
 ```
-SpotMeter zaktualizowany do v6.0.0 (WoT 2.3.0.0) — panele w bitwie i garażu, auto-dobieranie celu, klawisz PageDown, interfejs PL/EN. (autor: ISEDR_Mikus)
+SpotMeter zaktualizowany do v6.0.1 (WoT 2.3.0.1) — naprawione auto-ukrywanie panelu w garażu obok innych modów, usunięty znacznik przy nicku celu (zbędny przy panelu). (autor: ISEDR_Mikus)
 ```
 
 ## Zmiany wersji — pełne
 
 ```
-SpotMeter v6.0.0 — pod WoT 2.3.0.0.
+SpotMeter v6.0.1 — pod WoT 2.3.0.1.
 
-Duża aktualizacja — oprócz okręgu na minimapie pokazującego dystans wykrycia doszły panele i automatyka:
-
-NOWE
-- Panel w bitwie: lista przeciwników z zasięgiem widzenia (VR); identyczne czołgi grupowane w jeden wiersz. Pokazuje dystans spotu wybranego celu (albo Twojego czołgu, gdy nic nie wybrane). Wybór klikiem albo Numpad 2/8. Przeciągalny.
-- Panel w garażu: konfiguracja perków/sprzętu przed bitwą, z podglądem na żywo.
-- PageDown: pokaż/ukryj panel (bitwa + garaż); zostaje ukryty aż do ponownego wciśnięcia.
-- Auto-dobieranie (Numpad /): automatycznie celuje w najbliższego przeciwnika, presety per klasa.
-- Optyka / Wentylacja / CVS jako ręczne, cyklowane poziomy (Numpad 6 / + / −).
-- Auto-ukrywanie przy trzymaniu TAB/N oraz po otwarciu okien w garażu.
-- Interfejs po polsku i angielsku (wykrywany automatycznie z języka klienta).
+Wydanie naprawcze po testach w dużej paczce modów:
 
 POPRAWKI
-- Panel nie włącza się już sam po ukryciu przez PageDown.
-- Optymalizacja wydajności w garażu.
+- Auto-ukrywanie panelu w garażu: nakładki innych modów (przyciski modów, powiadomienia, czat) nie chowają już panelu. Panel chowa się tylko przy prawdziwych ekranach (Badania / magazyn / profil / wyposażenie) i oknach dialogowych, i niezawodnie wraca — wcześniej w paczce modów potrafił migotać albo zostać schowany.
+- Usunięty znacznik przy nicku wybranego celu — nigdy nie renderował się poprawnie, a panel bitewny i tak pokazuje cel. Mod hookuje teraz tylko dwie klasy gry (okrąg na minimapie + kara za strzał), więc ryzyko konfliktów z innymi modami jest jeszcze mniejsze.
+
+ZGODNOŚĆ
+- Potwierdzone działanie obok gambiter.guiflash 0.6.3 i modów CHAMPi (expectedvehiclevalues, playerpanelpro, settingsgui) — bez konfliktów.
 ```

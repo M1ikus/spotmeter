@@ -71,7 +71,6 @@
     "pickerOpticsFactors": [1.0, 1.10, 1.115, 1.125, 1.135],
     "pickerVentsFactors":  [1.0, 1.05, 1.0625, 1.075, 1.085],
     "pickerCvsFactors":    [1.0, 0.900, 0.875],
-    "pickerMarker": "● ",
     "pickerIncludeDeadEnemies": false,
 
     "_comment_overlay": "v5.5: status-block model. Block shows spot distance for ALL 4 states at once (ruch/postoj/siatka 3s/po strzale) plus picker+toggle+own-tank context. Two ways to see it: (1) NumpadEnter = on-demand snapshot; (2) Numpad9 = toggle live mode (default OFF) which re-posts the block every liveModeIntervalSec seconds. NO auto-spam on state changes / radius deltas. User-action confirmations (toggle/picker/diag) are short one-line responses, not the full block.",
@@ -86,7 +85,6 @@
     "autoPickRangeMeters": 445.0,
     "autoPickCacheTimeoutSec": 5.0,
     "autoPickToggleKey": "KEY_NUMPADSLASH",
-    "autoPickMarker": "○ ",
     "_comment_auto_presets": "Per-class presets applied ONLY while auto-pick is ON. Set ONCE when you ENABLE auto (toggle off+on to re-apply), based on the class of the tank auto picks at that moment - does NOT re-apply as auto retargets. Numpad presses override live. Keyed by WoT class tag (lightTank/mediumTank/heavyTank/AT-SPG/SPG); 'default' is the fallback for classes without their own entry. Levels 0..4 (0=OFF 1=basic 2=slot 3=bonds 4=deluxe). Default: lights = optics+CVS on slot + rations/BIA/recon ON; everyone else = optics+CVS OFF + rations/BIA/recon ON.",
     "autoPresetsEnabled": true,
     "autoPresets": {

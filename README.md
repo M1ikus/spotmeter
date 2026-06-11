@@ -2,7 +2,7 @@
 
 Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój czołg może zostać zauważony przez przeciwnika. Od **v6.0** dochodzą dwa przeciągalne panele GUIFlash: **panel bitewny** (lista przeciwników + picker celu) i **panel garażowy** (pre-konfiguracja przed bitwą), plus **auto-dobieranie** celu i pełne **PL/EN** UI. Panele pokazujesz/ukrywasz klawiszem **PageDown**.
 
-> Build pod **WoT 2.3.0.0** · wersja moda **6.0.0**.
+> Build pod **WoT 2.3.0.1** · wersja moda **6.0.1**.
 
 ## Co automatycznie / co ręcznie
 
@@ -140,7 +140,7 @@ Server NIE wysyła `vehPostProgression` przeciwnika (jest to `MY_VEHICLE` scope)
 
 Pobierz `spotmeter-v<wersja>.zip` z [GitHub Releases](https://github.com/M1ikus/spotmeter/releases). W środku:
 
-- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.3.0.0/`
+- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.3.0.1/`
 - `spotmeter.json` (opcjonalny) → wrzuć do `<WoT>/mods/configs/`
 - `INSTALL.txt` — szczegółowa instrukcja krok po kroku
 
@@ -215,7 +215,6 @@ Działa przy **NumLock włączonym i wyłączonym**. **PageDown** jest poza nump
 | `pickerFieldUpgradeCap` | `445.0` | cap na `base_vr` po zastosowaniu upgrade'u (m) |
 | `pickerAssumeStereoscope` | `true` | jeśli enemy ma lornetkę, zakłada że jest aktywna |
 | `pickerStereoscopeFallback` | `1.25` | mnożnik VR jeśli odczyt z descriptora padnie |
-| `pickerMarker` | `"● "` | prefix nazwy wybranego przeciwnika |
 | `pickerIncludeDeadEnemies` | `false` | czy uwzględniać martwych w cyklu |
 | `overlayEnabled` | `true` | włącza overlay tekstu (chat-line nad minimapą) |
 | `overlayShowOnTickChange` | `true` | automatycznie pokazuje przy istotnej zmianie radiusa |
@@ -253,7 +252,6 @@ Nazwy klawiszy: nazwy z modułu `Keys` (np. `KEY_F8`, `KEY_F7`, `KEY_HOME`, `KEY
 | `autoPickToggleKey` | `KEY_NUMPADSLASH` | klawisz auto-dobierania |
 | `autoPickRangeMeters` | `445.0` | maks. zasięg auto-dobierania |
 | `autoPickCacheTimeoutSec` | `5.0` | jak długo trzymać ostatnią pozycję gdy spotter mrugnie |
-| `autoPickMarker` | `"○ "` | prefix nazwy auto-wybranego |
 | `autoPresetsEnabled` | `true` | stosuje preset per-klasa przy włączeniu AUTO |
 | `autoPresets` | per-klasa | rations/BIA/recon/directives/fieldUpgrades + optics/vents/cvs wg klasy |
 | `defaultToggles` | rations/BIA/recon ON | które toggle są ON na starcie bitwy |
@@ -300,7 +298,7 @@ W bitwie naciśnij `NumpadPeriod` (lub klawisz z `reloadKey`) — config wczytuj
    - liczy camo i radius spotu
    - wywołuje na Flashu `as_addDynamicViewRange` / `as_updateDynRange` z (color, alpha, radius)
 5. Sprząta entry i callbacki w `_hideMarkup`, `__onPostMortemSwitched`, `stop`.
-6. **Panele v6.0** renderuje przez forka GUIFlash (`gui.mods.spotmeter_gf` — własny namespace + SWF) jako niezależny overlay; **nie modyfikuje plików UI Wargamingu**. Patchuje dodatkowo `Avatar.shoot/shootDualGun` (kara za strzał) i `PlayerFullNameFormatter.format` (marker `●`/`○` przy nicku celu) — **wszystkie patche wrapperem wołającym oryginał** + try/except, więc komponują się z innymi modami (np. XVM) i nie crashują.
+6. **Panele v6.0** renderuje przez forka GUIFlash (`gui.mods.spotmeter_gf` — własny namespace + SWF) jako niezależny overlay; **nie modyfikuje plików UI Wargamingu**. Patchuje dodatkowo `Avatar.shoot/shootDualGun` (kara za strzał) — **patche wrapperem wołającym oryginał** + try/except, więc komponują się z innymi modami (np. XVM) i nie crashują. (W v6.0.1 usunięto patch `PlayerFullNameFormatter` — marker przy nicku nigdy się porządnie nie renderował i był zbędny przy panelu; o jeden monkey-patch mniej = mniejsza powierzchnia konfliktu.)
 
 ## Roadmap
 

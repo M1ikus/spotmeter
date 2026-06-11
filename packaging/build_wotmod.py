@@ -63,7 +63,7 @@ def main():
     #   2. Files live under a 'res/' prefix inside the archive AND
     #      every intermediate directory must be present as its own
     #      empty entry. paths.xml has
-    #         <Path mask="*.wotmod" mode="recursive" root="res">./mods/2.3.0.0</Path>
+    #         <Path mask="*.wotmod" mode="recursive" root="res">./mods/2.3.0.1</Path>
     #      and the engine's resource manager only finds files inside
     #      a 'res/' tree that it can walk top-down via real directory
     #      entries. Without the directory entries the file is in the

@@ -23,7 +23,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '6.0.0'
+MOD_VERSION = '6.0.1'
 # Short "major.minor" form shown in panel titles ("6.0.0" -> "6.0"); the
 # full MOD_VERSION still drives logs / version reporting / meta.xml. Bumping
 # the patch (6.0.1) keeps the panel at "6.0"; a minor bump (6.1.0) -> "6.1".
@@ -234,7 +234,6 @@ DEFAULT_CONFIG = {
     #   L1 (zwykly):   -10%   = factor 0.900
     #   L2 (na slocie):-12.5% = factor 0.875
     'pickerCvsFactors':    [1.0, 0.900, 0.875],
-    'pickerMarker': u'● ',
     'pickerIncludeDeadEnemies': False,
     'pickerDiagDumpKey': 'KEY_NUMPADSTAR',
     # v5.5 overlay - rewritten as a multi-line "status block" that shows
@@ -261,7 +260,6 @@ DEFAULT_CONFIG = {
     'autoPickRangeMeters': 445.0,
     'autoPickCacheTimeoutSec': 5.0,
     'autoPickToggleKey': 'KEY_NUMPADSLASH',  # numpad /
-    'autoPickMarker': u'○ ',  # white circle - distinct from manual pickerMarker
     # Per-class auto presets. ONLY active while auto-pick is ON. Applied
     # ONCE when you ENABLE auto (toggle off+on to re-apply), based on the
     # class of the tank auto picks at that moment - it does NOT re-apply as
@@ -366,7 +364,6 @@ _CFG = _fresh_cfg()
 _CFG_PATH = None  # absolute path the active config was loaded from (None if running on defaults)
 _PATCHED = False
 _AVATAR_PATCHED = False
-_FORMATTER_PATCHED = False
 _HANGAR_PATCHED = False
 _HOTKEYS_INSTALLED = False  # v5.6.4: guards _install_reload_hotkey against double-registration
 _STATE = weakref.WeakKeyDictionary()
@@ -635,8 +632,6 @@ def init():
             _logger.exception('SpotMeter: early battle view registration failed')
         _patch_plugin()
         _patch_avatar_shoot()
-        if _CFG.get('pickerEnabled', True):
-            _patch_player_name_formatter()
         # v6.0.0: eager-import our private GUIFlash so it's ready to
         # catch the LOBBY space-entered event WoT fires right after
         # init. The library auto-subscribes its own onGUISpaceEntered
@@ -2193,55 +2188,12 @@ def _live_mode_tick():
 
 
 def _force_panel_refresh(affected_vids=None):
-    # The classic players panel does not expose a Python-side method for
-    # re-rendering individual rows. The hooked PlayerFullNameFormatter is
-    # consulted by the panel only on natural redraws (HP changes, death,
-    # mode switch), so the marker may not appear instantly. Primary visual
-    # feedback comes from the minimap spot circle changing radius.
+    # No-op. The enemy-name marker (a PlayerFullNameFormatter hook) was removed
+    # in v6.0.1 - it never reliably rendered and is redundant now that the
+    # battle panel shows the picked / auto-picked target. Visual feedback comes
+    # from the minimap spot circle + the panel. Kept as a stub so the existing
+    # call sites stay valid.
     return
-
-
-def _patch_player_name_formatter():
-    global _FORMATTER_PATCHED
-    if _FORMATTER_PATCHED:
-        return
-    try:
-        from gui.battle_control.arena_info import player_format
-    except ImportError:
-        _logger.info('SpotMeter: player_format unavailable, skipping picker marker')
-        return
-    Formatter = getattr(player_format, 'PlayerFullNameFormatter', None)
-    if Formatter is None:
-        return
-    orig_format = Formatter.format
-
-    def patched_format(self, vInfoVO, playerName=None):
-        result = orig_format(self, vInfoVO, playerName=playerName)
-        # Read markers from _CFG at format time, not hook time, so hot-reload
-        # picks up changes without a session restart.
-        try:
-            vid = getattr(vInfoVO, 'vehicleID', None)
-            marker = None
-            if vid is not None:
-                if _PICKED_VID is not None and vid == _PICKED_VID:
-                    marker = _CFG.get('pickerMarker', u'● ')
-                elif (_CFG.get('autoPickEnabled', False)
-                        and _AUTO_PICKED_VID is not None
-                        and vid == _AUTO_PICKED_VID):
-                    marker = _CFG.get('autoPickMarker', u'○ ')
-            if marker is not None:
-                from gui.battle_control.arena_info.player_format import PlayerFormatResult
-                return PlayerFormatResult(
-                    marker + result.playerFullName,
-                    result.playerName, result.playerFakeName,
-                    result.clanAbbrev, result.regionCode, result.vehicleName)
-        except Exception:
-            _logger.exception('SpotMeter: failed to inject marker')
-        return result
-
-    Formatter.format = patched_format
-    _FORMATTER_PATCHED = True
-    _logger.info('SpotMeter: PlayerFullNameFormatter hooked for marker')
 
 
 # ----- Auto-hide the panel when a WG window opens (research/depot/dialogs in
@@ -2293,18 +2245,49 @@ def _ww_window_alias(window):
     return type(window).__name__
 
 
+def _ww_window_layer(window):
+    """WindowLayer int parsed from the window repr ('layer=N'); None if absent.
+    Distinguishes blocking screens (content tabs = layer 5, dialogs / menus =
+    layer >= 10) from coexisting overlays (layer 7: other mods' GUIFlash views,
+    notifications, chat, mod-list buttons) that must NOT hide our panel."""
+    try:
+        s = str(window)
+        i = s.find('layer=')
+        if i >= 0:
+            j = i + 6
+            k = j
+            while k < len(s) and s[k].isdigit():
+                k += 1
+            if k > j:
+                return int(s[j:k])
+    except Exception:
+        pass
+    return None
+
+
 def _ww_is_real_window(window):
-    """True if `window` is a player-opened window/overlay that should hide the
-    panel: not the hangar, not us, not a tooltip/context-menu. No isHidden /
-    status check - during the status event those read True for everything, and
-    findWindows already excludes destroyed windows."""
+    """True if `window` is a player-opened SCREEN that should hide the panel -
+    a content tab (techtree / depot / profile / loadout = layer 5) or a modal
+    dialog / menu (layer >= 10). NOT the hangar, not us, not a tooltip, and
+    crucially NOT a coexisting layer-7 overlay (other mods' GUIFlash views,
+    notifications, chat, mod-list buttons) - those share the screen with the
+    hangar and must leave our panel visible.
+
+    Pre-2.3 this was a pure alias blacklist, which wrongly counted every other
+    mod's window as blocking - in a modpack (XVM/champi/poliroid/...) that made
+    the panel thrash and eventually stick hidden. The layer gate fixes that."""
     try:
         cls = type(window).__name__
         cls_l = cls.lower()
         if 'tooltip' in cls_l or 'contextmenu' in cls_l:
             return False
         alias = _ww_window_alias(window)
-        return alias not in _WW_IGNORE_ALIASES and cls not in _WW_IGNORE_ALIASES
+        if alias in _WW_IGNORE_ALIASES or cls in _WW_IGNORE_ALIASES:
+            return False
+        layer = _ww_window_layer(window)
+        if layer is None:
+            return False  # unknown layer -> don't hide (avoid false positives)
+        return layer == 5 or layer >= 10
     except Exception:
         return False
 
@@ -2504,14 +2487,19 @@ def _ww_hide_panel():
 
 
 def _ww_show_panel():
+    # Idempotent reconcile: drive toward "shown" whenever nothing blocks and the
+    # user hasn't hidden it with PgDn - regardless of how the panel got hidden.
+    # (The old `if not _PANEL_AUTO_HIDDEN: return` guard could leave the panel
+    # stuck hidden if anything other than the window-watch had cleared it.)
     global _PANEL_AUTO_HIDDEN
-    if not _PANEL_AUTO_HIDDEN:
-        return
     _PANEL_AUTO_HIDDEN = False
+    if _PANEL_USER_HIDDEN:
+        return  # user hid it with PgDn - leave hidden until they toggle back
     try:
         if _is_in_garage():
-            _show_garage_panel(force=True)
-        else:
+            if not _GARAGE_PANEL_ACTIVE:
+                _show_garage_panel(force=True)
+        elif not _BATTLE_PANEL_ACTIVE:
             _show_battle_view(force=True)
     except Exception:
         _logger.exception('SpotMeter: window-watch show failed')
