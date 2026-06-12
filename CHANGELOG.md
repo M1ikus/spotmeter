@@ -18,6 +18,13 @@ Garage configurator + quieter defaults. Scope agreed with Aslain.
 - `showMinimapCircle` config switch — "panel only" mode without the minimap
   circle (e.g. alongside XVM's own circles).
 - `panelToggleKeyset` — multi-key combo support for the panel toggle.
+- **Auto-pick presets in the configurator** — the per-class loadouts applied
+  when auto-pick turns on (light tanks / other classes) are editable as
+  sub-options of the auto-pick checkbox (greyed out while it's off on
+  Aslain's menu).
+- **Full key mapping in the configurator** — every hotkey (picker, toggles,
+  level cycling, diagnostics, reload) is rebindable; changes apply without
+  a restart.
 
 ### Changed
 - **The garage panel is gone** — everything it offered (panel visibility,

@@ -81,6 +81,20 @@ _STRINGS = {
         'msa_def_optics': 'Optics level',
         'msa_def_vents': 'Ventilation level',
         'msa_def_cvs': 'Enemy CVS',
+        'msa_preset_lt': 'AUTO preset - light tanks:',
+        'msa_preset_df': 'AUTO preset - other classes:',
+        'msa_hotkeys_label': 'Hotkeys:',
+        'msa_hk_next': 'Next enemy',
+        'msa_hk_prev': 'Previous enemy',
+        'msa_hk_clear': 'Clear pick',
+        'msa_hk_autopick': 'Auto-pick on/off',
+        'msa_hk_optics': 'Cycle optics level',
+        'msa_hk_vents': 'Cycle ventilation level',
+        'msa_hk_cvs': 'Cycle enemy CVS',
+        'msa_hk_dump': 'Dump enemy data to log',
+        'msa_hk_live': 'Live mode (chat block)',
+        'msa_hk_snapshot': 'Spot-distance snapshot to chat',
+        'msa_hk_reload': 'Reload config file',
         'chat_live_on': 'live mode: ON (refresh every %.1fs - Numpad9 to turn off)',
         'tl_rations': 'rations', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'recon+SitA',
         'tl_directives': 'directives', 'tl_fieldUpgrades': 'field upg.',
@@ -110,6 +124,20 @@ _STRINGS = {
         'msa_def_optics': 'Poziom optyki',
         'msa_def_vents': 'Poziom wentylacji',
         'msa_def_cvs': 'CVS przeciwnika',
+        'msa_preset_lt': 'Preset AUTO - czolgi lekkie:',
+        'msa_preset_df': 'Preset AUTO - pozostale klasy:',
+        'msa_hotkeys_label': 'Klawisze:',
+        'msa_hk_next': 'Nastepny przeciwnik',
+        'msa_hk_prev': 'Poprzedni przeciwnik',
+        'msa_hk_clear': 'Wyczysc wybor',
+        'msa_hk_autopick': 'Auto-dobieranie wl/wyl',
+        'msa_hk_optics': 'Cykl poziomu optyki',
+        'msa_hk_vents': 'Cykl poziomu wentylacji',
+        'msa_hk_cvs': 'Cykl CVS przeciwnika',
+        'msa_hk_dump': 'Zrzut danych wroga do logu',
+        'msa_hk_live': 'Tryb live (blok w czacie)',
+        'msa_hk_snapshot': 'Zrzut dystansu do czatu',
+        'msa_hk_reload': 'Przeladuj plik configu',
         'chat_live_on': 'live mode: ON (refresh co %.1fs - Numpad9 zeby wylaczyc)',
         'tl_rations': 'racje', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'Zwiad+Rozezn.',
         'tl_directives': 'dyrektywy', 'tl_fieldUpgrades': 'ulepsz.pol',
@@ -730,18 +758,74 @@ def _msa_keyset_value():
     return _msa_key_codes(names)
 
 
+# Every rebindable single-key hotkey exposed in the configurator: (config key,
+# i18n label key). Values map 1:1 onto the existing string config keys - the
+# configurator's hotkey control returns a keyset; we store its LAST key (multi-
+# key combos are supported only for the panel toggle, which has its own keyset).
+_MSA_HOTKEYS = (
+    ('pickerNextKey',          'msa_hk_next'),
+    ('pickerPrevKey',          'msa_hk_prev'),
+    ('pickerClearKey',         'msa_hk_clear'),
+    ('autoPickToggleKey',      'msa_hk_autopick'),
+    ('pickerRationsKey',       'msa_def_rations'),
+    ('pickerBIAKey',           'msa_def_BIA'),
+    ('pickerReconSitAwareKey', 'msa_def_reconSitAware'),
+    ('pickerOpticsKey',        'msa_hk_optics'),
+    ('pickerVentsKey',         'msa_hk_vents'),
+    ('pickerCvsKey',           'msa_hk_cvs'),
+    ('pickerDirectivesKey',    'msa_def_directives'),
+    ('pickerFieldUpgradesKey', 'msa_def_fieldUpgrades'),
+    ('pickerDiagDumpKey',      'msa_hk_dump'),
+    ('overlayToggleKey',       'msa_hk_live'),
+    ('overlayPrintNowKey',     'msa_hk_snapshot'),
+    ('reloadKey',              'msa_hk_reload'),
+)
+
+# Auto-pick per-class presets exposed in the configurator: (autoPresets class
+# key, varName prefix, section label key).
+_MSA_PRESETS = (
+    ('lightTank', 'ap_lt_', 'msa_preset_lt'),
+    ('default',   'ap_df_', 'msa_preset_df'),
+)
+
+_MSA_TOGGLE_KEYS = ('rations', 'BIA', 'reconSitAware', 'directives', 'fieldUpgrades')
+_MSA_LEVEL_CAPS = (('optics', 4), ('vents', 4), ('cvs', 2))
+
+
+def _msa_loadout_block(t, label_key, prefix, toggles, levels, lv5):
+    """label + 5 toggle checkboxes + 3 level dropdowns - used for both the
+    battle-start defaults and each auto-pick class preset."""
+    block = [t.createLabel(_t(label_key))]
+    for key in _MSA_TOGGLE_KEYS:
+        block.append(t.createCheckbox(_t('msa_def_' + key), prefix + key,
+                                      bool(toggles.get(key, False))))
+    for key, cap in _MSA_LEVEL_CAPS:
+        opts = lv5[:cap + 1]
+        try:
+            cur = max(0, min(int(levels.get(key, 0)), cap))
+        except (ValueError, TypeError):
+            cur = 0
+        block.append(t.createDropdown(_t('msa_def_' + key), prefix + key,
+                                      opts, cur, width=200))
+    return block
+
+
 def _msa_build_template():
     t = _MSA_TEMPLATES
     try:
         lang_idx = _MSA_LANG_VALUES.index((_CFG.get('language') or 'auto').lower())
     except ValueError:
         lang_idx = 0
+    lv5 = [_t('lv_%d' % i) for i in range(5)]
+    grouping = hasattr(t, 'createControlsGroup')
+
+    # --- column 1: panel + battle-start loadout + auto-pick presets ---
     master = t.createCheckbox(_t('msa_battle_panel'), 'battlePanelEnabled',
                               bool(_CFG.get('battlePanelEnabled', False)))
     group_tanks = t.createCheckbox(_t('msa_group_tanks'), 'battlePanelGroupSameTanks',
                                    bool(_CFG.get('battlePanelGroupSameTanks', True)))
     column1 = []
-    if hasattr(t, 'createControlsGroup'):
+    if grouping:
         # Fork-only nicety: indent + grey the sub-option while the battle
         # panel is off. Falls back to a flat list on the izeberg menu.
         column1 += t.createControlsGroup(master, [group_tanks])
@@ -749,19 +833,27 @@ def _msa_build_template():
         column1 += [master, group_tanks]
     column1.append(t.createCheckbox(_t('msa_autohide'), 'autoHidePanelOnWindow',
                                     bool(_CFG.get('autoHidePanelOnWindow', True))))
-    column1.append(t.createHotkey(_t('msa_hotkey'), 'panelToggleKeyset',
-                                  _msa_keyset_value()))
-    # v6.1.0: the loadout defaults moved here from the (removed) garage panel.
-    dt = _CFG.get('defaultToggles') or {}
+    # Battle-start loadout defaults (ex-garage-panel).
     column1.append(t.createEmpty())
-    column1.append(t.createLabel(_t('msa_defaults_label')))
-    for key in ('rations', 'BIA', 'reconSitAware', 'directives', 'fieldUpgrades'):
-        column1.append(t.createCheckbox(_t('msa_def_' + key), 'def_' + key,
-                                        bool(dt.get(key, False))))
-    column1.append(t.createCheckbox(_t('msa_def_autopick'), 'def_autopick',
-                                    bool(_CFG.get('autoPickEnabled', False))))
-    dl = _CFG.get('defaultLevels') or {}
-    lv5 = [_t('lv_%d' % i) for i in range(5)]
+    column1 += _msa_loadout_block(t, 'msa_defaults_label', 'def_',
+                                  _CFG.get('defaultToggles') or {},
+                                  _CFG.get('defaultLevels') or {}, lv5)
+    # Auto-pick + its per-class presets, greyed out while auto-pick is off
+    # (fork grouping; flat on izeberg).
+    column1.append(t.createEmpty())
+    autopick = t.createCheckbox(_t('msa_def_autopick'), 'def_autopick',
+                                bool(_CFG.get('autoPickEnabled', False)))
+    presets = _CFG.get('autoPresets') or {}
+    preset_controls = []
+    for cls_key, prefix, label_key in _MSA_PRESETS:
+        p = presets.get(cls_key) or {}
+        preset_controls += _msa_loadout_block(t, label_key, prefix, p, p, lv5)
+    if grouping:
+        column1 += t.createControlsGroup(autopick, preset_controls)
+    else:
+        column1 += [autopick] + preset_controls
+
+    # --- column 2: display + full hotkey mapping ---
     column2 = [
         t.createCheckbox(_t('msa_circle'), 'showMinimapCircle',
                          bool(_CFG.get('showMinimapCircle', True))),
@@ -771,16 +863,17 @@ def _msa_build_template():
                          [_t('msa_lang_auto'), 'English', 'Polski'],
                          lang_idx, width=200),
         t.createEmpty(),
-        t.createDropdown(_t('msa_def_optics'), 'def_optics', lv5,
-                         max(0, min(int(dl.get('optics', 0)), 4)), width=200),
-        t.createDropdown(_t('msa_def_vents'), 'def_vents', lv5,
-                         max(0, min(int(dl.get('vents', 0)), 4)), width=200),
-        t.createDropdown(_t('msa_def_cvs'), 'def_cvs', lv5[:3],
-                         max(0, min(int(dl.get('cvs', 0)), 2)), width=200),
+        t.createLabel(_t('msa_hotkeys_label')),
+        t.createHotkey(_t('msa_hotkey'), 'panelToggleKeyset',
+                       _msa_keyset_value()),
     ]
+    for cfg_key, label_key in _MSA_HOTKEYS:
+        name = _CFG.get(cfg_key) or ''
+        column2.append(t.createHotkey(_t(label_key), cfg_key,
+                                      _msa_key_codes([name] if name else [])))
     return {
         'modDisplayName': 'SpotMeter',
-        'settingsVersion': 2,
+        'settingsVersion': 3,
         'enabled': bool(_CFG.get('enabled', True)),
         'column1': column1,
         'column2': column2,
@@ -800,7 +893,7 @@ def _msa_apply(s, live=True):
     """Map the configurator's settings dict into _CFG, persist, apply live.
     live=False at init time - the GUI doesn't exist yet; the normal
     space-entered path will show panels per the (already updated) flags."""
-    global _DEFAULT_AUTO_PICK_ENABLED
+    global _DEFAULT_AUTO_PICK_ENABLED, _LANG
     lang_changed = False
     if 'languageIdx' in s:
         try:
@@ -861,15 +954,55 @@ def _msa_apply(s, live=True):
         names = _msa_key_names(list(s['panelToggleKeyset'] or []))
         _CFG['panelToggleKeyset'] = names
         _CFG['panelToggleKey'] = names[-1] if names else ''
+    # v6.1.0: auto-pick per-class presets (ap_lt_* / ap_df_*). Take effect the
+    # next time auto-pick switches on (same semantics as editing the JSON).
+    ap = dict(_CFG.get('autoPresets') or {})
+    ap_changed = False
+    for cls_key, prefix, _label in _MSA_PRESETS:
+        cur = dict(ap.get(cls_key) or {})
+        cls_changed = False
+        for key in _MSA_TOGGLE_KEYS:
+            var = prefix + key
+            if var in s and bool(s[var]) != bool(cur.get(key, False)):
+                cur[key] = bool(s[var])
+                cls_changed = True
+        for key, cap in _MSA_LEVEL_CAPS:
+            var = prefix + key
+            if var in s:
+                try:
+                    lvl = max(0, min(int(s[var]), cap))
+                except (ValueError, TypeError):
+                    continue
+                if lvl != int(cur.get(key, 0)):
+                    cur[key] = lvl
+                    cls_changed = True
+        if cls_changed:
+            ap[cls_key] = cur
+            ap_changed = True
+    if ap_changed:
+        _CFG['autoPresets'] = ap
+    # v6.1.0: full hotkey mapping - each control's keyset stores its LAST key
+    # into the existing single-key config slot ('' = unbound).
+    for cfg_key, _label in _MSA_HOTKEYS:
+        if cfg_key in s:
+            names = _msa_key_names(list(s[cfg_key] or []))
+            _CFG[cfg_key] = names[-1] if names else ''
     try:
         _write_config()
     except Exception:
         _logger.exception('SpotMeter: failed to persist configurator settings')
     if live:
         _msa_apply_live(lang_changed)
-    elif lang_changed:
-        global _LANG
-        _LANG = None  # re-detect on first use
+    else:
+        # Init-time apply: no GUI yet, but hotkeys are already installed -
+        # re-resolve the bindings so saved keybinds take effect this session.
+        if lang_changed:
+            _LANG = None  # re-detect on first use
+        try:
+            if _REBIND_HOTKEYS is not None:
+                _REBIND_HOTKEYS()
+        except Exception:
+            _logger.exception('SpotMeter: hotkey rebind failed')
 
 
 def _msa_apply_live(lang_changed=False):
