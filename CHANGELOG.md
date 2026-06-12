@@ -3,6 +3,32 @@
 All notable changes to **SpotMeter**. Dates are ISO (YYYY-MM-DD). Full per-commit
 history is in the git tags (`v5.1.0` … `v6.0.2`).
 
+## [6.1.0] — Unreleased (in development)
+
+Garage configurator + quieter defaults. Scope agreed with Aslain.
+
+### Added
+- **In-game configurator** — when a mods-settings API is installed (Aslain's
+  `aslainMenu`, fallback to izeberg's `ModsSettingsAPI` — both optional, the
+  mod keeps working without either), SpotMeter registers a settings page:
+  panel visibility (battle / garage), grouping of identical tanks, auto-hide,
+  panel show/hide hotkey (supports key combos), minimap circle on/off, circle
+  opacity, language (auto / EN / PL), plus the master mod toggle. Changes
+  apply live and are mirrored into `spotmeter.json`.
+- `showMinimapCircle` config switch — "panel only" mode without the minimap
+  circle (e.g. alongside XVM's own circles).
+- `panelToggleKeyset` — multi-key combo support for the panel toggle.
+
+### Changed
+- **Panels start hidden by default** (fresh installs only — an existing config
+  keeps its values). PageDown still summons them; enable permanently in the
+  configurator or the JSON. Response to modpack feedback: "the panel is in my
+  way and I don't know how to turn it off".
+- **Config lives in AppData now** — primary path
+  `%APPDATA%/Wargaming.net/WorldOfTanks/mods/spotmeter/spotmeter.json`
+  (survives modpack clean-installs). A legacy game-dir config is migrated
+  automatically on first load; game-dir paths remain as read fallbacks.
+
 ## [6.0.2] — 2026-06-11
 
 Config quality-of-life after modpack tester feedback ("there's no config file

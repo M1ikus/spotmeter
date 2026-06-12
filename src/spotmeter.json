@@ -1,5 +1,5 @@
 {
-    "_comment": "SpotMeter mod - configuration. Place at <WoT>/mods/configs/spotmeter.json (or one of the legacy paths). NumLock-on, NumpadPeriod (or Delete) reloads this file in-battle.",
+    "_comment": "SpotMeter mod - configuration. v6.1.0+: the PRIMARY home is %APPDATA%/Wargaming.net/WorldOfTanks/mods/spotmeter/spotmeter.json (auto-created; survives modpack reinstalls). <WoT>/mods/configs/spotmeter.json still works as a legacy fallback and is migrated to AppData on first load. NumLock-on, NumpadPeriod (or Delete) reloads in-battle. Most common options are also editable in-game via the mods-settings menu (Aslain's aslainMenu or izeberg's ModsSettingsAPI) when installed.",
 
     "_comment_schema": "Schema version. v1 (no field) = pre-v6 flat config; v2 = v6.0+ with defaultToggles + auto-pick. Loader auto-migrates v1 -> v2 in memory; this file is only rewritten when you save via the v6 in-garage menu.",
     "configVersion": 2,
@@ -22,6 +22,9 @@
     "colorAfterShot": 16753920,
     "colorCamoNet": 2263842,
     "alpha": 70,
+
+    "_comment_circle_switch": "v6.1.0: master switch for the minimap spot-distance circle. false = panel-only mode (e.g. when XVM's own circles are enough). Editable live from the mods-settings menu.",
+    "showMinimapCircle": true,
 
     "_comment_perf": "How often to recompute (s) and the speed (m/s) above which counts as moving.",
     "tickInterval": 0.2,
@@ -116,9 +119,12 @@
 
     "_comment_panel_toggle": "Hotkey to show/hide the SpotMeter panel - works BOTH in battle (battle panel) and in the garage (garage panel) as one context-aware key. Default PageDown (KEY_PGDN). This frees KEY_PGDN from being the NumLock-off alias of Numpad3/BIA (Numpad3 still does BIA). battlePanelEnabled / garagePanelEnabled below set STARTUP visibility; this key flips visibility live and can summon a panel even when its Enabled flag is false. Set to \"\" to disable the hotkey.",
     "panelToggleKey": "KEY_PGDN",
+    "_comment_panel_keyset": "v6.1.0: optional multi-key combo for the panel toggle, written by the mods-settings configurator (list of Keys names, e.g. ['KEY_LCONTROL','KEY_PGDN']). Empty = single key from panelToggleKey. Triggers on the LAST key; the others must be held.",
+    "panelToggleKeyset": [],
 
     "_comment_battle_panel": "v6.0.0: in-battle SpotMeter picker panel rendered via the bundled GUIFlash fork (spotmeter_gf - shipped INSIDE this .wotmod, NO external gambiter.guiflash needed). Lists enemies (grouped if battlePanelGroupSameTanks), shows target spot-distance + AUTO state + toggle/level state. Pick with Numpad 2/8 or by clicking a row; 5 clears; 1/3/4/7/0 + 6/+/- for toggles & levels; NumpadSlash for auto-pick. Drag to reposition (coords persist here). PageDown shows/hides it.",
-    "battlePanelEnabled": true,
+    "_comment_panels_default_off": "v6.1.0: panels start HIDDEN by default (modpack feedback). PageDown still summons them; set these to true for the v6.0-style always-on behaviour - or just tick the boxes in the mods-settings menu.",
+    "battlePanelEnabled": false,
     "battlePanelX": 10,
     "battlePanelY": 400,
     "battlePanelW": 320,
@@ -131,7 +137,7 @@
     "battleHidePanelKeys": ["KEY_TAB", "KEY_N"],
 
     "_comment_garage_panel": "v6.0.0: read-only garage settings/info panel rendered via the bundled GUIFlash fork. Shows current toggle state, battle-panel position, Numpad hotkey reference. Drag to move (position persists here). Edit defaultToggles below + restart WoT to change what's ON at battle start - the in-battle Numpad keys change the live session state without rewriting defaults.",
-    "garagePanelEnabled": true,
+    "garagePanelEnabled": false,
     "garagePanelX": 1500,
     "garagePanelY": 320,
     "garagePanelW": 380,

@@ -23,7 +23,7 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '6.0.2'
+MOD_VERSION = '6.1.0'
 # Short "major.minor" form shown in panel titles ("6.0.0" -> "6.0"); the
 # full MOD_VERSION still drives logs / version reporting / meta.xml. Bumping
 # the patch (6.0.1) keeps the panel at "6.0"; a minor bump (6.1.0) -> "6.1".
@@ -66,7 +66,16 @@ _STRINGS = {
         'garage_title_suffix': '- garage, settings',
         'garage_loadout_header': 'Loadout (session):',
         'garage_battle_panel': 'Battle panel:',
-        'garage_footer': 'To change defaults: edit mods/configs/spotmeter.json + restart WoT',
+        'garage_footer': 'Settings: mod-settings menu in the garage, or spotmeter.json in AppData',
+        'msa_battle_panel': 'Battle panel visible at start',
+        'msa_garage_panel': 'Garage panel visible at start',
+        'msa_autohide': 'Auto-hide panel behind game windows',
+        'msa_group_tanks': 'Group identical enemy tanks',
+        'msa_circle': 'Minimap spot-distance circle',
+        'msa_alpha': 'Circle opacity',
+        'msa_hotkey': 'Show/hide panel hotkey',
+        'msa_language': 'Language',
+        'msa_lang_auto': 'Auto (game client)',
         'garage_hotkeys': (
             '<font size="11" color="#88AABB"><b>Keyboard shortcuts:</b></font><br>'
             '<font size="10" color="#CCCCCC">'
@@ -97,7 +106,16 @@ _STRINGS = {
         'garage_title_suffix': '- garaz, ustawienia',
         'garage_loadout_header': 'Ulepszacze (sesja):',
         'garage_battle_panel': 'Panel w bitwie:',
-        'garage_footer': 'Zmiany defaultow: edytuj mods/configs/spotmeter.json + restart WoT',
+        'garage_footer': 'Ustawienia: menu modow w garazu albo spotmeter.json w AppData',
+        'msa_battle_panel': 'Panel w bitwie widoczny na starcie',
+        'msa_garage_panel': 'Panel w garazu widoczny na starcie',
+        'msa_autohide': 'Chowaj panel pod oknami gry',
+        'msa_group_tanks': 'Grupuj identyczne czolgi',
+        'msa_circle': 'Okrag dystansu wykrycia na minimapie',
+        'msa_alpha': 'Przezroczystosc okregu',
+        'msa_hotkey': 'Klawisz pokaz/ukryj panel',
+        'msa_language': 'Jezyk',
+        'msa_lang_auto': 'Auto (jezyk klienta)',
         'garage_hotkeys': (
             '<font size="11" color="#88AABB"><b>Skroty klawiszowe:</b></font><br>'
             '<font size="10" color="#CCCCCC">'
@@ -130,15 +148,30 @@ _S_NAME = _mm_settings.ENTRY_SYMBOL_NAME
 _C_NAME = _mm_settings.CONTAINER_NAME
 _AS3 = _mm_settings.VIEW_RANGE_CIRCLES_AS3_DESCR
 
-# Tried in order. The legacy 'wot_spot_mod.json' names are kept so users with
-# a config from before the rename keep working without manual migration.
-_CONFIG_CANDIDATES = (
-    './mods/configs/spotmeter.json',
-    './res_mods/configs/spotmeter.json',
-    './mods/spotmeter.json',
-    './mods/configs/wot_spot_mod.json',
-    './res_mods/configs/wot_spot_mod.json',
-    './mods/wot_spot_mod.json',
+# v6.1.0: the PRIMARY config home is AppData (survives modpack clean-installs
+# that wipe the game dir - Aslain's recommendation, same pattern as CHAMPi).
+# Game-dir paths stay as read fallbacks; a legacy config found there is
+# migrated to AppData on first load. The legacy 'wot_spot_mod.json' names are
+# kept so users with a config from before the rename keep working.
+def _appdata_config_path():
+    base = os.environ.get('APPDATA')
+    if not base:
+        return None
+    return os.path.join(base, 'Wargaming.net', 'WorldOfTanks',
+                        'mods', 'spotmeter', 'spotmeter.json')
+
+
+_APPDATA_CONFIG = _appdata_config_path()
+
+_CONFIG_CANDIDATES = tuple(
+    ([_APPDATA_CONFIG] if _APPDATA_CONFIG else []) + [
+        './mods/configs/spotmeter.json',
+        './res_mods/configs/spotmeter.json',
+        './mods/spotmeter.json',
+        './mods/configs/wot_spot_mod.json',
+        './res_mods/configs/wot_spot_mod.json',
+        './mods/wot_spot_mod.json',
+    ]
 )
 
 DEFAULT_CONFIG = {
@@ -154,6 +187,10 @@ DEFAULT_CONFIG = {
     'colorAfterShot': 0xFFA500,
     'colorCamoNet': 0x228B22,
     'alpha': 70,
+    # v6.1.0: master switch for the minimap spot-distance circle. False =
+    # "panel only" mode (e.g. when XVM's own circles are enough). Exposed in
+    # the mods-settings configurator; flipping it mid-battle applies live.
+    'showMinimapCircle': True,
     'tickInterval': 0.2,
     'movingSpeedThreshold': 0.5,
     'applyFirePenalty': True,
@@ -185,6 +222,11 @@ DEFAULT_CONFIG = {
     # the whole numpad + nav cluster is taken (see _key_aliases below), so
     # KEY_PGDN is freed from the Numpad3/BIA alias and reused here.
     'panelToggleKey':           'KEY_PGDN',
+    # v6.1.0: optional multi-key combo for the panel toggle, written by the
+    # mods-settings configurator (list of Keys names, e.g. ['KEY_LCONTROL',
+    # 'KEY_PGDN']). Empty = single key from panelToggleKey. The binding
+    # triggers on the LAST key; the others must be held.
+    'panelToggleKeyset':        [],
     # Picker VR multipliers. Two-stage model:
     #   crew_amplified = base_vr * (1 + (rations? 0.0430 : 0) + (BIA? 0.0253 : 0))
     #   final = crew_amplified
@@ -318,7 +360,12 @@ DEFAULT_CONFIG = {
     'menuButtonY': 850,
     'menuButtonW': 90,  # button width  (px) - matches stock hangar button height roughly
     'menuButtonH': 28,  # button height (px)
-    'battlePanelEnabled': True,
+    # v6.1.0: panels start HIDDEN by default (modpack feedback via Aslain -
+    # "the panel is in my way and I don't know how to turn it off"). PgDn
+    # still summons them; enable here / in the mods-settings configurator
+    # for the v6.0-style always-on behaviour. Existing configs keep whatever
+    # they have - this only affects fresh installs.
+    'battlePanelEnabled': False,
     'battlePanelX': 10,
     'battlePanelY': 400,
     'battlePanelW': 320,
@@ -342,7 +389,7 @@ DEFAULT_CONFIG = {
     # current in-session state of toggles plus a Numpad hotkey
     # reference card. Default position is top-right area of the
     # garage at 1920x1080.
-    'garagePanelEnabled': True,
+    'garagePanelEnabled': False,  # v6.1.0: hidden by default, like the battle panel
     'garagePanelX': 1500,
     'garagePanelY': 320,
     'garagePanelW': 380,
@@ -366,6 +413,7 @@ _PATCHED = False
 _AVATAR_PATCHED = False
 _HANGAR_PATCHED = False
 _HOTKEYS_INSTALLED = False  # v5.6.4: guards _install_reload_hotkey against double-registration
+_REBIND_HOTKEYS = None      # v6.1.0: set by _install_reload_hotkey; call to re-resolve bindings from _CFG
 _STATE = weakref.WeakKeyDictionary()
 _LAST_SHOT_TIME = 0.0
 _LAST_MOVEMENT_TIME = 0.0
@@ -428,6 +476,7 @@ def _read_config():
                         _CFG[k] = v
                 _CFG_PATH = path
                 _logger.info('SpotMeter: config loaded from %s', path)
+                _migrate_config_to_appdata(path)
                 return
         except IOError:
             continue
@@ -447,6 +496,25 @@ def _read_config():
             _logger.info('SpotMeter: created default config at %s', written)
     except Exception:
         _logger.exception('SpotMeter: failed to seed default config')
+
+
+def _migrate_config_to_appdata(loaded_path):
+    """v6.1.0: AppData is the primary config home. When the config was loaded
+    from a legacy game-dir path and AppData has none yet, copy it over and
+    switch _CFG_PATH so future saves land in AppData. The game-dir file is
+    left in place (still read if AppData ever disappears)."""
+    global _CFG_PATH
+    if not _APPDATA_CONFIG or loaded_path == _APPDATA_CONFIG:
+        return
+    if os.path.exists(_APPDATA_CONFIG):
+        return  # AppData copy already exists (it loads first; this is unreachable normally)
+    try:
+        written = _write_config(_APPDATA_CONFIG)
+        if written:
+            _CFG_PATH = written
+            _logger.info('SpotMeter: config migrated to %s (game-dir copy kept)', written)
+    except Exception:
+        _logger.exception('SpotMeter: config migration to AppData failed')
 
 
 def _migrate_config(payload):
@@ -610,6 +678,241 @@ def _write_config(path=None):
     return target
 
 
+# ---------------------------------------------------------------------------
+# ModsSettingsAPI integration (v6.1.0) - garage configurator.
+#
+# SOFT dependency. Import preference per Aslain: his fork (gui.aslainMenu)
+# first, then izeberg's original (gui.modsSettingsApi), else None - without
+# any API installed everything keeps working (JSON config + numpad hotkeys).
+# Fork-only template features are hasattr-guarded so the same template renders
+# on the plain izeberg menu too.
+#
+# Settings flow: template values are seeded from _CFG; setModTemplate returns
+# the API's stored copy which then OVERRIDES the exposed subset (the menu is
+# authoritative for what it exposes); every change is mirrored back into our
+# JSON via _write_config() so the file stays the single human-readable truth.
+
+_MSA_LINKAGE = 'spotmeter'
+_MSA_API = None
+_MSA_TEMPLATES = None
+_MSA_REGISTERED = False
+
+_MSA_LANG_VALUES = ('auto', 'en', 'pl')  # dropdown index -> config value
+
+
+def _msa_import():
+    global _MSA_API, _MSA_TEMPLATES
+    try:
+        from gui.aslainMenu import g_modsSettingsApi as _api, templates as _tpl
+        _MSA_API, _MSA_TEMPLATES = _api, _tpl
+        return 'aslainMenu'
+    except ImportError:
+        pass
+    try:
+        from gui.modsSettingsApi import g_modsSettingsApi as _api, templates as _tpl
+        _MSA_API, _MSA_TEMPLATES = _api, _tpl
+        return 'modsSettingsApi'
+    except ImportError:
+        return None
+
+
+def _msa_key_codes(names):
+    """['KEY_PGDN', ...] -> [BigWorld key codes] (unknown names dropped)."""
+    try:
+        import Keys
+    except ImportError:
+        return []
+    out = []
+    for n in names or []:
+        kid = getattr(Keys, n, None)
+        if kid is not None:
+            out.append(kid)
+    return out
+
+
+def _msa_key_names(codes):
+    """[BigWorld key codes] -> ['KEY_PGDN', ...] (unknown codes dropped)."""
+    try:
+        import Keys
+    except ImportError:
+        return []
+    by_code = {}
+    for n in dir(Keys):
+        if n.startswith('KEY_'):
+            v = getattr(Keys, n)
+            if isinstance(v, int) and v not in by_code:
+                by_code[v] = n
+    out = []
+    for c in codes or []:
+        try:
+            n = by_code.get(int(c))
+        except (TypeError, ValueError):
+            n = None
+        if n:
+            out.append(n)
+    return out
+
+
+def _msa_keyset_value():
+    """Current panel-toggle keyset as a list of key codes for the template."""
+    names = _CFG.get('panelToggleKeyset') or []
+    if not names:
+        single = _CFG.get('panelToggleKey') or ''
+        names = [single] if single else []
+    return _msa_key_codes(names)
+
+
+def _msa_build_template():
+    t = _MSA_TEMPLATES
+    try:
+        lang_idx = _MSA_LANG_VALUES.index((_CFG.get('language') or 'auto').lower())
+    except ValueError:
+        lang_idx = 0
+    master = t.createCheckbox(_t('msa_battle_panel'), 'battlePanelEnabled',
+                              bool(_CFG.get('battlePanelEnabled', False)))
+    group_tanks = t.createCheckbox(_t('msa_group_tanks'), 'battlePanelGroupSameTanks',
+                                   bool(_CFG.get('battlePanelGroupSameTanks', True)))
+    column1 = []
+    if hasattr(t, 'createControlsGroup'):
+        # Fork-only nicety: indent + grey the sub-option while the battle
+        # panel is off. Falls back to a flat list on the izeberg menu.
+        column1 += t.createControlsGroup(master, [group_tanks])
+    else:
+        column1 += [master, group_tanks]
+    column1.append(t.createCheckbox(_t('msa_garage_panel'), 'garagePanelEnabled',
+                                    bool(_CFG.get('garagePanelEnabled', False))))
+    column1.append(t.createCheckbox(_t('msa_autohide'), 'autoHidePanelOnWindow',
+                                    bool(_CFG.get('autoHidePanelOnWindow', True))))
+    column1.append(t.createHotkey(_t('msa_hotkey'), 'panelToggleKeyset',
+                                  _msa_keyset_value()))
+    column2 = [
+        t.createCheckbox(_t('msa_circle'), 'showMinimapCircle',
+                         bool(_CFG.get('showMinimapCircle', True))),
+        t.createSlider(_t('msa_alpha'), 'alpha',
+                       int(_CFG.get('alpha', 70)), 10, 100, 5),
+        t.createDropdown(_t('msa_language'), 'languageIdx',
+                         [_t('msa_lang_auto'), 'English', 'Polski'],
+                         lang_idx, width=200),
+    ]
+    return {
+        'modDisplayName': 'SpotMeter',
+        'settingsVersion': 1,
+        'enabled': bool(_CFG.get('enabled', True)),
+        'column1': column1,
+        'column2': column2,
+    }
+
+
+def _msa_on_settings_changed(linkage, newSettings):
+    if linkage != _MSA_LINKAGE:
+        return
+    try:
+        _msa_apply(newSettings)
+    except Exception:
+        _logger.exception('SpotMeter: applying configurator settings failed')
+
+
+def _msa_apply(s, live=True):
+    """Map the configurator's settings dict into _CFG, persist, apply live.
+    live=False at init time - the GUI doesn't exist yet; the normal
+    space-entered path will show panels per the (already updated) flags."""
+    lang_changed = False
+    if 'languageIdx' in s:
+        try:
+            new_lang = _MSA_LANG_VALUES[int(s['languageIdx'])]
+        except (ValueError, IndexError, TypeError):
+            new_lang = 'auto'
+        if new_lang != (_CFG.get('language') or 'auto').lower():
+            _CFG['language'] = new_lang
+            lang_changed = True
+    for k in ('battlePanelEnabled', 'garagePanelEnabled', 'autoHidePanelOnWindow',
+              'battlePanelGroupSameTanks', 'showMinimapCircle'):
+        if k in s:
+            _CFG[k] = bool(s[k])
+    if 'alpha' in s:
+        try:
+            _CFG['alpha'] = int(s['alpha'])
+        except (ValueError, TypeError):
+            pass
+    if 'enabled' in s:
+        _CFG['enabled'] = bool(s['enabled'])
+    if 'panelToggleKeyset' in s:
+        names = _msa_key_names(list(s['panelToggleKeyset'] or []))
+        _CFG['panelToggleKeyset'] = names
+        _CFG['panelToggleKey'] = names[-1] if names else ''
+    try:
+        _write_config()
+    except Exception:
+        _logger.exception('SpotMeter: failed to persist configurator settings')
+    if live:
+        _msa_apply_live(lang_changed)
+    elif lang_changed:
+        global _LANG
+        _LANG = None  # re-detect on first use
+
+
+def _msa_apply_live(lang_changed=False):
+    """Make the new settings visible immediately - panels, circle, hotkeys."""
+    global _LANG, _PANEL_USER_HIDDEN
+    if lang_changed:
+        _LANG = None  # _t() re-detects on next use
+    try:
+        if _REBIND_HOTKEYS is not None:
+            _REBIND_HOTKEYS()
+    except Exception:
+        _logger.exception('SpotMeter: hotkey rebind failed')
+    enabled = bool(_CFG.get('enabled', True))
+    try:
+        if _is_in_garage():
+            want = enabled and _CFG.get('garagePanelEnabled', False)
+            if want and not _GARAGE_PANEL_ACTIVE:
+                _PANEL_USER_HIDDEN = False
+                _show_garage_panel(force=True)
+            elif not want and _GARAGE_PANEL_ACTIVE:
+                _hide_garage_panel()
+            elif lang_changed and _GARAGE_PANEL_ACTIVE:
+                _hide_garage_panel()
+                _show_garage_panel(force=True)
+        else:
+            want = enabled and _CFG.get('battlePanelEnabled', False)
+            if want and not _BATTLE_PANEL_ACTIVE:
+                _PANEL_USER_HIDDEN = False
+                _show_battle_view(force=True)
+            elif not want and _BATTLE_PANEL_ACTIVE:
+                _hide_battle_view()
+            elif lang_changed and _BATTLE_PANEL_ACTIVE:
+                _hide_battle_view()
+                _show_battle_view(force=True)
+    except Exception:
+        _logger.exception('SpotMeter: live panel reconcile failed')
+    try:
+        plugin = _get_picker_plugin()
+        if plugin is not None:
+            _refresh_spot_circle(plugin)  # adds or removes the circle per flags
+    except Exception:
+        _logger.exception('SpotMeter: live circle reconcile failed')
+
+
+def _msa_register():
+    global _MSA_REGISTERED
+    if _MSA_REGISTERED:
+        return
+    which = _msa_import()
+    if which is None:
+        _logger.info('SpotMeter: no ModsSettingsAPI found - garage configurator '
+                     'disabled (JSON config + hotkeys still work)')
+        return
+    saved = _MSA_API.setModTemplate(_MSA_LINKAGE, _msa_build_template(),
+                                    _msa_on_settings_changed)
+    _MSA_REGISTERED = True
+    _logger.warning('SpotMeter: configurator registered via %s (saved settings: %s)',
+                    which, 'yes' if saved else 'fresh')
+    if saved:
+        # The menu's stored copy wins for the exposed subset (it is what the
+        # user last saw and Applied there). live=False: no GUI exists yet.
+        _msa_apply(saved, live=False)
+
+
 def init():
     global _DEFAULT_AUTO_PICK_ENABLED
     _logger.warning('SpotMeter: init() called')
@@ -665,6 +968,12 @@ def init():
         # independently via their own `*PanelEnabled` flags.
         _patch_hangar_lifecycle()
         _install_reload_hotkey()
+        # v6.1.0: garage configurator (soft dependency - no-op without the API).
+        # Registered AFTER hotkey install so a saved-settings apply can rebind.
+        try:
+            _msa_register()
+        except Exception:
+            _logger.exception('SpotMeter: ModsSettingsAPI registration failed')
         _logger.warning(
             'SpotMeter: initialised (version=%s, useOwnViewRange=%s, fire=%s, picker=%s)',
             MOD_VERSION, _CFG['useOwnViewRange'],
@@ -1299,6 +1608,13 @@ def _set_active(plugin, state, active):
 
 
 def _refresh_spot_circle(plugin):
+    # v6.1.0: master + circle switches (live-applied from the configurator).
+    if not _CFG.get('enabled', True) or not _CFG.get('showMinimapCircle', True):
+        _stop_ticking(plugin)
+        state = _state_for(plugin)
+        _remove_dyn_circle(plugin, state)
+        _set_active(plugin, state, False)
+        return
     if not plugin._isAlive() or plugin._getIsObserver():
         _stop_ticking(plugin)
         state = _state_for(plugin)
@@ -4362,35 +4678,56 @@ def _install_reload_hotkey():
         for key_id, key_name in _resolve_keys(cfg_key):
             bindings.append((key_id, action, label, key_name))
 
-    _bind('reloadKey', _hot_reload, 'reload')
-    _bind('panelToggleKey', _toggle_panel, 'panel-toggle')
-    if _CFG.get('pickerEnabled', True):
-        _bind('pickerNextKey', lambda: _cycle_picker(+1), 'picker-next')
-        _bind('pickerPrevKey', lambda: _cycle_picker(-1), 'picker-prev')
-        _bind('pickerClearKey', _clear_picker, 'picker-clear')
-        _bind('pickerRationsKey',
-              lambda: _toggle_perk('rations'), 'rations')
-        _bind('pickerBIAKey',
-              lambda: _toggle_perk('BIA'), 'BIA')
-        _bind('pickerReconSitAwareKey',
-              lambda: _toggle_perk('reconSitAware'), 'recon-sitaware')
-        _bind('pickerOpticsKey',
-              lambda: _cycle_level('optics'), 'optics-cycle')
-        _bind('pickerVentsKey',
-              lambda: _cycle_level('vents'), 'vents-cycle')
-        _bind('pickerCvsKey',
-              lambda: _cycle_level('cvs'), 'cvs-cycle')
-        _bind('pickerDirectivesKey',
-              lambda: _toggle_perk('directives'), 'directives')
-        _bind('pickerFieldUpgradesKey',
-              lambda: _toggle_perk('fieldUpgrades'), 'field-upgrades')
-        _bind('pickerDiagDumpKey',
-              lambda: _dump_picker_descriptor(_get_picker_plugin()),
-              'diag-dump')
-        _bind('autoPickToggleKey', _toggle_auto_pick, 'auto-pick-toggle')
-    if _CFG.get('overlayEnabled', True):
-        _bind('overlayToggleKey', _toggle_live_mode, 'live-mode-toggle')
-        _bind('overlayPrintNowKey', _print_now, 'status-snapshot')
+    def _panel_toggle_action():
+        # v6.1.0: the configurator may set a multi-key combo via
+        # panelToggleKeyset. The binding fires on the LAST key of the set;
+        # all earlier keys (modifiers) must currently be held down.
+        names = _CFG.get('panelToggleKeyset') or []
+        if len(names) > 1:
+            for n in names[:-1]:
+                kid = getattr(Keys, n, None)
+                if kid is not None and not BigWorld.isKeyDown(kid):
+                    return
+        _toggle_panel()
+
+    def _rebuild_bindings():
+        # v6.1.0: re-runnable so the configurator can rebind live. The
+        # `bindings` list object is shared with the _on_key_event closure -
+        # mutate in place, never rebind the name.
+        del bindings[:]
+        _bind('reloadKey', _hot_reload, 'reload')
+        _bind('panelToggleKey', _panel_toggle_action, 'panel-toggle')
+        if _CFG.get('pickerEnabled', True):
+            _bind('pickerNextKey', lambda: _cycle_picker(+1), 'picker-next')
+            _bind('pickerPrevKey', lambda: _cycle_picker(-1), 'picker-prev')
+            _bind('pickerClearKey', _clear_picker, 'picker-clear')
+            _bind('pickerRationsKey',
+                  lambda: _toggle_perk('rations'), 'rations')
+            _bind('pickerBIAKey',
+                  lambda: _toggle_perk('BIA'), 'BIA')
+            _bind('pickerReconSitAwareKey',
+                  lambda: _toggle_perk('reconSitAware'), 'recon-sitaware')
+            _bind('pickerOpticsKey',
+                  lambda: _cycle_level('optics'), 'optics-cycle')
+            _bind('pickerVentsKey',
+                  lambda: _cycle_level('vents'), 'vents-cycle')
+            _bind('pickerCvsKey',
+                  lambda: _cycle_level('cvs'), 'cvs-cycle')
+            _bind('pickerDirectivesKey',
+                  lambda: _toggle_perk('directives'), 'directives')
+            _bind('pickerFieldUpgradesKey',
+                  lambda: _toggle_perk('fieldUpgrades'), 'field-upgrades')
+            _bind('pickerDiagDumpKey',
+                  lambda: _dump_picker_descriptor(_get_picker_plugin()),
+                  'diag-dump')
+            _bind('autoPickToggleKey', _toggle_auto_pick, 'auto-pick-toggle')
+        if _CFG.get('overlayEnabled', True):
+            _bind('overlayToggleKey', _toggle_live_mode, 'live-mode-toggle')
+            _bind('overlayPrintNowKey', _print_now, 'status-snapshot')
+
+    _rebuild_bindings()
+    global _REBIND_HOTKEYS
+    _REBIND_HOTKEYS = _rebuild_bindings
 
     if not bindings:
         _logger.warning('SpotMeter: no hotkeys registered (check Keys names in config)')
@@ -4406,6 +4743,8 @@ def _install_reload_hotkey():
     _KEY_DEBOUNCE_SEC = 0.12
 
     def _on_key_event(event):
+        if not _CFG.get('enabled', True):
+            return False  # v6.1.0: soft-disabled via the configurator
         try:
             is_down = event.isKeyDown()
         except Exception:

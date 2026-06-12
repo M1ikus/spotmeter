@@ -18,10 +18,13 @@ gambiter.guiflash 0.6.3 + poliroid.modslistapi + openwg.gameface + izeberg).
   auto-hide rewrite + enemy-name-marker removal + 2.3.0.1 repackage. Git tag
   `v6.0.1` pinned to that commit; GH release carries artifacts rebuilt from it.
 
-## v6.1.0 — planned (garage configurator + panels off by default)
+## v6.1.0 — IMPLEMENTED (pending in-game testing; not released)
 
 Scope agreed with Aslain (2026-06-12). Goal: kill the "panel is in my way and I
-don't know how to turn it off" complaints.
+don't know how to turn it off" complaints. **Code is in (2026-06-12), built +
+installed locally (mods/2.3.0.1, alongside aslainMenu 1.1.2 + modslist 1.7.8 +
+gameface 1.1.5). Remaining: in-game test matrix (no API / izeberg / aslainMenu),
+README + PORTAL_LISTING (EN+PL) updates, release.** Plan below as implemented:
 
 ### 1. Panels default OFF
 Flip `battlePanelEnabled` / `garagePanelEnabled` defaults to `false` (code
