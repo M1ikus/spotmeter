@@ -703,6 +703,12 @@ def _write_config(path=None):
 # JSON via _write_config() so the file stays the single human-readable truth.
 
 _MSA_LINKAGE = 'spotmeter'
+# BUMP THIS on EVERY template change (controls, options, labels, layout).
+# The API stores the template per user and only replaces it when the version
+# INCREASES - an unbumped change silently keeps the old menu (e.g. the
+# 'default' class stayed in the dropdown after its removal). User values
+# survive a bump: the new template is seeded from _CFG.
+_MSA_SETTINGS_VERSION = 5
 _MSA_API = None
 _MSA_TEMPLATES = None
 _MSA_REGISTERED = False
@@ -997,7 +1003,7 @@ def _msa_build_template():
                                       _msa_key_codes([name] if name else [])))
     return {
         'modDisplayName': 'SpotMeter',
-        'settingsVersion': 4,
+        'settingsVersion': _MSA_SETTINGS_VERSION,
         'enabled': bool(_CFG.get('enabled', True)),
         'column1': column1,
         'column2': column2,
