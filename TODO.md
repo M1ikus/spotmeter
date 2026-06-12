@@ -18,6 +18,73 @@ gambiter.guiflash 0.6.3 + poliroid.modslistapi + openwg.gameface + izeberg).
   auto-hide rewrite + enemy-name-marker removal + 2.3.0.1 repackage. Git tag
   `v6.0.1` pinned to that commit; GH release carries artifacts rebuilt from it.
 
+## v6.1.0 — planned (garage configurator + panels off by default)
+
+Scope agreed with Aslain (2026-06-12). Goal: kill the "panel is in my way and I
+don't know how to turn it off" complaints.
+
+### 1. Panels default OFF
+Flip `battlePanelEnabled` / `garagePanelEnabled` defaults to `false` (code
+`DEFAULT_CONFIG` + shipped `spotmeter.json`). PgDn still summons; the minimap
+circle stays default ON. Existing users keep their seeded config (true/true)
+— only fresh installs start hidden. v6.0.2's enabled-flags work makes this
+behave correctly.
+
+### 2. ModsSettingsAPI integration (garage configurator)
+Soft dependency — without any API installed everything keeps working (JSON +
+numpad). Import pattern per Aslain (his fork first, izeberg fallback):
+```python
+g_modsSettingsApi = None; msa_templates = None
+try:
+    from gui.aslainMenu import g_modsSettingsApi, templates as msa_templates
+except ImportError: pass
+if g_modsSettingsApi is None:
+    try:
+        from gui.modsSettingsApi import g_modsSettingsApi, templates as msa_templates
+    except ImportError: pass
+```
+- Linkage `'spotmeter'`, `settingsVersion: 1`, labels via our `_t()` (PL/EN).
+- Register: `setModTemplate(linkage, template, onModSettingsChanged)` — seed
+  template values from `_CFG`; returned saved settings (MSA's copy) override
+  the exposed subset; mirror every change back into our JSON (`_write_config`)
+  so the file stays the single human-readable truth.
+- Controls v1 (tight): master `enabled` (soft-disable: hide circle+panels,
+  ignore keys, live), checkboxes `battlePanelEnabled` / `garagePanelEnabled` /
+  `autoHidePanelOnWindow` / `battlePanelGroupSameTanks` / **`showMinimapCircle`
+  (NEW key — the long-deferred panel-only opt-out, guards the circle entry)**,
+  hotkey `panelToggleKey` (value = list of BigWorld key codes — needs mapping
+  to/from our `'KEY_PGDN'` string; press-detect via `checkKeyset` when MSA
+  present, plain key compare otherwise), dropdown `language` (auto/en/pl ->
+  index), slider `alpha` (circle opacity).
+- Apply live in `onModSettingsChanged` (filter by linkage): update `_CFG`,
+  `_write_config()`, show/hide panels per flags + context, add/remove circle,
+  rebind hotkey, re-create panels on language change.
+- Fork-only extras guarded with `hasattr` (izeberg-compatible per Aslain):
+  `templates.createControlsGroup` to indent panel sub-options (fallback: flat
+  list). Skip image/live-change extras in v1.
+- Test matrix: no API at all / izeberg 1.7.x (already in our test pack) /
+  aslainMenu 1.1.2 (1.1.3 imminent — Aslain says 1.1.2 is OK to test against).
+  Need the aslainMenu .wotmod from Aslain or his repo releases.
+
+### 3. Config in AppData (Aslain's recommendation)
+New primary path: `%APPDATA%/Wargaming.net/WorldOfTanks/mods/spotmeter/spotmeter.json`
+(CHAMPi-style; survives modpack clean-installs that wipe the game dir).
+- Read order: AppData -> `./mods/configs/spotmeter.json` (legacy) ->
+  `./res_mods/configs/` (legacy) -> defaults.
+- Migration: AppData missing + legacy found -> load legacy, write AppData copy.
+- All writes (incl. v6.0.2 first-run seed) target AppData; `os.environ['APPDATA']`
+  missing -> fall back to `./mods/configs`.
+- Update the garage-panel footer string + README/INSTALL (they say "edit
+  mods/configs/spotmeter.json").
+
+### 4. Docs
+README section "Konfigurator w garażu", PORTAL_LISTING + INSTALL (soft-dep
+note: works standalone; integrates with ModsSettingsAPI / Aslain's menu when
+present), CHANGELOG `[6.1.0]`.
+
+Reference sources downloaded to `research/msa/` (izeberg api/templates/example
++ aslainMenu fork example/templates/README).
+
 ## Optional / low priority
 
 ### Isolate the GUIFlash fork's AS3 namespace
