@@ -83,6 +83,14 @@ _STRINGS = {
         'msa_def_cvs': 'Enemy CVS',
         'msa_preset_lt': 'AUTO preset - light tanks:',
         'msa_preset_df': 'AUTO preset - other classes:',
+        'msa_preset_class': 'Preset for class',
+        'msa_preset_edit': 'Class preset:',
+        'msa_cls_lt': 'Light tanks',
+        'msa_cls_mt': 'Medium tanks',
+        'msa_cls_ht': 'Heavy tanks',
+        'msa_cls_td': 'Tank destroyers',
+        'msa_cls_spg': 'Artillery (SPG)',
+        'msa_cls_default': 'Default (other / fallback)',
         'msa_hotkeys_label': 'Hotkeys:',
         'msa_hk_next': 'Next enemy',
         'msa_hk_prev': 'Previous enemy',
@@ -126,6 +134,14 @@ _STRINGS = {
         'msa_def_cvs': 'CVS przeciwnika',
         'msa_preset_lt': 'Preset AUTO - czolgi lekkie:',
         'msa_preset_df': 'Preset AUTO - pozostale klasy:',
+        'msa_preset_class': 'Klasa presetu',
+        'msa_preset_edit': 'Preset klasy:',
+        'msa_cls_lt': 'Czolgi lekkie',
+        'msa_cls_mt': 'Czolgi srednie',
+        'msa_cls_ht': 'Czolgi ciezkie',
+        'msa_cls_td': 'Niszczyciele czolgow',
+        'msa_cls_spg': 'Artyleria',
+        'msa_cls_default': 'Domyslny (pozostale)',
         'msa_hotkeys_label': 'Klawisze:',
         'msa_hk_next': 'Nastepny przeciwnik',
         'msa_hk_prev': 'Poprzedni przeciwnik',
@@ -782,27 +798,52 @@ _MSA_HOTKEYS = (
 )
 
 # Auto-pick per-class presets exposed in the configurator: (autoPresets class
-# key, varName prefix, section label key).
+# key, varName prefix, section label key). Used by the STATIC layout (plain
+# izeberg menu - no live re-render available).
 _MSA_PRESETS = (
     ('lightTank', 'ap_lt_', 'msa_preset_lt'),
     ('default',   'ap_df_', 'msa_preset_df'),
 )
 
+# Aslain-fork layout: ONE preset editor + a class dropdown that switches which
+# autoPresets entry it edits (live re-render via reloadModTemplate). All five
+# WoT class tags + the 'default' fallback are editable.
+_MSA_PRESET_CLASSES = (
+    ('lightTank',  'msa_cls_lt'),
+    ('mediumTank', 'msa_cls_mt'),
+    ('heavyTank',  'msa_cls_ht'),
+    ('AT-SPG',     'msa_cls_td'),
+    ('SPG',        'msa_cls_spg'),
+    ('default',    'msa_cls_default'),
+)
+_MSA_FORK_LIVE = False      # set at registration: reloadModTemplate + live events available
+_MSA_PRESET_SEL = 0         # which _MSA_PRESET_CLASSES entry the editor shows
+_MSA_PRESET_PENDING = {}    # {classKey: {presetKey: value}} - uncommitted per-class edits
+_MSA_LIVE_PENDING = {}      # {varName: value} - other uncommitted edits (survive re-render)
+
 _MSA_TOGGLE_KEYS = ('rations', 'BIA', 'reconSitAware', 'directives', 'fieldUpgrades')
 _MSA_LEVEL_CAPS = (('optics', 4), ('vents', 4), ('cvs', 2))
 
 
+def _msa_val(var, fallback):
+    """Template value for `var`: the uncommitted in-menu value when the user
+    changed it this window session (so a live re-render doesn't visually
+    revert their pending edits), else the committed config value."""
+    return _MSA_LIVE_PENDING.get(var, fallback)
+
+
 def _msa_loadout_block(t, label_key, prefix, toggles, levels, lv5):
-    """label + 5 toggle checkboxes + 3 level dropdowns - used for both the
-    battle-start defaults and each auto-pick class preset."""
+    """label + 5 toggle checkboxes + 3 level dropdowns - used for the
+    battle-start defaults and the auto-pick class preset editor."""
     block = [t.createLabel(_t(label_key))]
     for key in _MSA_TOGGLE_KEYS:
         block.append(t.createCheckbox(_t('msa_def_' + key), prefix + key,
-                                      bool(toggles.get(key, False))))
+                                      bool(_msa_val(prefix + key,
+                                                    toggles.get(key, False)))))
     for key, cap in _MSA_LEVEL_CAPS:
         opts = lv5[:cap + 1]
         try:
-            cur = max(0, min(int(levels.get(key, 0)), cap))
+            cur = max(0, min(int(_msa_val(prefix + key, levels.get(key, 0))), cap))
         except (ValueError, TypeError):
             cur = 0
         block.append(t.createDropdown(_t('msa_def_' + key), prefix + key,
@@ -821,9 +862,11 @@ def _msa_build_template():
 
     # --- column 1: panel + battle-start loadout + auto-pick presets ---
     master = t.createCheckbox(_t('msa_battle_panel'), 'battlePanelEnabled',
-                              bool(_CFG.get('battlePanelEnabled', False)))
+                              bool(_msa_val('battlePanelEnabled',
+                                            _CFG.get('battlePanelEnabled', False))))
     group_tanks = t.createCheckbox(_t('msa_group_tanks'), 'battlePanelGroupSameTanks',
-                                   bool(_CFG.get('battlePanelGroupSameTanks', True)))
+                                   bool(_msa_val('battlePanelGroupSameTanks',
+                                                 _CFG.get('battlePanelGroupSameTanks', True))))
     column1 = []
     if grouping:
         # Fork-only nicety: indent + grey the sub-option while the battle
@@ -832,7 +875,8 @@ def _msa_build_template():
     else:
         column1 += [master, group_tanks]
     column1.append(t.createCheckbox(_t('msa_autohide'), 'autoHidePanelOnWindow',
-                                    bool(_CFG.get('autoHidePanelOnWindow', True))))
+                                    bool(_msa_val('autoHidePanelOnWindow',
+                                                  _CFG.get('autoHidePanelOnWindow', True)))))
     # Battle-start loadout defaults (ex-garage-panel).
     column1.append(t.createEmpty())
     column1 += _msa_loadout_block(t, 'msa_defaults_label', 'def_',
@@ -842,26 +886,52 @@ def _msa_build_template():
     # (fork grouping; flat on izeberg).
     column1.append(t.createEmpty())
     autopick = t.createCheckbox(_t('msa_def_autopick'), 'def_autopick',
-                                bool(_CFG.get('autoPickEnabled', False)))
+                                bool(_msa_val('def_autopick',
+                                              _CFG.get('autoPickEnabled', False))))
     presets = _CFG.get('autoPresets') or {}
     preset_controls = []
-    for cls_key, prefix, label_key in _MSA_PRESETS:
-        p = presets.get(cls_key) or {}
-        preset_controls += _msa_loadout_block(t, label_key, prefix, p, p, lv5)
+    if _MSA_FORK_LIVE:
+        # Aslain-fork layout: ONE editor + a class dropdown. Switching the
+        # class live-re-renders the editor with that class's values (pending
+        # per-class edits are kept in _MSA_PRESET_PENDING until Apply).
+        cls_key = _MSA_PRESET_CLASSES[_MSA_PRESET_SEL][0]
+        # Seed the editor with what WOULD apply for this class: its own entry,
+        # else the 'default' fallback (same lookup _apply_auto_preset uses).
+        p = dict(presets.get(cls_key) or presets.get('default') or {})
+        p.update(_MSA_PRESET_PENDING.get(cls_key) or {})
+        preset_controls.append(t.createDropdown(
+            _t('msa_preset_class'), 'preset_class',
+            [_t(lab) for _cls, lab in _MSA_PRESET_CLASSES],
+            _MSA_PRESET_SEL, width=200))
+        preset_controls += _msa_loadout_block(t, 'msa_preset_edit', 'ap_',
+                                              p, p, lv5)
+    else:
+        # Plain izeberg menu: static light-tanks + other-classes sections.
+        for cls_key, prefix, label_key in _MSA_PRESETS:
+            p = presets.get(cls_key) or {}
+            preset_controls += _msa_loadout_block(t, label_key, prefix, p, p, lv5)
     if grouping:
         column1 += t.createControlsGroup(autopick, preset_controls)
     else:
         column1 += [autopick] + preset_controls
 
     # --- column 2: display + full hotkey mapping ---
+    try:
+        alpha_val = int(_msa_val('alpha', _CFG.get('alpha', 70)))
+    except (ValueError, TypeError):
+        alpha_val = 70
+    try:
+        lang_val = int(_msa_val('languageIdx', lang_idx))
+    except (ValueError, TypeError):
+        lang_val = lang_idx
     column2 = [
         t.createCheckbox(_t('msa_circle'), 'showMinimapCircle',
-                         bool(_CFG.get('showMinimapCircle', True))),
-        t.createSlider(_t('msa_alpha'), 'alpha',
-                       int(_CFG.get('alpha', 70)), 10, 100, 5),
+                         bool(_msa_val('showMinimapCircle',
+                                       _CFG.get('showMinimapCircle', True)))),
+        t.createSlider(_t('msa_alpha'), 'alpha', alpha_val, 10, 100, 5),
         t.createDropdown(_t('msa_language'), 'languageIdx',
                          [_t('msa_lang_auto'), 'English', 'Polski'],
-                         lang_idx, width=200),
+                         lang_val, width=200),
         t.createEmpty(),
         t.createLabel(_t('msa_hotkeys_label')),
         t.createHotkey(_t('msa_hotkey'), 'panelToggleKeyset',
@@ -873,7 +943,7 @@ def _msa_build_template():
                                       _msa_key_codes([name] if name else [])))
     return {
         'modDisplayName': 'SpotMeter',
-        'settingsVersion': 3,
+        'settingsVersion': 4,
         'enabled': bool(_CFG.get('enabled', True)),
         'column1': column1,
         'column2': column2,
@@ -893,7 +963,7 @@ def _msa_apply(s, live=True):
     """Map the configurator's settings dict into _CFG, persist, apply live.
     live=False at init time - the GUI doesn't exist yet; the normal
     space-entered path will show panels per the (already updated) flags."""
-    global _DEFAULT_AUTO_PICK_ENABLED, _LANG
+    global _DEFAULT_AUTO_PICK_ENABLED, _LANG, _MSA_PRESET_SEL
     lang_changed = False
     if 'languageIdx' in s:
         try:
@@ -954,32 +1024,66 @@ def _msa_apply(s, live=True):
         names = _msa_key_names(list(s['panelToggleKeyset'] or []))
         _CFG['panelToggleKeyset'] = names
         _CFG['panelToggleKey'] = names[-1] if names else ''
-    # v6.1.0: auto-pick per-class presets (ap_lt_* / ap_df_*). Take effect the
+    # v6.1.0: auto-pick per-class presets. Two possible sources: the static
+    # izeberg sections (ap_lt_* / ap_df_*) and the fork's class-dropdown
+    # editor (ap_* belongs to the class in s['preset_class']; classes edited
+    # earlier in the same window sit in _MSA_PRESET_PENDING). Take effect the
     # next time auto-pick switches on (same semantics as editing the JSON).
     ap = dict(_CFG.get('autoPresets') or {})
-    ap_changed = False
-    for cls_key, prefix, _label in _MSA_PRESETS:
+    ap_changed = [False]  # list: py2 closures can't rebind outer locals
+
+    def _merge_preset(cls_key, vals):
         cur = dict(ap.get(cls_key) or {})
-        cls_changed = False
+        changed = False
         for key in _MSA_TOGGLE_KEYS:
-            var = prefix + key
-            if var in s and bool(s[var]) != bool(cur.get(key, False)):
-                cur[key] = bool(s[var])
-                cls_changed = True
+            if key in vals and bool(vals[key]) != bool(cur.get(key, False)):
+                cur[key] = bool(vals[key])
+                changed = True
         for key, cap in _MSA_LEVEL_CAPS:
-            var = prefix + key
-            if var in s:
+            if key in vals:
                 try:
-                    lvl = max(0, min(int(s[var]), cap))
+                    lvl = max(0, min(int(vals[key]), cap))
                 except (ValueError, TypeError):
                     continue
                 if lvl != int(cur.get(key, 0)):
                     cur[key] = lvl
-                    cls_changed = True
-        if cls_changed:
+                    changed = True
+        if changed:
             ap[cls_key] = cur
-            ap_changed = True
-    if ap_changed:
+            ap_changed[0] = True
+
+    def _collect(prefix):
+        vals = {}
+        for key in _MSA_TOGGLE_KEYS:
+            if (prefix + key) in s:
+                vals[key] = s[prefix + key]
+        for key, _cap in _MSA_LEVEL_CAPS:
+            if (prefix + key) in s:
+                vals[key] = s[prefix + key]
+        return vals
+
+    for cls_key, prefix, _label in _MSA_PRESETS:
+        vals = _collect(prefix)
+        if vals:
+            _merge_preset(cls_key, vals)
+    if 'preset_class' in s:
+        try:
+            sel = int(s['preset_class'])
+        except (ValueError, TypeError):
+            sel = _MSA_PRESET_SEL
+        if 0 <= sel < len(_MSA_PRESET_CLASSES):
+            _MSA_PRESET_SEL = sel
+    # Classes edited earlier in this window session, then the visible class's
+    # ap_* values last (they are the freshest state of that class).
+    for cls_key, pend in list(_MSA_PRESET_PENDING.items()):
+        if pend:
+            _merge_preset(cls_key, dict(pend))
+    vis_vals = _collect('ap_')
+    if vis_vals:
+        _merge_preset(_MSA_PRESET_CLASSES[_MSA_PRESET_SEL][0], vis_vals)
+    _MSA_PRESET_PENDING.clear()
+    _MSA_LIVE_PENDING.clear()
+    if ap_changed[0]:
         _CFG['autoPresets'] = ap
     # v6.1.0: full hotkey mapping - each control's keyset stores its LAST key
     # into the existing single-key config slot ('' = unbound).
@@ -1038,8 +1142,64 @@ def _msa_apply_live(lang_changed=False):
         _logger.exception('SpotMeter: live circle reconcile failed')
 
 
+def _msa_on_live_change(linkage, changed):
+    """Uncommitted in-menu edits (fork only; with mode='changedOnly' `changed`
+    holds just the keys that moved, with the legacy mode the full dict - the
+    logic below works with either). Routes preset-editor edits into the
+    per-class pending store, mirrors everything else so a live template
+    re-render doesn't visually revert it, and re-renders the preset editor
+    when the class dropdown changes."""
+    global _MSA_PRESET_SEL
+    if linkage != _MSA_LINKAGE or not isinstance(changed, dict):
+        return
+    try:
+        cls_key = _MSA_PRESET_CLASSES[_MSA_PRESET_SEL][0]
+        for key in _MSA_TOGGLE_KEYS:
+            var = 'ap_' + key
+            if var in changed:
+                _MSA_PRESET_PENDING.setdefault(cls_key, {})[key] = bool(changed[var])
+        for key, cap in _MSA_LEVEL_CAPS:
+            var = 'ap_' + key
+            if var in changed:
+                try:
+                    lvl = max(0, min(int(changed[var]), cap))
+                except (ValueError, TypeError):
+                    continue
+                _MSA_PRESET_PENDING.setdefault(cls_key, {})[key] = lvl
+        for var, val in changed.items():
+            if var == 'preset_class' or var.startswith('ap_'):
+                continue
+            _MSA_LIVE_PENDING[var] = val
+        if 'preset_class' in changed:
+            try:
+                new_sel = int(changed['preset_class'])
+            except (ValueError, TypeError):
+                new_sel = _MSA_PRESET_SEL
+            if new_sel != _MSA_PRESET_SEL and 0 <= new_sel < len(_MSA_PRESET_CLASSES):
+                _MSA_PRESET_SEL = new_sel
+                # Deferred: reloading from inside the change event would tear
+                # down the very component whose event is still on the stack.
+                BigWorld.callback(0.0, _msa_reload_template)
+    except Exception:
+        _logger.exception('SpotMeter: live settings change failed')
+
+
+def _msa_reload_template():
+    try:
+        if _MSA_API is not None and hasattr(_MSA_API, 'reloadModTemplate'):
+            _MSA_API.reloadModTemplate(_MSA_LINKAGE, _msa_build_template())
+    except Exception:
+        _logger.exception('SpotMeter: template reload failed')
+
+
+def _msa_on_window_closed(*args, **kwargs):
+    # Cancel/close discards uncommitted edits - drop our mirrors of them.
+    _MSA_PRESET_PENDING.clear()
+    _MSA_LIVE_PENDING.clear()
+
+
 def _msa_register():
-    global _MSA_REGISTERED
+    global _MSA_REGISTERED, _MSA_FORK_LIVE
     if _MSA_REGISTERED:
         return
     which = _msa_import()
@@ -1047,6 +1207,26 @@ def _msa_register():
         _logger.info('SpotMeter: no ModsSettingsAPI found - garage configurator '
                      'disabled (JSON config + hotkeys still work)')
         return
+    # Fork-only live channel: class-dropdown preset editor needs in-place
+    # template re-render + uncommitted-change events. Plain izeberg menu
+    # falls back to the static two-section preset layout.
+    _MSA_FORK_LIVE = (hasattr(_MSA_API, 'reloadModTemplate')
+                      and hasattr(_MSA_API, 'registerLiveSettingsChange'))
+    if _MSA_FORK_LIVE:
+        try:
+            try:
+                _MSA_API.registerLiveSettingsChange(
+                    _MSA_LINKAGE, _msa_on_live_change, mode='changedOnly')
+            except TypeError:
+                # Older fork build without the mode parameter.
+                _MSA_API.registerLiveSettingsChange(_MSA_LINKAGE, _msa_on_live_change)
+        except Exception:
+            _logger.exception('SpotMeter: live-change subscription failed')
+            _MSA_FORK_LIVE = False
+        try:
+            _MSA_API.onWindowClosed += _msa_on_window_closed
+        except Exception:
+            pass
     saved = _MSA_API.setModTemplate(_MSA_LINKAGE, _msa_build_template(),
                                     _msa_on_settings_changed)
     _MSA_REGISTERED = True

@@ -19,9 +19,12 @@ Garage configurator + quieter defaults. Scope agreed with Aslain.
   circle (e.g. alongside XVM's own circles).
 - `panelToggleKeyset` — multi-key combo support for the panel toggle.
 - **Auto-pick presets in the configurator** — the per-class loadouts applied
-  when auto-pick turns on (light tanks / other classes) are editable as
-  sub-options of the auto-pick checkbox (greyed out while it's off on
-  Aslain's menu).
+  when auto-pick turns on are editable as sub-options of the auto-pick
+  checkbox. On Aslain's menu a **class dropdown** (light / medium / heavy /
+  TD / SPG / default) switches which class the editor shows, re-rendering
+  in place; pending edits per class are kept until Apply. On the plain
+  izeberg menu a static two-section layout (light tanks / other classes)
+  is used instead.
 - **Full key mapping in the configurator** — every hotkey (picker, toggles,
   level cycling, diagnostics, reload) is rebindable; changes apply without
   a restart.
