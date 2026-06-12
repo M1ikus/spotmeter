@@ -90,7 +90,6 @@ _STRINGS = {
         'msa_cls_ht': 'Heavy tanks',
         'msa_cls_td': 'Tank destroyers',
         'msa_cls_spg': 'Artillery (SPG)',
-        'msa_cls_default': 'Default (other / fallback)',
         'msa_hotkeys_label': 'Hotkeys:',
         'msa_hk_next': 'Next enemy',
         'msa_hk_prev': 'Previous enemy',
@@ -141,7 +140,6 @@ _STRINGS = {
         'msa_cls_ht': 'Czolgi ciezkie',
         'msa_cls_td': 'Niszczyciele czolgow',
         'msa_cls_spg': 'Artyleria',
-        'msa_cls_default': 'Domyslny (pozostale)',
         'msa_hotkeys_label': 'Klawisze:',
         'msa_hk_next': 'Nastepny przeciwnik',
         'msa_hk_prev': 'Poprzedni przeciwnik',
@@ -861,15 +859,16 @@ _MSA_PRESETS = (
 )
 
 # Aslain-fork layout: ONE preset editor + a class dropdown that switches which
-# autoPresets entry it edits (live re-render via reloadModTemplate). All five
-# WoT class tags + the 'default' fallback are editable.
+# autoPresets entry it edits (live re-render via reloadModTemplate). The five
+# WoT class tags cover every vehicle, so the 'default' fallback entry is NOT
+# exposed here - it remains config-only (seed + safety net for classes the
+# user never edited).
 _MSA_PRESET_CLASSES = (
     ('lightTank',  'msa_cls_lt'),
     ('mediumTank', 'msa_cls_mt'),
     ('heavyTank',  'msa_cls_ht'),
     ('AT-SPG',     'msa_cls_td'),
     ('SPG',        'msa_cls_spg'),
-    ('default',    'msa_cls_default'),
 )
 _MSA_FORK_LIVE = False      # set at registration: reloadModTemplate + live events available
 _MSA_PRESET_SEL = 0         # which _MSA_PRESET_CLASSES entry the editor shows
