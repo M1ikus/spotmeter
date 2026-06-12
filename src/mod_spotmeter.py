@@ -63,35 +63,24 @@ def _t(key):
 
 _STRINGS = {
     'en': {
-        'garage_title_suffix': '- garage, settings',
-        'garage_loadout_header': 'Loadout (session):',
-        'garage_battle_panel': 'Battle panel:',
-        'garage_footer': 'Settings: mod-settings menu in the garage, or spotmeter.json in AppData',
         'msa_battle_panel': 'Battle panel visible at start',
-        'msa_garage_panel': 'Garage panel visible at start',
-        'msa_autohide': 'Auto-hide panel behind game windows',
+        'msa_autohide': 'Hide panel while TAB / N is held',
         'msa_group_tanks': 'Group identical enemy tanks',
         'msa_circle': 'Minimap spot-distance circle',
         'msa_alpha': 'Circle opacity',
-        'msa_hotkey': 'Show/hide panel hotkey',
+        'msa_hotkey': 'Show/hide panel hotkey (battle)',
         'msa_language': 'Language',
         'msa_lang_auto': 'Auto (game client)',
-        'garage_hotkeys': (
-            '<font size="11" color="#88AABB"><b>Keyboard shortcuts:</b></font><br>'
-            '<font size="10" color="#CCCCCC">'
-            '  <b>N 2 / N 8</b> &#8212; next / previous enemy<br>'
-            '  <b>N 5</b>       &#8212; clear pick (back to auto)<br>'
-            '  <b>N /</b>       &#8212; auto-pick (nearest visible)<br>'
-            '  <b>N 7 / N 3 / N 4</b> &#8212; rations / BIA / recon+SitA<br>'
-            '  <b>N 6</b>       &#8212; cycle optics level (OFF/basic/slot/bonds/deluxe)<br>'
-            '  <b>N +</b>       &#8212; cycle ventilation level<br>'
-            '  <b>N -</b>       &#8212; cycle enemy CVS (lowers our moving camo)<br>'
-            '  <b>N 1 / N 0</b>    &#8212; directives / field upgrades<br>'
-            '  <b>N *</b>       &#8212; dump enemy descriptor to python.log<br>'
-            '  <b>N Enter</b>   &#8212; snapshot spot-distance to chat<br>'
-            '  <b>N .</b>       &#8212; hot-reload spotmeter.json<br>'
-            '  <b>PageDown</b>  &#8212; show/hide panel (battle + garage)'
-            '</font>'),
+        'msa_defaults_label': 'Loadout assumed at battle start:',
+        'msa_def_rations': 'Combat rations',
+        'msa_def_BIA': 'Brothers in Arms',
+        'msa_def_reconSitAware': 'Recon + Situational Awareness',
+        'msa_def_directives': 'Equipment directives',
+        'msa_def_fieldUpgrades': 'Field upgrades (VR, BETA)',
+        'msa_def_autopick': 'Auto-pick nearest enemy',
+        'msa_def_optics': 'Optics level',
+        'msa_def_vents': 'Ventilation level',
+        'msa_def_cvs': 'Enemy CVS',
         'chat_live_on': 'live mode: ON (refresh every %.1fs - Numpad9 to turn off)',
         'tl_rations': 'rations', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'recon+SitA',
         'tl_directives': 'directives', 'tl_fieldUpgrades': 'field upg.',
@@ -103,35 +92,24 @@ _STRINGS = {
         'battle_target_own': 'own',
     },
     'pl': {
-        'garage_title_suffix': '- garaz, ustawienia',
-        'garage_loadout_header': 'Ulepszacze (sesja):',
-        'garage_battle_panel': 'Panel w bitwie:',
-        'garage_footer': 'Ustawienia: menu modow w garazu albo spotmeter.json w AppData',
         'msa_battle_panel': 'Panel w bitwie widoczny na starcie',
-        'msa_garage_panel': 'Panel w garazu widoczny na starcie',
-        'msa_autohide': 'Chowaj panel pod oknami gry',
+        'msa_autohide': 'Chowaj panel przy trzymaniu TAB / N',
         'msa_group_tanks': 'Grupuj identyczne czolgi',
         'msa_circle': 'Okrag dystansu wykrycia na minimapie',
         'msa_alpha': 'Przezroczystosc okregu',
-        'msa_hotkey': 'Klawisz pokaz/ukryj panel',
+        'msa_hotkey': 'Klawisz pokaz/ukryj panel (bitwa)',
         'msa_language': 'Jezyk',
         'msa_lang_auto': 'Auto (jezyk klienta)',
-        'garage_hotkeys': (
-            '<font size="11" color="#88AABB"><b>Skroty klawiszowe:</b></font><br>'
-            '<font size="10" color="#CCCCCC">'
-            '  <b>N 2 / N 8</b> &#8212; nastepny / poprzedni przeciwnik<br>'
-            '  <b>N 5</b>       &#8212; wyczysc wybor (powrot do auto)<br>'
-            '  <b>N /</b>       &#8212; auto-pick (najblizszy widoczny)<br>'
-            '  <b>N 7 / N 3 / N 4</b> &#8212; racje / BIA / Zwiad+Rozezn.<br>'
-            '  <b>N 6</b>       &#8212; cykl poziomow optyki (WYL/zwykla/na slocie/Z nagrod/Ulepszone)<br>'
-            '  <b>N +</b>       &#8212; cykl poziomow wentylacji<br>'
-            '  <b>N -</b>       &#8212; cykl CVS przeciwnika (zmniejsza nasze camo w ruchu)<br>'
-            '  <b>N 1 / N 0</b>    &#8212; dyrektywy / ulepszenia polowe<br>'
-            '  <b>N *</b>       &#8212; zrzut deskryptora wroga do python.log<br>'
-            '  <b>N Enter</b>   &#8212; zrzut dystansu spot do czatu<br>'
-            '  <b>N .</b>       &#8212; przeladuj spotmeter.json<br>'
-            '  <b>PageDown</b>  &#8212; pokaz/ukryj panel (bitwa + garaz)'
-            '</font>'),
+        'msa_defaults_label': 'Zalozony loadout na starcie bitwy:',
+        'msa_def_rations': 'Racje bojowe',
+        'msa_def_BIA': 'Braterstwo broni (BIA)',
+        'msa_def_reconSitAware': 'Zwiad + Rozeznanie w sytuacji',
+        'msa_def_directives': 'Dyrektywy na sprzet',
+        'msa_def_fieldUpgrades': 'Ulepszenia polowe (VR, BETA)',
+        'msa_def_autopick': 'Auto-dobieranie najblizszego przeciwnika',
+        'msa_def_optics': 'Poziom optyki',
+        'msa_def_vents': 'Poziom wentylacji',
+        'msa_def_cvs': 'CVS przeciwnika',
         'chat_live_on': 'live mode: ON (refresh co %.1fs - Numpad9 zeby wylaczyc)',
         'tl_rations': 'racje', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'Zwiad+Rozezn.',
         'tl_directives': 'dyrektywy', 'tl_fieldUpgrades': 'ulepsz.pol',
@@ -381,19 +359,9 @@ DEFAULT_CONFIG = {
     # In battle, hide the panel while one of these keys is held (TAB / N show
     # the team-stats overlays); released -> panel returns. WoT Keys names.
     'battleHidePanelKeys': ['KEY_TAB', 'KEY_N'],
-    # v6.0.0 garage settings readout panel. Same GUIFlash plumbing as
-    # the in-battle panel - draggable, position persists, components
-    # tagged lobby=True so they only render in the garage. Display-only
-    # (no click events available on WoT 2.x in our setup); user edits
-    # spotmeter.json to change defaults and the panel reflects the
-    # current in-session state of toggles plus a Numpad hotkey
-    # reference card. Default position is top-right area of the
-    # garage at 1920x1080.
-    'garagePanelEnabled': False,  # v6.1.0: hidden by default, like the battle panel
-    'garagePanelX': 1500,
-    'garagePanelY': 320,
-    'garagePanelW': 380,
-    'garagePanelH': 340,
+    # v6.1.0: the garage panel keys (garagePanelEnabled/X/Y/W/H) are GONE -
+    # its settings moved into the mods-settings configurator. Stale keys in
+    # old config files are simply ignored on load.
 }
 
 def _fresh_cfg():
@@ -779,12 +747,21 @@ def _msa_build_template():
         column1 += t.createControlsGroup(master, [group_tanks])
     else:
         column1 += [master, group_tanks]
-    column1.append(t.createCheckbox(_t('msa_garage_panel'), 'garagePanelEnabled',
-                                    bool(_CFG.get('garagePanelEnabled', False))))
     column1.append(t.createCheckbox(_t('msa_autohide'), 'autoHidePanelOnWindow',
                                     bool(_CFG.get('autoHidePanelOnWindow', True))))
     column1.append(t.createHotkey(_t('msa_hotkey'), 'panelToggleKeyset',
                                   _msa_keyset_value()))
+    # v6.1.0: the loadout defaults moved here from the (removed) garage panel.
+    dt = _CFG.get('defaultToggles') or {}
+    column1.append(t.createEmpty())
+    column1.append(t.createLabel(_t('msa_defaults_label')))
+    for key in ('rations', 'BIA', 'reconSitAware', 'directives', 'fieldUpgrades'):
+        column1.append(t.createCheckbox(_t('msa_def_' + key), 'def_' + key,
+                                        bool(dt.get(key, False))))
+    column1.append(t.createCheckbox(_t('msa_def_autopick'), 'def_autopick',
+                                    bool(_CFG.get('autoPickEnabled', False))))
+    dl = _CFG.get('defaultLevels') or {}
+    lv5 = [_t('lv_%d' % i) for i in range(5)]
     column2 = [
         t.createCheckbox(_t('msa_circle'), 'showMinimapCircle',
                          bool(_CFG.get('showMinimapCircle', True))),
@@ -793,10 +770,17 @@ def _msa_build_template():
         t.createDropdown(_t('msa_language'), 'languageIdx',
                          [_t('msa_lang_auto'), 'English', 'Polski'],
                          lang_idx, width=200),
+        t.createEmpty(),
+        t.createDropdown(_t('msa_def_optics'), 'def_optics', lv5,
+                         max(0, min(int(dl.get('optics', 0)), 4)), width=200),
+        t.createDropdown(_t('msa_def_vents'), 'def_vents', lv5,
+                         max(0, min(int(dl.get('vents', 0)), 4)), width=200),
+        t.createDropdown(_t('msa_def_cvs'), 'def_cvs', lv5[:3],
+                         max(0, min(int(dl.get('cvs', 0)), 2)), width=200),
     ]
     return {
         'modDisplayName': 'SpotMeter',
-        'settingsVersion': 1,
+        'settingsVersion': 2,
         'enabled': bool(_CFG.get('enabled', True)),
         'column1': column1,
         'column2': column2,
@@ -816,6 +800,7 @@ def _msa_apply(s, live=True):
     """Map the configurator's settings dict into _CFG, persist, apply live.
     live=False at init time - the GUI doesn't exist yet; the normal
     space-entered path will show panels per the (already updated) flags."""
+    global _DEFAULT_AUTO_PICK_ENABLED
     lang_changed = False
     if 'languageIdx' in s:
         try:
@@ -825,10 +810,46 @@ def _msa_apply(s, live=True):
         if new_lang != (_CFG.get('language') or 'auto').lower():
             _CFG['language'] = new_lang
             lang_changed = True
-    for k in ('battlePanelEnabled', 'garagePanelEnabled', 'autoHidePanelOnWindow',
+    for k in ('battlePanelEnabled', 'autoHidePanelOnWindow',
               'battlePanelGroupSameTanks', 'showMinimapCircle'):
         if k in s:
             _CFG[k] = bool(s[k])
+    # v6.1.0: loadout defaults (ex-garage-panel). Re-seed the live session
+    # state too, so a change in the garage is what the next battle starts with.
+    dt = dict(_CFG.get('defaultToggles') or {})
+    dt_changed = False
+    for key in ('rations', 'BIA', 'reconSitAware', 'directives', 'fieldUpgrades'):
+        var = 'def_' + key
+        if var in s and bool(s[var]) != bool(dt.get(key, False)):
+            dt[key] = bool(s[var])
+            dt_changed = True
+    if dt_changed:
+        _CFG['defaultToggles'] = dt
+        try:
+            _apply_default_toggles()
+        except Exception:
+            _logger.exception('SpotMeter: applying default toggles failed')
+    dl = dict(_CFG.get('defaultLevels') or {})
+    dl_changed = False
+    for key in ('optics', 'vents', 'cvs'):
+        var = 'def_' + key
+        if var in s:
+            try:
+                lvl = int(s[var])
+            except (ValueError, TypeError):
+                continue
+            if lvl != int(dl.get(key, 0)):
+                dl[key] = lvl
+                dl_changed = True
+    if dl_changed:
+        _CFG['defaultLevels'] = dl
+        try:
+            _apply_default_levels()
+        except Exception:
+            _logger.exception('SpotMeter: applying default levels failed')
+    if 'def_autopick' in s:
+        _DEFAULT_AUTO_PICK_ENABLED = bool(s['def_autopick'])
+        _CFG['autoPickEnabled'] = _DEFAULT_AUTO_PICK_ENABLED
     if 'alpha' in s:
         try:
             _CFG['alpha'] = int(s['alpha'])
@@ -863,17 +884,8 @@ def _msa_apply_live(lang_changed=False):
         _logger.exception('SpotMeter: hotkey rebind failed')
     enabled = bool(_CFG.get('enabled', True))
     try:
-        if _is_in_garage():
-            want = enabled and _CFG.get('garagePanelEnabled', False)
-            if want and not _GARAGE_PANEL_ACTIVE:
-                _PANEL_USER_HIDDEN = False
-                _show_garage_panel(force=True)
-            elif not want and _GARAGE_PANEL_ACTIVE:
-                _hide_garage_panel()
-            elif lang_changed and _GARAGE_PANEL_ACTIVE:
-                _hide_garage_panel()
-                _show_garage_panel(force=True)
-        else:
+        if not _is_in_garage():
+            # Battle-only panel (v6.1.0: the garage panel is gone).
             want = enabled and _CFG.get('battlePanelEnabled', False)
             if want and not _BATTLE_PANEL_ACTIVE:
                 _PANEL_USER_HIDDEN = False
@@ -2538,162 +2550,28 @@ _PANEL_USER_HIDDEN = False   # True when the USER explicitly hid the panel via t
                              # PERSISTS across battles + garage/battle transitions;
                              # cleared ONLY when the user presses PgDn again to show
                              # (initialised False at game launch -> panel shown).
-_WW_ROUTE_BUSY = False        # True when the lobby route is a hangar loadout sub-state
 _WW_HELD_HIDE_KEYS = set()    # battle overlay keys (TAB/N) currently held down
 _WW_HIDE_KEY_IDS = None       # cached resolved key codes for battleHidePanelKeys
 _WW_KEY_POLL_CB = None        # BigWorld.callback handle for the key-release poll
-# Persistent base views that must NOT trigger a hide; everything else the
-# player opens (techtree/depot/dialogs/menu/stronghold/...) does.
-_WW_IGNORE_ALIASES = frozenset((
-    SPOTMETER_GF_ALIAS,
-    'hangar', 'HangarWindow', 'RandomHangar', 'MainWindow',
-    'lobby', 'login', 'lobbyVehicleMarkerView', 'waiting',
-    'crosshair', 'battle',
-))
-
-
-def _ww_window_alias(window):
-    """View alias parsed from the window repr (it reliably contains 'alias=X'
-    for SFWindows - direct attribute access returns None here); falls back to
-    the window class name (e.g. HangarWindow / TechTreeWindow)."""
-    try:
-        s = str(window)
-        i = s.find('alias=')
-        if i >= 0:
-            j = i + 6
-            k = j
-            while k < len(s) and s[k] not in ', ]':
-                k += 1
-            a = s[j:k].strip()
-            if a:
-                return a
-    except Exception:
-        pass
-    return type(window).__name__
-
-
-def _ww_window_layer(window):
-    """WindowLayer int parsed from the window repr ('layer=N'); None if absent.
-    Distinguishes blocking screens (content tabs = layer 5, dialogs / menus =
-    layer >= 10) from coexisting overlays (layer 7: other mods' GUIFlash views,
-    notifications, chat, mod-list buttons) that must NOT hide our panel."""
-    try:
-        s = str(window)
-        i = s.find('layer=')
-        if i >= 0:
-            j = i + 6
-            k = j
-            while k < len(s) and s[k].isdigit():
-                k += 1
-            if k > j:
-                return int(s[j:k])
-    except Exception:
-        pass
-    return None
-
-
-def _ww_is_real_window(window):
-    """True if `window` is a player-opened SCREEN that should hide the panel -
-    a content tab (techtree / depot / profile / loadout = layer 5) or a modal
-    dialog / menu (layer >= 10). NOT the hangar, not us, not a tooltip, and
-    crucially NOT a coexisting layer-7 overlay (other mods' GUIFlash views,
-    notifications, chat, mod-list buttons) - those share the screen with the
-    hangar and must leave our panel visible.
-
-    Pre-2.3 this was a pure alias blacklist, which wrongly counted every other
-    mod's window as blocking - in a modpack (XVM/champi/poliroid/...) that made
-    the panel thrash and eventually stick hidden. The layer gate fixes that."""
-    try:
-        cls = type(window).__name__
-        cls_l = cls.lower()
-        if 'tooltip' in cls_l or 'contextmenu' in cls_l:
-            return False
-        alias = _ww_window_alias(window)
-        if alias in _WW_IGNORE_ALIASES or cls in _WW_IGNORE_ALIASES:
-            return False
-        layer = _ww_window_layer(window)
-        if layer is None:
-            return False  # unknown layer -> don't hide (avoid false positives)
-        return layer == 5 or layer >= 10
-    except Exception:
-        return False
-
-
-def _ww_windows_manager():
-    """The wulf windows manager - lives on the IGuiLoader dependency (NOT on
-    the app, which only exposes the legacy containerManager)."""
-    try:
-        from helpers import dependency
-        from skeletons.gui.impl import IGuiLoader
-        loader = dependency.instance(IGuiLoader)
-        return getattr(loader, 'windowsManager', None) if loader is not None else None
-    except Exception:
-        return None
-
-
-def _ww_lobby_sm():
-    """The lobby state machine (for hangar sub-state routes like loadout).
-    getLobbyStateMachine lives in gui.Scaleform.lobby_entry."""
-    try:
-        from gui.Scaleform.lobby_entry import getLobbyStateMachine
-        return getLobbyStateMachine()
-    except Exception:
-        return None
+# v6.1.0: the garage panel is GONE (its settings moved into the mods-settings
+# configurator), so the whole lobby window/route watcher went with it. What
+# remains is battle-only: hide the panel while a scoreboard key (TAB/N) is
+# held, restore on release.
 
 
 def _ww_reeval():
-    """Lobby: hide for a real window or a hangar loadout route. Battle: hide
-    ONLY while a configured overlay key (TAB/N) is held - battle HUD windows
-    (strongholdBattlePage, etc.) are always present and must NOT hide the
-    panel, so we ignore windows entirely in battle."""
+    """Battle-only: hide while a configured overlay key (TAB/N) is held.
+    Battle HUD windows (strongholdBattlePage, etc.) are always present and
+    must NOT hide the panel, so windows are ignored entirely."""
     try:
         if _is_in_garage():
-            wm = _ww_windows_manager()
-            real = []
-            if wm is not None:
-                try:
-                    real = wm.findWindows(_ww_is_real_window) or []
-                except Exception:
-                    real = []
-            hide = bool(real) or _WW_ROUTE_BUSY
-        else:
-            hide = bool(_WW_HELD_HIDE_KEYS)
-        if hide:
+            return
+        if _WW_HELD_HIDE_KEYS:
             _ww_hide_panel()
         else:
             _ww_show_panel()
     except Exception:
         _logger.exception('SpotMeter: window-watch reeval failed')
-
-
-def _ww_on_window_status(uniqueID, newStatus):
-    # Skip tooltip/context-menu churn - they fire constantly on hover and never
-    # hide the panel, so re-evaluating the whole window list each time is waste.
-    try:
-        wm = _ww_windows_manager()
-        w = wm.getWindow(uniqueID) if wm is not None else None
-        if w is not None:
-            cls = type(w).__name__.lower()
-            if 'tooltip' in cls or 'contextmenu' in cls:
-                return
-    except Exception:
-        pass
-    _ww_reeval()
-
-
-def _ww_on_route_changed(*args):
-    """Lobby visible-route changed. Loadout sub-states (equipment/shells/
-    consumables) render inside the hangar WITHOUT opening a window, so the
-    windowsManager hook can't see them - catch them by route here. Other tabs
-    already open windows and are handled by windowsManager."""
-    global _WW_ROUTE_BUSY
-    try:
-        sm = _ww_lobby_sm()
-        state = getattr(sm, 'visibleState', None) if sm is not None else None
-        _WW_ROUTE_BUSY = ('loadout' in str(state).lower()) if state is not None else False
-    except Exception:
-        _WW_ROUTE_BUSY = False
-    _ww_reeval()
 
 
 def _ww_hide_key_ids():
@@ -2715,8 +2593,7 @@ def _ww_hide_key_ids():
 
 def _ww_battle_key(key, is_down):
     """While a configured battle-overlay key (TAB / N) is held, hide the panel;
-    show it on release. Battle only - in the garage these keys do nothing here
-    (the window/route watchers cover the garage)."""
+    show it on release. Battle only - in the garage these keys do nothing."""
     try:
         if not _CFG.get('autoHidePanelOnWindow', True):
             return
@@ -2771,44 +2648,16 @@ def _ww_key_poll_tick():
 
 
 def _ww_on_space_entered(spaceID):
-    """Reset state for the new space and (re)subscribe to its windowsManager -
-    lobby and battle each have their own."""
-    global _PANEL_AUTO_HIDDEN, _WW_ROUTE_BUSY
+    """Reset hide-state for the new space (battle keys can't be held across
+    a loading screen; a window-watch auto-hide never outlives its space)."""
+    global _PANEL_AUTO_HIDDEN
     _PANEL_AUTO_HIDDEN = False
-    _WW_ROUTE_BUSY = False
-    if not _CFG.get('autoHidePanelOnWindow', True):
-        return
-    try:
-        wm = _ww_windows_manager()
-        if wm is not None:
-            try:
-                wm.onWindowStatusChanged -= _ww_on_window_status
-            except Exception:
-                pass
-            wm.onWindowStatusChanged += _ww_on_window_status
-    except Exception:
-        _logger.exception('SpotMeter: window-watch subscribe failed')
-    # Lobby state machine - catches hangar loadout sub-states (equipment / ammo
-    # / consumables) which switch route WITHOUT opening a window.
-    try:
-        sm = _ww_lobby_sm()
-        if sm is not None and hasattr(sm, 'onVisibleRouteChanged'):
-            try:
-                sm.onVisibleRouteChanged -= _ww_on_route_changed
-            except Exception:
-                pass
-            sm.onVisibleRouteChanged += _ww_on_route_changed
-    except Exception:
-        _logger.exception('SpotMeter: route-watch subscribe failed')
+    _WW_HELD_HIDE_KEYS.clear()
 
 
 def _ww_hide_panel():
     global _PANEL_AUTO_HIDDEN
-    if _is_in_garage():
-        if _GARAGE_PANEL_ACTIVE:
-            _hide_garage_panel()
-            _PANEL_AUTO_HIDDEN = True
-    elif _BATTLE_PANEL_ACTIVE:
+    if not _is_in_garage() and _BATTLE_PANEL_ACTIVE:
         _hide_battle_view()
         _PANEL_AUTO_HIDDEN = True
 
@@ -2816,23 +2665,17 @@ def _ww_hide_panel():
 def _ww_show_panel():
     # Idempotent reconcile: drive toward "shown" whenever nothing blocks and the
     # user hasn't hidden it with PgDn - regardless of how the panel got hidden.
-    # (The old `if not _PANEL_AUTO_HIDDEN: return` guard could leave the panel
-    # stuck hidden if anything other than the window-watch had cleared it.)
-    # Only panels allowed to auto-show are restored: config-enabled ones, or a
-    # panel the window-watch itself just hid (covers PgDn-summoned panels with
-    # *PanelEnabled=false). Without this check a "panel off by default" config
-    # would get force-summoned by the first window open/close event.
+    # Only a panel allowed to auto-show is restored: config-enabled, or one the
+    # window-watch itself just hid (covers a PgDn-summoned panel with
+    # battlePanelEnabled=false). Without this check a "panel off by default"
+    # config would get force-summoned by the first TAB release.
     global _PANEL_AUTO_HIDDEN
     was_auto_hidden = _PANEL_AUTO_HIDDEN
     _PANEL_AUTO_HIDDEN = False
     if _PANEL_USER_HIDDEN:
         return  # user hid it with PgDn - leave hidden until they toggle back
     try:
-        if _is_in_garage():
-            if (not _GARAGE_PANEL_ACTIVE
-                    and (was_auto_hidden or _CFG.get('garagePanelEnabled', True))):
-                _show_garage_panel(force=True)
-        elif (not _BATTLE_PANEL_ACTIVE
+        if (not _is_in_garage() and not _BATTLE_PANEL_ACTIVE
                 and (was_auto_hidden or _CFG.get('battlePanelEnabled', True))):
             _show_battle_view(force=True)
     except Exception:
@@ -2867,7 +2710,6 @@ def _patch_hangar_lifecycle():
             _logger.warning('SpotMeter: onGUISpaceEntered spaceID=%s', spaceID)
             if spaceID == SPACE_ID.LOBBY:
                 _on_hangar_populate(None)
-                _show_garage_panel()
             elif spaceID == SPACE_ID.BATTLE:
                 _show_battle_view()
             _ww_on_space_entered(spaceID)
@@ -2878,7 +2720,6 @@ def _patch_hangar_lifecycle():
         try:
             _logger.warning('SpotMeter: onGUISpaceLeft spaceID=%s', spaceID)
             if spaceID == SPACE_ID.LOBBY:
-                _hide_garage_panel()
                 _on_hangar_dispose(None)
             elif spaceID == SPACE_ID.BATTLE:
                 _hide_battle_view()
@@ -3608,17 +3449,9 @@ SPOTMETER_PANEL_ROOT = 'spotmeter'
 SPOTMETER_PANEL_REFRESH_SEC = 0.5
 SPOTMETER_MAX_ENEMY_ROWS = 15
 
-# v6.0.0 garage info panel. Separate alias tree so battle and garage
-# panels coexist within the same GUIFlash view instance - components
-# get lobby=True (instead of battle=True) so they only render in the
-# garage. Refresh is slower than battle (no per-tick state need); 2s
-# is enough to pick up Numpad toggle changes if the user toggles
-# something mid-session from a previous battle.
-_GARAGE_PANEL_ACTIVE = False
-_GARAGE_PANEL_REFRESH_CB = None
-_GARAGE_PANEL_LAST = {}
-SPOTMETER_GARAGE_ROOT = 'sm_garage'
-SPOTMETER_GARAGE_REFRESH_SEC = 2.0
+# v6.1.0: the v6.0 garage info panel is GONE - its settings (loadout defaults,
+# panel visibility, hotkey) moved into the mods-settings configurator and the
+# battle panel covers the in-battle state. The SpotMeter panel is battle-only.
 
 # Visual layout constants for the in-battle panel. Pixel offsets are
 # relative to the root Panel; the root is positioned via battlePanelX/Y
@@ -3891,11 +3724,9 @@ def _on_guiflash_component_updated(alias, props):
         return
     if 'x' not in props and 'y' not in props:
         return
-    # Determine which panel was dragged.
+    # Only the battle panel is draggable (the garage panel is gone in v6.1.0).
     if alias == SPOTMETER_PANEL_ROOT:
         cfg_x_key, cfg_y_key, label = 'battlePanelX', 'battlePanelY', 'battle'
-    elif alias == SPOTMETER_GARAGE_ROOT:
-        cfg_x_key, cfg_y_key, label = 'garagePanelX', 'garagePanelY', 'garage'
     else:
         return
     new_x = props.get('x', _CFG.get(cfg_x_key))
@@ -4206,282 +4037,29 @@ def _html_escape(s):
 # via the same COMPONENT_EVENT.UPDATED hook the battle panel uses.
 # ============================================================================
 
-def _show_garage_panel(force=False):
-    """Build the garage info panel using GUIFlash. Components are tagged
-    lobby=True, battle=False so they only render in the garage; the
-    same GUIFlash view instance handles both the in-battle panel and
-    this one without conflict.
-    """
-    global _GARAGE_PANEL_ACTIVE
-    if not force and not _CFG.get('garagePanelEnabled', True):
-        return
-    if not force and _PANEL_USER_HIDDEN:
-        return  # user hid it with PgDn - don't let the hangar hooks revive it
-    if _GARAGE_PANEL_ACTIVE:
-        return
-    try:
-        from gui.mods.spotmeter_gf import g_smGuiFlash
-    except ImportError:
-        _logger.warning('SpotMeter: spotmeter_gf wrapper missing; garage panel disabled')
-        return
-    _install_guiflash_event_hook()
-
-    x = float(_CFG.get('garagePanelX', 1500))
-    y = float(_CFG.get('garagePanelY', 320))
-    w = float(_CFG.get('garagePanelW', 380))
-    h = float(_CFG.get('garagePanelH', 320))
-
-    try:
-        g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT, 'Panel', {
-            'x': x, 'y': y,
-            'width': w, 'height': h,
-            'drag': True, 'limit': True,
-        }, battle=False, lobby=True)
-        g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.title', 'Label', {
-            'x': 8, 'y': 4,
-            'text': '<font size="14" color="#FFFFFF"><b>SpotMeter v%s</b></font> '
-                    '<font size="10" color="#888888">%s</font> '
-                    '<font size="9" color="#888888">by %s</font>'
-                    % (MOD_VERSION_SHORT, _t('garage_title_suffix'), MOD_AUTHOR),
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-        }, battle=False, lobby=True)
-        g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.defaults', 'Label', {
-            'x': 8, 'y': 28,
-            'text': _fmt_garage_defaults(),
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-            'multiline': True,
-        }, battle=False, lobby=True)
-        g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.battle_panel', 'Label', {
-            'x': 8, 'y': 84,
-            'text': _fmt_garage_battle_panel(),
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-            'multiline': True,
-        }, battle=False, lobby=True)
-        g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.hotkeys', 'Label', {
-            'x': 8, 'y': 108,
-            'text': _fmt_garage_hotkeys(),
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-            'multiline': True,
-        }, battle=False, lobby=True)
-        g_smGuiFlash.createComponent(SPOTMETER_GARAGE_ROOT + '.footer', 'Label', {
-            'x': 8, 'y': h - 24,
-            'text': '<font size="9" color="#666666"><i>%s</i></font>' % _t('garage_footer'),
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-        }, battle=False, lobby=True)
-    except Exception:
-        _logger.exception('SpotMeter: failed to create garage panel components')
-        return
-
-    _GARAGE_PANEL_ACTIVE = True
-    _GARAGE_PANEL_LAST.clear()
-    _logger.warning('SpotMeter: garage panel created at (%s,%s)', x, y)
-    _schedule_garage_refresh()
-
-
-def _hide_garage_panel():
-    """Tear down the garage panel cleanly. Safe to call multiple times."""
-    global _GARAGE_PANEL_ACTIVE, _GARAGE_PANEL_REFRESH_CB
-    if not _GARAGE_PANEL_ACTIVE:
-        return
-    if _GARAGE_PANEL_REFRESH_CB is not None:
-        try:
-            BigWorld.cancelCallback(_GARAGE_PANEL_REFRESH_CB)
-        except Exception:
-            pass
-        _GARAGE_PANEL_REFRESH_CB = None
-    try:
-        from gui.mods.spotmeter_gf import g_smGuiFlash
-        for suffix in ('title', 'defaults', 'battle_panel', 'hotkeys', 'footer'):
-            try:
-                g_smGuiFlash.deleteComponent(SPOTMETER_GARAGE_ROOT + '.' + suffix)
-            except Exception:
-                pass
-        g_smGuiFlash.deleteComponent(SPOTMETER_GARAGE_ROOT)
-    except Exception:
-        _logger.exception('SpotMeter: failed to delete garage panel')
-    _GARAGE_PANEL_ACTIVE = False
-    _GARAGE_PANEL_LAST.clear()
-    _logger.info('SpotMeter: garage panel destroyed')
-
-
 def _toggle_panel():
-    """Show/hide the SpotMeter panel (PageDown by default). Context-aware:
-    flips the garage panel when in the garage, the battle panel otherwise.
-    Passes force=True so it can summon a panel even when its *PanelEnabled
-    flag is False - that flag only governs whether the panel auto-shows at
-    startup, while this key controls live visibility either way.
+    """Show/hide the battle panel (PageDown by default). v6.1.0: battle-only -
+    the garage panel is gone (its settings live in the mods-settings menu).
+    Passes force=True so it can summon the panel even when battlePanelEnabled
+    is False - that flag only governs auto-show at battle start, while this
+    key controls live visibility either way.
     """
     global _PANEL_USER_HIDDEN
     if _is_in_garage():
-        if _GARAGE_PANEL_ACTIVE:
-            _hide_garage_panel()
-            _PANEL_USER_HIDDEN = True
-        else:
-            _PANEL_USER_HIDDEN = False
-            _show_garage_panel(force=True)
+        return  # nothing to toggle in the garage anymore
+    if _BATTLE_PANEL_ACTIVE:
+        _hide_battle_view()
+        _PANEL_USER_HIDDEN = True
     else:
-        if _BATTLE_PANEL_ACTIVE:
-            _hide_battle_view()
-            _PANEL_USER_HIDDEN = True
-        else:
-            _PANEL_USER_HIDDEN = False
-            _show_battle_view(force=True)
-
-
-def _schedule_garage_refresh():
-    global _GARAGE_PANEL_REFRESH_CB
-    if not _GARAGE_PANEL_ACTIVE:
-        return
-    try:
-        _GARAGE_PANEL_REFRESH_CB = BigWorld.callback(
-            SPOTMETER_GARAGE_REFRESH_SEC, _garage_panel_tick)
-    except Exception:
-        _logger.exception('SpotMeter: failed to schedule garage refresh')
-
-
-def _garage_panel_tick():
-    """Refresh dynamic text in the garage panel. Slow tick (2s) since
-    state rarely changes in the garage - only when user pressed a
-    Numpad toggle mid-session from a previous battle's mod state."""
-    global _GARAGE_PANEL_REFRESH_CB
-    _GARAGE_PANEL_REFRESH_CB = None
-    if not _GARAGE_PANEL_ACTIVE:
-        return
-    try:
-        _refresh_garage_state()
-    except Exception:
-        _logger.exception('SpotMeter: garage refresh tick failed')
-    _schedule_garage_refresh()
-
-
-def _refresh_garage_state():
-    try:
-        from gui.mods.spotmeter_gf import g_smGuiFlash
-    except ImportError:
-        return
-    _maybe_update_garage_label(g_smGuiFlash, SPOTMETER_GARAGE_ROOT + '.defaults',
-                               _fmt_garage_defaults())
-    _maybe_update_garage_label(g_smGuiFlash, SPOTMETER_GARAGE_ROOT + '.battle_panel',
-                               _fmt_garage_battle_panel())
-    # Hotkeys are static, no refresh needed.
+        _PANEL_USER_HIDDEN = False
+        _show_battle_view(force=True)
 
 
 def _refresh_garage_if_active():
-    """Repaint the garage panel immediately after a Numpad action so the
-    change shows at once instead of waiting for the ~2s tick. No-op in
-    battle (the garage panel is inactive there)."""
-    if not _GARAGE_PANEL_ACTIVE:
-        return
-    try:
-        _refresh_garage_state()
-    except Exception:
-        _logger.exception('SpotMeter: immediate garage refresh failed')
-
-
-def _maybe_update_garage_label(g_smGuiFlash, alias, html):
-    if _GARAGE_PANEL_LAST.get(alias) == html:
-        return
-    _GARAGE_PANEL_LAST[alias] = html
-    try:
-        g_smGuiFlash.updateComponent(alias, {'text': html})
-    except Exception:
-        _logger.exception('SpotMeter: updateComponent failed for %s', alias)
-
-
-def _fmt_garage_defaults():
-    """Render the current session's toggle state. Distinguish 'config
-    default' (what loads at battle start) from 'current session' (what
-    Numpad presses changed mid-session) so the user can tell when their
-    in-session changes will reset."""
-    defaults = _CFG.get('defaultToggles') or {}
-    pairs = [
-        ('rations',       'N7'),
-        ('BIA',           'N3'),
-        ('reconSitAware', 'N4'),
-        ('directives',    'N1'),
-        ('fieldUpgrades', 'N0'),
-    ]
-    rows = []
-    for key, hotkey in pairs:
-        label = _t('tl_' + key)
-        default_on = bool(defaults.get(key, False))
-        current_on = bool(_PICKER_TOGGLES.get(key, False))
-        default_sym = '+' if default_on else '-'
-        current_sym = '+' if current_on else '-'
-        if default_on == current_on:
-            color = '#88FF88' if current_on else '#888888'
-            rows.append(
-                '<font color="%s">%s%s</font> '
-                '<font color="#555555">(%s)</font>'
-                % (color, current_sym, label, hotkey))
-        else:
-            rows.append(
-                '<font color="#FFCC66">%s%s</font> '
-                '<font color="#555555">(%s, default %s)</font>'
-                % (current_sym, label, hotkey, default_sym))
-
-    # Auto-pick is a mode toggle with its own state vars (not _PICKER_TOGGLES).
-    auto_on = bool(_CFG.get('autoPickEnabled', False))
-    auto_def = bool(_DEFAULT_AUTO_PICK_ENABLED)
-    auto_sym = '+' if auto_on else '-'
-    if auto_on == auto_def:
-        auto_color = '#88FF88' if auto_on else '#888888'
-        rows.append('<font color="%s">%s%s</font> '
-                    '<font color="#555555">(N/)</font>'
-                    % (auto_color, auto_sym, _t('tl_auto')))
-    else:
-        rows.append('<font color="#FFCC66">%s%s</font> '
-                    '<font color="#555555">(N/, default %s)</font>'
-                    % (auto_sym, _t('tl_auto'), '+' if auto_def else '-'))
-
-    # Multi-level cells (optics + vents + cvs) go on their OWN second line
-    # so the on/off toggles above don't run off the panel width.
-    level_rows = []
-    default_levels = _CFG.get('defaultLevels') or {}
-    for key, hotkey in [('optics', 'N6'), ('vents', 'N+'), ('cvs', 'N-')]:
-        label = _t('tl_' + key)
-        cur_lvl = int(_PICKER_LEVELS.get(key, 0))
-        def_lvl = int(default_levels.get(key, 0))
-        cur_lvl = max(0, min(cur_lvl, len(_LEVEL_NAMES) - 1))
-        cur_name = _level_name_loc(cur_lvl)
-        if cur_lvl == def_lvl:
-            color = '#88FF88' if cur_lvl > 0 else '#888888'
-            level_rows.append(
-                '<font color="%s">%s:%s</font> '
-                '<font color="#555555">(%s)</font>'
-                % (color, label, cur_name, hotkey))
-        else:
-            def_name = _level_name_loc(def_lvl)
-            level_rows.append(
-                '<font color="#FFCC66">%s:%s</font> '
-                '<font color="#555555">(%s, default %s)</font>'
-                % (label, cur_name, hotkey, def_name))
-
-    # Two lines: line 1 = on/off toggles (+auto), line 2 = equipment levels.
-    return ('<font size="11" color="#88AABB"><b>' + _t('garage_loadout_header') + '</b></font><br>'
-            '<font size="11">  ' + '  '.join(rows) + '</font><br>'
-            '<font size="11">  ' + '  '.join(level_rows) + '</font>')
-
-
-def _fmt_garage_battle_panel():
-    on = bool(_CFG.get('battlePanelEnabled', True))
-    px = int(_CFG.get('battlePanelX', 10))
-    py = int(_CFG.get('battlePanelY', 400))
-    color = '#88FF88' if on else '#888888'
-    state = 'ON' if on else 'OFF'
-    return ('<font size="11" color="#88AABB"><b>%s</b></font> '
-            '<font size="11" color="%s">%s</font> '
-            '<font size="10" color="#888888">@ (%d, %d)</font>'
-            % (_t('garage_battle_panel'), color, state, px, py))
-
-
-def _fmt_garage_hotkeys():
-    return _t('garage_hotkeys')
+    # v6.1.0: no-op stub. The garage panel is gone; numpad actions in the
+    # garage still call this from their shared paths. Kept so those call
+    # sites stay valid.
+    return
 
 
 # ---- battle-panel event handlers (Python side) ----

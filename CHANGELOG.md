@@ -20,10 +20,16 @@ Garage configurator + quieter defaults. Scope agreed with Aslain.
 - `panelToggleKeyset` — multi-key combo support for the panel toggle.
 
 ### Changed
-- **Panels start hidden by default** (fresh installs only — an existing config
-  keeps its values). PageDown still summons them; enable permanently in the
-  configurator or the JSON. Response to modpack feedback: "the panel is in my
-  way and I don't know how to turn it off".
+- **The garage panel is gone** — everything it offered (panel visibility,
+  loadout defaults, hotkey reference) lives in the configurator now, where it
+  belongs. The SpotMeter panel is battle-only; PageDown toggles it in battle.
+  With the panel went the whole lobby window/route watcher (the most fragile
+  code in the mod) and the `garagePanel*` config keys (stale entries in old
+  configs are ignored).
+- **The battle panel starts hidden by default** (fresh installs only — an
+  existing config keeps its values). PageDown still summons it; enable
+  permanently in the configurator or the JSON. Response to modpack feedback:
+  "the panel is in my way and I don't know how to turn it off".
 - **Config lives in AppData now** — primary path
   `%APPDATA%/Wargaming.net/WorldOfTanks/mods/spotmeter/spotmeter.json`
   (survives modpack clean-installs). A legacy game-dir config is migrated

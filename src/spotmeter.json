@@ -117,7 +117,7 @@
     "menuButtonW": 90,
     "menuButtonH": 28,
 
-    "_comment_panel_toggle": "Hotkey to show/hide the SpotMeter panel - works BOTH in battle (battle panel) and in the garage (garage panel) as one context-aware key. Default PageDown (KEY_PGDN). This frees KEY_PGDN from being the NumLock-off alias of Numpad3/BIA (Numpad3 still does BIA). battlePanelEnabled / garagePanelEnabled below set STARTUP visibility; this key flips visibility live and can summon a panel even when its Enabled flag is false. Set to \"\" to disable the hotkey.",
+    "_comment_panel_toggle": "Hotkey to show/hide the battle panel (v6.1.0: battle-only - the garage panel is gone). Default PageDown (KEY_PGDN). This frees KEY_PGDN from being the NumLock-off alias of Numpad3/BIA (Numpad3 still does BIA). battlePanelEnabled below sets STARTUP visibility; this key flips visibility live and can summon the panel even when the flag is false. Set to \"\" to disable the hotkey.",
     "panelToggleKey": "KEY_PGDN",
     "_comment_panel_keyset": "v6.1.0: optional multi-key combo for the panel toggle, written by the mods-settings configurator (list of Keys names, e.g. ['KEY_LCONTROL','KEY_PGDN']). Empty = single key from panelToggleKey. Triggers on the LAST key; the others must be held.",
     "panelToggleKeyset": [],
@@ -131,17 +131,12 @@
     "battlePanelH": 380,
     "_comment_group_same_tanks": "If true (default), identical enemy tanks collapse into ONE panel row and ONE Numpad 2/8 cycle stop, labelled 'Name xN' (same model = same view range = same spot circle, so listing each separately just means cycling through identical circles). Set false to list every enemy individually.",
     "battlePanelGroupSameTanks": true,
-    "_comment_auto_hide": "Auto-hide the panel when any WG window opens (research/depot/dialogs in the garage, TAB-style overlays in battle) and restore it when the last window closes. false = panel always on top.",
+    "_comment_auto_hide": "v6.1.0: battle-only - hide the panel while a scoreboard key (battleHidePanelKeys, TAB/N) is held; restore on release. false = panel always on top.",
     "autoHidePanelOnWindow": true,
     "_comment_battle_hide_keys": "In battle, hide the panel while one of these keys is held (TAB/N show the team-stats overlays); released -> panel returns. WoT Keys names.",
     "battleHidePanelKeys": ["KEY_TAB", "KEY_N"],
 
-    "_comment_garage_panel": "v6.0.0: read-only garage settings/info panel rendered via the bundled GUIFlash fork. Shows current toggle state, battle-panel position, Numpad hotkey reference. Drag to move (position persists here). Edit defaultToggles below + restart WoT to change what's ON at battle start - the in-battle Numpad keys change the live session state without rewriting defaults.",
-    "garagePanelEnabled": false,
-    "garagePanelX": 1500,
-    "garagePanelY": 320,
-    "garagePanelW": 380,
-    "garagePanelH": 320,
+    "_comment_garage_panel_gone": "v6.1.0: the garage panel was removed - its settings (panel visibility, loadout defaults, hotkey) live in the in-game mods-settings menu now. Old garagePanel* keys in existing configs are ignored.",
 
     "_comment_debug": "logCalcDetails=true logs camo/radius/state each tick to python.log.",
     "logCalcDetails": false
