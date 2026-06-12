@@ -774,6 +774,61 @@ def _msa_keyset_value():
     return _msa_key_codes(names)
 
 
+# Compact display names for the menu's fixed-width hotkey button. The API
+# sends the raw Keys constant name (KEY_NUMPAD2 -> 'NUMPAD2'), which the AS3
+# TextField clips to 'NUMPAD' - every numpad key looks identical. First
+# matching prefix wins; everything stays <= 6 characters.
+_MSA_KEY_DISPLAY = (
+    ('NUMPADENTER', 'N-ENT'),
+    ('NUMPADMINUS', 'NUM-'),
+    ('NUMPADPERIOD', 'NUM.'),
+    ('NUMPADSLASH', 'NUM/'),
+    ('NUMPADSTAR', 'NUM*'),
+    ('NUMPAD', 'NUM'),       # NUMPAD0..9 -> NUM0..NUM9
+    ('LCONTROL', 'L-CTRL'),
+    ('RCONTROL', 'R-CTRL'),
+    ('LSHIFT', 'L-SHF'),
+    ('RSHIFT', 'R-SHF'),
+    ('LMENU', 'L-ALT'),
+    ('RMENU', 'R-ALT'),
+    ('CAPITAL', 'CAPS'),
+)
+
+
+def _msa_display_key_name(name):
+    for prefix, repl in _MSA_KEY_DISPLAY:
+        if name.startswith(prefix):
+            return repl + name[len(prefix):]
+    return name
+
+
+def _msa_patch_hotkey_names():
+    """Cosmetic wrapper on the API's HotkeysController.getHotkeyData, OUR
+    linkage only: compacts the key name before it reaches the AS3 button so
+    NUMPAD2 shows as NUM2 instead of a clipped 'NUMPAD'. Chains the original,
+    fails safe, leaves other mods' rows untouched, and self-neutralises once
+    the API ships its own prettifier (already-short names match no prefix)."""
+    try:
+        hk = getattr(_MSA_API, 'hotkeys', None)
+        orig = getattr(hk, 'getHotkeyData', None)
+        if orig is None:
+            return
+
+        def patched_getHotkeyData(linkage, varName):
+            data = orig(linkage, varName)
+            try:
+                if (linkage == _MSA_LINKAGE and isinstance(data, dict)
+                        and data.get('text')):
+                    data['text'] = _msa_display_key_name(data['text'])
+            except Exception:
+                pass
+            return data
+
+        hk.getHotkeyData = patched_getHotkeyData
+    except Exception:
+        _logger.exception('SpotMeter: hotkey display-name patch failed')
+
+
 # Every rebindable single-key hotkey exposed in the configurator: (config key,
 # i18n label key). Values map 1:1 onto the existing string config keys - the
 # configurator's hotkey control returns a keyset; we store its LAST key (multi-
@@ -1227,6 +1282,7 @@ def _msa_register():
             _MSA_API.onWindowClosed += _msa_on_window_closed
         except Exception:
             pass
+    _msa_patch_hotkey_names()
     saved = _MSA_API.setModTemplate(_MSA_LINKAGE, _msa_build_template(),
                                     _msa_on_settings_changed)
     _MSA_REGISTERED = True
