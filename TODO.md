@@ -123,14 +123,17 @@ creation behind the flag, ~15 lines, no SWF/AS3 risk). Considered for v6.0.1,
 deferred (user: keep documented). The companion `enemyNameMarker` flag is moot now
 (the name marker was removed in v6.0.1).
 
-### Test specifically with XVM
-The 2026-06-06 modpack test did NOT include XVM itself (only champi/gambiter/
-poliroid/gameface/izeberg - including champi.playerpanelpro, an XVM-ears
-equivalent, which coexisted cleanly). XVM-specific interaction still untested:
-our minimap circle (native `VIEW_RANGE_CIRCLES`) may visually overlap XVM's own
-circles. Non-crashing by analysis; optional opt-out flag `showMinimapCircle` if
-it ever matters. (The other XVM concern - the enemy-name marker - is GONE: the
-`PlayerFullNameFormatter` patch was removed in v6.0.1.)
+### Test specifically with XVM - CONFIRMED 2026-06-13
+A tester's NA python.log (SpotMeter v6.0.2) showed `com.modxvm.xvm_13.1.0.0031`
++ `com.modxvm.xfw.crashfix` loaded in a heavy Aslain pack (also locastan
+minimap, pmod, battlehits, goldvisibility, crosshairs, champi, both MSAs).
+**No crash; battle panel + minimap circle work; PgDn works in battle.** So XVM
+coexistence is empirically OK. The ONE issue was the v6.0.x garage panel
+thrashing (window-watch reacting to the pack's window churn) + GUIFlash #1009
+desync - which made PgDn unusable in the garage. That subsystem is removed in
+v6.1.0 (garage panel gone, garage window-watch gone), so the problem is fixed
+by design. `showMinimapCircle` opt-out remains available if our circle ever
+clashes visually with XVM's own circles, but nobody has reported that.
 
 ## Bigger / future projects
 
