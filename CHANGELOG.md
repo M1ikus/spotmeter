@@ -1,9 +1,9 @@
 # Changelog
 
 All notable changes to **SpotMeter**. Dates are ISO (YYYY-MM-DD). Full per-commit
-history is in the git tags (`v5.1.0` … `v6.0.2`).
+history is in the git tags (`v5.1.0` … `v6.1.0`).
 
-## [6.1.0] — Unreleased (in development)
+## [6.1.0] — 2026-06-14
 
 Garage configurator + quieter defaults. Scope agreed with Aslain.
 
@@ -44,6 +44,20 @@ Garage configurator + quieter defaults. Scope agreed with Aslain.
   `%APPDATA%/Wargaming.net/WorldOfTanks/mods/spotmeter/spotmeter.json`
   (survives modpack clean-installs). A legacy game-dir config is migrated
   automatically on first load; game-dir paths remain as read fallbacks.
+
+### Hardening
+- All client patches are now individually fault-isolated: the `Avatar.shootDualGun`
+  wrapper guards the original call against signature drift (mirroring `shoot`),
+  and each install step in `init()` (plugin / shoot / hangar lifecycle / reload
+  hotkey) is wrapped so one failing hook can't abort the rest of startup.
+- The ModsSettingsAPI read-back clamps every numeric setting to its valid range
+  and tolerates non-list hotkey values, so a hand-edited or stale settings store
+  can't feed bad data into the mod.
+- **New offline pre-send gate** — `packaging/preflight.py` (one command) plus
+  `packaging/PRESEND_CHECKLIST.md` automate the structural/consistency checks
+  (py2.7 compile, config + i18n parity, dead-symbol scan, version consistency,
+  portal char limits, `.wotmod` ZIP_STORED/payload audit) so every build is
+  verified before it ships.
 
 ## [6.0.2] — 2026-06-11
 

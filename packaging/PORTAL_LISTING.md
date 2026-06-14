@@ -1,6 +1,6 @@
 <!--
 Release listing texts for SpotMeter, per distribution channel.
-Content in the code blocks is the CURRENT (v6.0.0) copy - paste it straight in.
+Content in the code blocks is the CURRENT (v6.1.0) copy - paste it straight in.
 
 Channels:
   1. WG Mods portal (wgmods.net) - ENGLISH. Three fields with HARD char limits.
@@ -31,17 +31,17 @@ NONE - SpotMeter is fully self-contained in the single .wotmod:
 ## Version changes  (max 1000 characters)
 
 ```
-v6.0.2 - for WoT 2.3.0.1.
+v6.1.0 - for WoT 2.3.0.1.
 
-Small follow-up to v6.0.1 based on modpack tester feedback:
+In-game settings + cleaner defaults:
 
 NEW
-- The mod now creates mods/configs/spotmeter.json with the default settings on first run, so there is always a config file to find and edit (previously, without the optional config, no file existed at all).
-- To start with the panel hidden: set battlePanelEnabled and garagePanelEnabled to false in the config - PageDown still shows the panel on demand. The minimap circle works independently of the panel.
+- In-game configurator: with a mods-settings menu installed (Aslain's aslainMenu, or izeberg's ModsSettingsAPI - both optional, the mod works without either) SpotMeter gets a settings page: panel visibility, identical-tank grouping, auto-hide, panel hotkey (key combos supported), minimap circle on/off, circle opacity, language, the battle-start loadout, per-class auto-pick presets (class dropdown), and a full rebindable hotkey list. Changes apply live and save to spotmeter.json.
+- "Panel only" mode: showMinimapCircle turns the minimap circle off independently of the panel.
 
-FIXED
-- A "panel hidden by default" config is now fully honored - window open/close events no longer bring the panel back on their own.
-- No more harmless AS3 "Error #1009" entries in python.log when hiding or refreshing the panel alongside many other mods.
+CHANGED
+- The battle panel starts HIDDEN by default (PageDown shows it). The separate garage panel is gone - its settings live in the configurator now.
+- Config moved to AppData (survives modpack reinstalls); an old config is migrated automatically.
 ```
 
 ## Mod description  (max 3000 characters)
@@ -61,11 +61,10 @@ Everything in your own tank's data: base view range, crew, optics, binoculars, c
 ENEMY PICKER
 Pick a specific enemy (click a row in the panel, or Numpad 2/8) and the circle switches to that tank's view range. Because the server no longer sends enemy equipment, you set the assumed optics / vents / CVS as quick cyclable levels (Numpad 6 / + / -) and toggle the likely crew perks (Rations, BIA, Recon + Situational Awareness). The estimate matches the in-game view-range formula.
 
-PANELS (v6.0)
-- In-battle panel: every enemy with its view range; identical tanks grouped (e.g. "Dravec x5"); a target line with the spot-distance; the AUTO state. Click a row to pick.
-- Garage panel: set everything up before battle with a live preview.
-- PageDown shows/hides the panels (the choice persists). They also auto-hide while you hold TAB/N or open garage windows.
-- Auto-pick (Numpad /) tracks the nearest enemy automatically.
+PANEL & SETTINGS
+- In-battle panel: every enemy with its view range; identical tanks grouped (e.g. "Dravec x5"); a target line with the spot-distance; the AUTO state. Click a row or Numpad 2/8 to pick. PageDown shows/hides it; hold TAB/N to peek the team panels.
+- Auto-pick (Numpad /) tracks the nearest enemy, with per-class loadout presets.
+- In-game configurator (when a mods-settings menu is installed): panel options, the assumed loadout, auto-pick presets, language, and a full rebindable hotkey list - changes apply live. Everything is also in spotmeter.json.
 
 LANGUAGE
 English and Polish, auto-detected from your game client.
@@ -79,22 +78,19 @@ Hotkeys are on the numpad and work with NumLock on or off; everything is configu
 ## Installation  (max 1000 characters)
 
 ```
-1. Download spotmeter-v6.0.2.wotmod.
+1. Download spotmeter-v6.1.0.wotmod.
 
 2. Copy it into:  <WoT>\mods\2.3.0.1\
    Example:  D:\Games\World_of_Tanks_EU\mods\2.3.0.1\
    (create the folder if it does not exist)
 
-3. (Optional) To change colours, multipliers or keys, copy spotmeter.json into:
-   <WoT>\mods\configs\
-   Without it the mod uses sensible defaults.
+3. Launch the game. The minimap spot-distance circle works right away. The battle panel starts hidden - press PageDown in battle to show it.
 
-4. Launch the game and enter a battle. An extra circle appears on the minimap and the SpotMeter panel appears on screen - press PageDown to hide/show it.
+4. (Optional) Install a mods-settings menu (Aslain's aslainMenu or izeberg's ModsSettingsAPI) to configure everything in the garage, or edit the auto-created config at:
+   %APPDATA%\Wargaming.net\WorldOfTanks\mods\spotmeter\spotmeter.json
 
 The game auto-loads every .wotmod in mods\<version>\ at startup.
-
 To uninstall: delete the .wotmod from mods\2.3.0.1\.
-
 Requires WoT 2.3.0.1. No other mods needed - the GUIFlash library is bundled.
 ```
 
@@ -106,21 +102,21 @@ limitu znakow - Aslain lubi zwiezle wpisy). Dwie formy do wyboru.
 ## Zmiany wersji — jedna linia (kompaktowy changelog Aslaina)
 
 ```
-SpotMeter zaktualizowany do v6.0.2 (WoT 2.3.0.1) — mod tworzy domyślny config przy pierwszym starcie; panel można domyślnie ukryć (battlePanelEnabled / garagePanelEnabled na false, PageDown przywołuje). (autor: ISEDR_Mikus)
+SpotMeter zaktualizowany do v6.1.0 (WoT 2.3.0.1) — konfigurator w garażu (menu ustawień modów): widoczność panelu, założony loadout, presety auto-dobierania per klasa, pełna klawiszologia. Panel bitewny domyślnie ukryty (PageDown pokazuje), panel garażowy usunięty, config w AppData. (autor: ISEDR_Mikus)
 ```
 
 ## Zmiany wersji — pełne
 
 ```
-SpotMeter v6.0.2 — pod WoT 2.3.0.1.
+SpotMeter v6.1.0 — pod WoT 2.3.0.1.
 
-Drobna poprawka po opiniach testerów paczki:
+Ustawienia w grze + czytelniejsze domyślne:
 
 NOWE
-- Mod tworzy mods/configs/spotmeter.json z domyślnymi ustawieniami przy pierwszym starcie — zawsze jest plik do edycji (wcześniej, bez opcjonalnego configu, plik w ogóle nie istniał).
-- Panel można domyślnie ukryć: battlePanelEnabled i garagePanelEnabled na false w configu — PageDown nadal przywołuje panel, a okrąg na minimapie działa niezależnie od panelu.
+- Konfigurator w garażu: z zainstalowanym menu ustawień modów (aslainMenu Aslaina albo ModsSettingsAPI izeberga — oba opcjonalne, bez nich mod też działa) SpotMeter dostaje stronę ustawień: widoczność panelu, grupowanie identycznych czołgów, auto-ukrywanie, klawisz panelu (z kombinacjami), okrąg na minimapie wł/wył, przezroczystość, język, założony loadout na start bitwy, presety auto-dobierania per klasa (dropdown klas) oraz pełna lista przypisywanych klawiszy. Zmiany działają na żywo i zapisują się do spotmeter.json.
+- Tryb „sam panel": showMinimapCircle wyłącza okrąg na minimapie niezależnie od panelu.
 
-POPRAWKI
-- Config z domyślnie ukrytym panelem jest teraz w pełni respektowany — otwieranie/zamykanie okien nie przywraca już panelu samo z siebie.
-- Koniec niegroźnych wpisów AS3 "Error #1009" w python.log przy ukrywaniu/odświeżaniu panelu obok wielu innych modów.
+ZMIANY
+- Panel bitewny domyślnie ukryty (PageDown pokazuje). Osobny panel garażowy usunięty — jego ustawienia są teraz w konfiguratorze.
+- Config przeniesiony do AppData (przeżywa reinstalacje paczki); stary config migruje automatycznie.
 ```

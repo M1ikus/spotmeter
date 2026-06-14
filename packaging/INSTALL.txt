@@ -23,17 +23,18 @@ Jesli folder mods\2.3.0.1 nie istnieje, gra go zrobi po pierwszym uruchomieniu.
 Game auto-laduje wszystkie .wotmod z tego katalogu po starcie.
 
 
-KROK 2 (opcjonalny): Wrzuc config
+KROK 2 (opcjonalny): Konfiguracja
 ----------------------------------
-Domyslne ustawienia sa wbudowane w mod, ale jesli chcesz tweakowac kolory
-/ multiplikatory / klawisze:
+Najlatwiej: zainstaluj menu ustawien modow (aslainMenu Aslaina albo
+ModsSettingsAPI izeberga - oba opcjonalne). SpotMeter doda wtedy w garazu
+strone ustawien (widocznosc panelu, loadout, presety auto-dobierania per
+klasa, pelna klawiszologia, jezyk) - zmiany dzialaja na zywo i zapisuja sie.
 
-Skopiuj  spotmeter.json
-Do       <katalog gry>\mods\configs\spotmeter.json
-
-(folder mods\configs\ moze trzeba stworzyc recznie)
-
-Bez tego pliku mod uzyje sensownych domyslnych wartosci.
+Recznie: mod sam tworzy config z domyslnymi wartosciami przy pierwszym
+starcie pod:
+   %APPDATA%\Wargaming.net\WorldOfTanks\mods\spotmeter\spotmeter.json
+(stary config z <katalog gry>\mods\configs\spotmeter.json jest migrowany
+automatycznie). Bez konfiguracji mod uzyje sensownych domyslnych wartosci.
 
 
 KROK 3: Uruchom gre i wejdz w bitwe
@@ -78,16 +79,20 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     *      - dump descriptora wybranego enemy do python.log (diagnostyka)
     .      - reload configu
 
-  PANEL (v6.0):
-    PageDown - pokaz/ukryj panel (kontekstowy: bitwa = panel bitewny,
-               garaz = panel garazowy). Chowa sie tez na TAB/N w bitwie
-               i przy oknach WG w garazu; wraca sam.
+  PANEL (v6.1):
+    PageDown - pokaz/ukryj panel bitewny. Panel jest TYLKO w bitwie i
+               domyslnie startuje UKRYTY - PageDown go przywoluje. Wybor
+               jest trwaly: raz ukryty PageDownem zostaje ukryty (tez w
+               nastepnej bitwie i po powrocie z garazu) az znow wcisniesz
+               PageDown. Chowa sie tez chwilowo na TAB/N w bitwie.
+    Panel garazowy zostal usuniety - jego ustawienia sa teraz w
+    konfiguratorze (menu ustawien modow, patrz nizej).
 
   JEZYK: pole "language" w configu - "auto" (jezyk klienta WoT, pl->PL,
   reszta->EN), albo wymus "pl" / "en".
 
   CO POKAZUJE BLOK STATUSU:
-    [SpotMeter v6.0.0] vs VR=445m (own)
+    [SpotMeter v6.1.0] vs VR=445m (own)
       ruch:         287m
       postoj:       295m  <-- AKTUALNY
       siatka 3s+:   275m
@@ -141,7 +146,7 @@ WERYFIKACJA / DEBUG
 Logi: <katalog gry>\python.log
 
 Po starcie gry powinien byc tam wpis:
-   SpotMeter: initialised (version=6.0.0, ...)
+   SpotMeter: initialised (version=6.1.0, ...)
 
 Jesli nie ma — mod sie nie zaladowal. Najczestsze przyczyny:
 - zla wersja gry (sprawdz numer w sciezce mods\<wersja>\)
@@ -156,7 +161,8 @@ co tick — w logu beda linie:
 JAK ODINSTALOWAC
 -----------------
 Usun spotmeter-v{{VERSION}}.wotmod z mods\2.3.0.1\.
-(Plik configu w mods\configs\spotmeter.json mozna zostawic albo skasowac.)
+(Config w %APPDATA%\Wargaming.net\WorldOfTanks\mods\spotmeter\ mozna
+zostawic albo skasowac.)
 
 
 WSPARCIE / PROBLEMY

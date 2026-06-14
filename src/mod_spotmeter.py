@@ -6,7 +6,7 @@
 # Works alongside the game's existing view-range circles (does not replace them).
 #
 # Loader entry: scripts/client/gui/mods/mod_spotmeter.pyc
-# Game version: World of Tanks 2.2.1.3 (Python 2.7 bytecode)
+# Game version: World of Tanks 2.3.0.1 (Python 2.7 bytecode)
 import json
 import logging
 import os
@@ -1054,11 +1054,11 @@ def _msa_apply(s, live=True):
             _logger.exception('SpotMeter: applying default toggles failed')
     dl = dict(_CFG.get('defaultLevels') or {})
     dl_changed = False
-    for key in ('optics', 'vents', 'cvs'):
+    for key, cap in _MSA_LEVEL_CAPS:
         var = 'def_' + key
         if var in s:
             try:
-                lvl = int(s[var])
+                lvl = max(0, min(int(s[var]), cap))  # clamp to the level cap
             except (ValueError, TypeError):
                 continue
             if lvl != int(dl.get(key, 0)):
@@ -1075,13 +1075,14 @@ def _msa_apply(s, live=True):
         _CFG['autoPickEnabled'] = _DEFAULT_AUTO_PICK_ENABLED
     if 'alpha' in s:
         try:
-            _CFG['alpha'] = int(s['alpha'])
+            _CFG['alpha'] = max(10, min(100, int(s['alpha'])))  # clamp to slider bounds
         except (ValueError, TypeError):
             pass
     if 'enabled' in s:
         _CFG['enabled'] = bool(s['enabled'])
     if 'panelToggleKeyset' in s:
-        names = _msa_key_names(list(s['panelToggleKeyset'] or []))
+        raw = s['panelToggleKeyset']
+        names = _msa_key_names(raw) if isinstance(raw, (list, tuple)) else []
         _CFG['panelToggleKeyset'] = names
         _CFG['panelToggleKey'] = names[-1] if names else ''
     # v6.1.0: auto-pick per-class presets. Two possible sources: the static
@@ -1149,7 +1150,8 @@ def _msa_apply(s, live=True):
     # into the existing single-key config slot ('' = unbound).
     for cfg_key, _label in _MSA_HOTKEYS:
         if cfg_key in s:
-            names = _msa_key_names(list(s[cfg_key] or []))
+            raw = s[cfg_key]
+            names = _msa_key_names(raw) if isinstance(raw, (list, tuple)) else []
             _CFG[cfg_key] = names[-1] if names else ''
     try:
         _write_config()
@@ -1330,8 +1332,16 @@ def init():
             _register_battle_view()
         except Exception:
             _logger.exception('SpotMeter: early battle view registration failed')
-        _patch_plugin()
-        _patch_avatar_shoot()
+        # Each patch is independent - one failing on an unexpected WoT build
+        # must not abort the rest of init (the minimap circle is the core).
+        try:
+            _patch_plugin()
+        except Exception:
+            _logger.exception('SpotMeter: minimap plugin patch failed')
+        try:
+            _patch_avatar_shoot()
+        except Exception:
+            _logger.exception('SpotMeter: avatar shoot patch failed')
         # v6.0.0: eager-import our private GUIFlash so it's ready to
         # catch the LOBBY space-entered event WoT fires right after
         # init. The library auto-subscribes its own onGUISpaceEntered
@@ -1352,8 +1362,14 @@ def init():
         # misleading after the pivot to space-events - we always want
         # the subscription active so individual panels can decide
         # independently via their own `*PanelEnabled` flags.
-        _patch_hangar_lifecycle()
-        _install_reload_hotkey()
+        try:
+            _patch_hangar_lifecycle()
+        except Exception:
+            _logger.exception('SpotMeter: hangar lifecycle hook failed')
+        try:
+            _install_reload_hotkey()
+        except Exception:
+            _logger.exception('SpotMeter: hotkey install failed')
         # v6.1.0: garage configurator (soft dependency - no-op without the API).
         # Registered AFTER hotkey install so a saved-settings apply can rebind.
         try:
@@ -2253,7 +2269,14 @@ def _patch_avatar_shoot():
 
     if orig_shootDualGun is not None:
         def patched_shootDualGun(self, chargeActionType, isPrepared=False, isRepeat=False):
-            result = orig_shootDualGun(self, chargeActionType, isPrepared=isPrepared, isRepeat=isRepeat)
+            # Same signature-drift guard as patched_shoot: if WG renames a kwarg
+            # across a client version, retry positionally instead of letting a
+            # TypeError crash the dual-gun fire path. Any genuine engine error
+            # from the original still propagates (the game expects it).
+            try:
+                result = orig_shootDualGun(self, chargeActionType, isPrepared=isPrepared, isRepeat=isRepeat)
+            except TypeError:
+                result = orig_shootDualGun(self, chargeActionType, isPrepared, isRepeat)
             try:
                 _record_shot()
             except Exception:
