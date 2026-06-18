@@ -103,6 +103,7 @@ _STRINGS = {
         'msa_hk_snapshot': 'Spot-distance snapshot to chat',
         'msa_hk_reload': 'Reload config file',
         'chat_live_on': 'live mode: ON (refresh every %.1fs - Numpad9 to turn off)',
+        'chat_no_menu_hint': 'no settings menu found - edit settings in the config file: %s  (or install aslainMenu / ModsSettingsAPI for an in-garage menu)',
         'tl_rations': 'rations', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'recon+SitA',
         'tl_directives': 'directives', 'tl_fieldUpgrades': 'field upg.',
         'tl_optics': 'optics', 'tl_vents': 'vents', 'tl_cvs': 'CVS', 'tl_auto': 'auto',
@@ -153,6 +154,7 @@ _STRINGS = {
         'msa_hk_snapshot': 'Zrzut dystansu do czatu',
         'msa_hk_reload': 'Przeladuj plik configu',
         'chat_live_on': 'live mode: ON (refresh co %.1fs - Numpad9 zeby wylaczyc)',
+        'chat_no_menu_hint': 'brak menu ustawien - edytuj ustawienia w pliku configu: %s  (lub zainstaluj aslainMenu / ModsSettingsAPI dla menu w garazu)',
         'tl_rations': 'racje', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'Zwiad+Rozezn.',
         'tl_directives': 'dyrektywy', 'tl_fieldUpgrades': 'ulepsz.pol',
         'tl_optics': 'optyka', 'tl_vents': 'wentyl.', 'tl_cvs': 'CVS', 'tl_auto': 'auto',
@@ -309,6 +311,10 @@ DEFAULT_CONFIG = {
     # dump) remain as short one-line responses since they're triggered
     # by user input, not background events.
     'overlayEnabled': True,
+    # v6.1.0: when NO mods-settings menu is installed (the in-garage
+    # configurator is unavailable), post a one-time per-battle-session chat
+    # line telling the user where the JSON config lives. Set false to silence.
+    'configHintWhenNoMenu': True,
     'overlayToggleKey': 'KEY_NUMPAD9',  # toggles live mode
     'overlayPrintNowKey': 'KEY_NUMPADENTER',  # one-shot snapshot
     'liveModeIntervalSec': 3.0,  # only used when live mode is enabled
@@ -712,6 +718,12 @@ _MSA_SETTINGS_VERSION = 5
 _MSA_API = None
 _MSA_TEMPLATES = None
 _MSA_REGISTERED = False
+# Tri-state, set by _msa_register(): True = a settings menu was found,
+# False = none found (-> the no-menu chat hint may fire), None = registration
+# not run / crashed (treated as "unknown" -> never nag).
+_SETTINGS_MENU_PRESENT = None
+# Once-per-WoT-session guard for the no-menu chat hint (see _maybe_hint_no_menu).
+_NO_MENU_HINT_DONE = False
 
 _MSA_LANG_VALUES = ('auto', 'en', 'pl')  # dropdown index -> config value
 
@@ -1261,14 +1273,17 @@ def _msa_on_window_closed(*args, **kwargs):
 
 
 def _msa_register():
-    global _MSA_REGISTERED, _MSA_FORK_LIVE
+    global _MSA_REGISTERED, _MSA_FORK_LIVE, _SETTINGS_MENU_PRESENT
     if _MSA_REGISTERED:
         return
     which = _msa_import()
     if which is None:
-        _logger.info('SpotMeter: no ModsSettingsAPI found - garage configurator '
-                     'disabled (JSON config + hotkeys still work)')
+        _SETTINGS_MENU_PRESENT = False
+        _logger.info('SpotMeter: no mods-settings menu found - in-garage '
+                     'configurator disabled. Edit settings in the JSON config '
+                     '(%s); in-battle hotkeys still work.', _APPDATA_CONFIG)
         return
+    _SETTINGS_MENU_PRESENT = True
     # Fork-only live channel: class-dropdown preset editor needs in-place
     # template re-render + uncommitted-change events. Plain izeberg menu
     # falls back to the static two-section preset layout.
@@ -2053,6 +2068,10 @@ def _color_for_state(state_name):
 
 def _tick(plugin):
     global _LAST_MOVEMENT_TIME, _LAST_SPOT_RADIUS
+    # One-time per session: nudge no-menu users toward the JSON config. The
+    # flag short-circuits this to a single bool check on every later tick.
+    if not _NO_MENU_HINT_DONE:
+        _maybe_hint_no_menu()
     state = _STATE.get(plugin)
     if state is None:
         return
@@ -2783,11 +2802,42 @@ def _post_chat_line(text):
         return
     if _CFG.get('battlePanelEnabled', True):
         return
+    _post_chat_raw(text)
+
+
+def _post_chat_raw(text):
+    """Post one client chat line, bypassing the panel-silence gate in
+    _post_chat_line. For rare, important one-time notices (the no-menu config
+    hint). Returns True only if the messenger accepted the line, so callers can
+    retry on a later tick until the in-battle messenger is ready.
+    """
     try:
         from messenger.MessengerEntry import g_instance as _messengerEntry
         _messengerEntry.gui.addClientMessage('[SpotMeter] ' + text, isCurrentPlayer=True)
+        return True
     except Exception:
-        _logger.exception('SpotMeter: failed to push chat line')
+        # Messenger not ready yet (early in battle load) or unavailable - the
+        # caller may retry. Don't log.exception here: this is an expected,
+        # transient miss on the first ticks, not an error.
+        return False
+
+
+def _maybe_hint_no_menu():
+    """Once per battle session, if NO mods-settings menu was found at startup,
+    tell the user in chat where the JSON config lives - the only way to
+    configure without a menu. Best-effort: retries on later ticks until the
+    messenger accepts it, then never fires again this session. Suppressible via
+    `configHintWhenNoMenu`. Never fires when a menu is present or when
+    registration status is unknown (None)."""
+    global _NO_MENU_HINT_DONE
+    if _SETTINGS_MENU_PRESENT is not False:
+        _NO_MENU_HINT_DONE = True   # menu present / unknown -> never nag
+        return
+    if not _CFG.get('configHintWhenNoMenu', True):
+        _NO_MENU_HINT_DONE = True
+        return
+    if _post_chat_raw(_t('chat_no_menu_hint') % _APPDATA_CONFIG):
+        _NO_MENU_HINT_DONE = True
 
 
 def _format_status_block(plugin):

@@ -78,6 +78,10 @@
 
     "_comment_overlay": "v5.5: status-block model. Block shows spot distance for ALL 4 states at once (ruch/postoj/siatka 3s/po strzale) plus picker+toggle+own-tank context. Two ways to see it: (1) NumpadEnter = on-demand snapshot; (2) Numpad9 = toggle live mode (default OFF) which re-posts the block every liveModeIntervalSec seconds. NO auto-spam on state changes / radius deltas. User-action confirmations (toggle/picker/diag) are short one-line responses, not the full block.",
     "overlayEnabled": true,
+
+    "_comment_no_menu_hint": "v6.1.0: if NO mods-settings menu (aslainMenu / ModsSettingsAPI) is installed, the in-garage configurator is unavailable, so the mod posts ONE chat line per battle session telling you where this config file lives. Set false to silence it.",
+    "configHintWhenNoMenu": true,
+
     "overlayToggleKey": "KEY_NUMPAD9",
     "overlayPrintNowKey": "KEY_NUMPADENTER",
     "liveModeIntervalSec": 3.0,

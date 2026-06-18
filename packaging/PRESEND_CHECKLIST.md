@@ -63,6 +63,10 @@ The author runs these in a clean WoT 2.3.0.1 with **only** SpotMeter installed.
       auto-pick preset being edited; hotkey buttons show compact names
       (`NUM2`, not a clipped `NUMPAD`). Without any menu installed, the mod must
       still load and run normally.
+- [ ] **No-menu hint**: with **no** mods-settings menu installed, the first
+      battle of a session posts exactly **one** chat line pointing to the
+      `spotmeter.json` path; it does not repeat that session and does not appear
+      at all when a menu *is* installed or when `configHintWhenNoMenu` is false.
 - [ ] **Config location**: confirm `spotmeter.json` is created/updated under
       `%APPDATA%\Wargaming.net\WorldOfTanks\mods\spotmeter\`; an existing old
       config is migrated, not ignored.

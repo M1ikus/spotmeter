@@ -22,6 +22,10 @@ NONE - SpotMeter is fully self-contained in the single .wotmod:
 - bundles mod_spotmeter.pyc + a private GUIFlash fork (gui.mods.spotmeter_gf + its SWF)
 - does NOT require gambiter.guiflash, XVM, XFW or any shared library
 - spotmeter.json config is optional (built-in defaults if absent)
+- a mods-settings menu (Aslain's aslainMenu / izeberg's ModsSettingsAPI) is
+  OPTIONAL too - it only adds the in-garage settings page; the mod runs fully
+  without it (JSON config + hotkeys). Recommended for solo installs that want
+  in-game configuration.
 - requires WoT 2.3.0.1; no special load order
 - coexists with other mods: own namespace, replaces no WG UI files, every game
   hook is a wrapper that calls the original, hotkeys are never consumed
@@ -64,7 +68,7 @@ Pick a specific enemy (click a row in the panel, or Numpad 2/8) and the circle s
 PANEL & SETTINGS
 - In-battle panel: every enemy with its view range; identical tanks grouped (e.g. "Dravec x5"); a target line with the spot-distance; the AUTO state. Click a row or Numpad 2/8 to pick. PageDown shows/hides it; hold TAB/N to peek the team panels.
 - Auto-pick (Numpad /) tracks the nearest enemy, with per-class loadout presets.
-- In-game configurator (when a mods-settings menu is installed): panel options, the assumed loadout, auto-pick presets, language, and a full rebindable hotkey list - changes apply live. Everything is also in spotmeter.json.
+- In-game configurator: install a mods-settings menu (Aslain's aslainMenu or izeberg's ModsSettingsAPI - free, optional) and SpotMeter adds a settings page in the garage: panel options, the assumed loadout, auto-pick presets, language and a full rebindable hotkey list, applied live. Without a menu the mod auto-creates a commented spotmeter.json you can edit (and tells you where it is).
 
 LANGUAGE
 English and Polish, auto-detected from your game client.

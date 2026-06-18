@@ -45,6 +45,15 @@ Garage configurator + quieter defaults. Scope agreed with Aslain.
   (survives modpack clean-installs). A legacy game-dir config is migrated
   automatically on first load; game-dir paths remain as read fallbacks.
 
+### Added (no-menu polish)
+- When **no** mods-settings menu is installed, the in-garage configurator is
+  unavailable — so the mod now posts **one** chat line per battle session
+  pointing to the auto-created, fully commented `spotmeter.json` (the only way
+  to configure without a menu). Suppressible via `configHintWhenNoMenu`. The
+  startup log line names the exact config path too. The listing now also
+  recommends a (free, optional) mods-settings menu for solo installs that want
+  in-game configuration.
+
 ### Hardening
 - All client patches are now individually fault-isolated: the `Avatar.shootDualGun`
   wrapper guards the original call against signature drift (mirroring `shoot`),
