@@ -99,11 +99,8 @@ _STRINGS = {
         'msa_hk_vents': 'Cycle ventilation level',
         'msa_hk_cvs': 'Cycle enemy CVS',
         'msa_hk_dump': 'Dump enemy data to log',
-        'msa_hk_live': 'Live mode (chat block)',
-        'msa_hk_snapshot': 'Spot-distance snapshot to chat',
+        'msa_hk_snapshot': 'Spot-distance snapshot to log',
         'msa_hk_reload': 'Reload config file',
-        'chat_live_on': 'live mode: ON (refresh every %.1fs - Numpad9 to turn off)',
-        'chat_no_menu_hint': 'no settings menu found - edit settings in the config file: %s  (or install aslainMenu / ModsSettingsAPI for an in-garage menu)',
         'tl_rations': 'rations', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'recon+SitA',
         'tl_directives': 'directives', 'tl_fieldUpgrades': 'field upg.',
         'tl_optics': 'optics', 'tl_vents': 'vents', 'tl_cvs': 'CVS', 'tl_auto': 'auto',
@@ -150,11 +147,8 @@ _STRINGS = {
         'msa_hk_vents': 'Cykl poziomu wentylacji',
         'msa_hk_cvs': 'Cykl CVS przeciwnika',
         'msa_hk_dump': 'Zrzut danych wroga do logu',
-        'msa_hk_live': 'Tryb live (blok w czacie)',
-        'msa_hk_snapshot': 'Zrzut dystansu do czatu',
+        'msa_hk_snapshot': 'Zrzut dystansu do logu',
         'msa_hk_reload': 'Przeladuj plik configu',
-        'chat_live_on': 'live mode: ON (refresh co %.1fs - Numpad9 zeby wylaczyc)',
-        'chat_no_menu_hint': 'brak menu ustawien - edytuj ustawienia w pliku configu: %s  (lub zainstaluj aslainMenu / ModsSettingsAPI dla menu w garazu)',
         'tl_rations': 'racje', 'tl_BIA': 'BIA', 'tl_reconSitAware': 'Zwiad+Rozezn.',
         'tl_directives': 'dyrektywy', 'tl_fieldUpgrades': 'ulepsz.pol',
         'tl_optics': 'optyka', 'tl_vents': 'wentyl.', 'tl_cvs': 'CVS', 'tl_auto': 'auto',
@@ -300,24 +294,15 @@ DEFAULT_CONFIG = {
     'pickerCvsFactors':    [1.0, 0.900, 0.875],
     'pickerIncludeDeadEnemies': False,
     'pickerDiagDumpKey': 'KEY_NUMPADSTAR',
-    # v5.5 overlay - rewritten as a multi-line "status block" that shows
-    # spot distance for all 4 states at once (still/moving/net/afterShot).
-    # Auto-spam on tick changes is GONE. Two ways to see the block:
-    #   1) NumpadEnter (overlayPrintNowKey) - one-shot snapshot
-    #   2) live mode (overlayToggleKey, default OFF) - re-posts every
-    #      liveModeIntervalSec seconds while enabled. The chat will show
-    #      a refreshing block; older blocks scroll out.
-    # User-action chat lines (toggle confirmations, picker change, diag
-    # dump) remain as short one-line responses since they're triggered
-    # by user input, not background events.
+    # v6.1.0: the mod NEVER writes to chat. On-demand diagnostics go to
+    # python.log instead: NumpadEnter (overlayPrintNowKey) logs a one-shot
+    # status block (spot distance for all 4 states + picker/toggle/own-tank
+    # context); NumpadStar (pickerDiagDumpKey) logs the enemy descriptor + VR
+    # breakdown. overlayEnabled gates this on-demand logging. There is no
+    # live/auto-refresh mode and no chat confirmations - the battle panel and
+    # the minimap circle are the only in-game UI.
     'overlayEnabled': True,
-    # v6.1.0: when NO mods-settings menu is installed (the in-garage
-    # configurator is unavailable), post a one-time per-battle-session chat
-    # line telling the user where the JSON config lives. Set false to silence.
-    'configHintWhenNoMenu': True,
-    'overlayToggleKey': 'KEY_NUMPAD9',  # toggles live mode
-    'overlayPrintNowKey': 'KEY_NUMPADENTER',  # one-shot snapshot
-    'liveModeIntervalSec': 3.0,  # only used when live mode is enabled
+    'overlayPrintNowKey': 'KEY_NUMPADENTER',  # one-shot status block -> python.log
     # v6.0 auto-pick: continuously track the closest visible enemy as VR
     # target. Default OFF. Manual pick (Numpad 2/8) always overrides auto;
     # clearing manual (Numpad 5) restores auto when enabled. Position cache
@@ -456,8 +441,6 @@ _PICKER_LEVELS = {
     'vents':  0,  # default OFF - vents are less universal than optics
     'cvs':    0,  # default OFF - CVS is rare on most enemies
 }
-_LIVE_MODE_ENABLED = False  # default OFF - user enables via Numpad9 if they want auto-refreshing block
-_LIVE_MODE_CALLBACK_ID = None  # BigWorld.callback handle for the periodic poster
 _AUTO_PICKED_VID = None  # vid auto-selected as nearest visible enemy; None when no candidate
 _ENEMY_POS_CACHE = {}  # vid -> (x, z, timestamp) last-known 2D positions for auto-pick
 # v6.0.0 per-battle reset. _DEFAULT_AUTO_PICK_ENABLED captures the user's
@@ -630,7 +613,7 @@ def _reset_battle_state():
     clears the flag so the next battle gets a fresh reset.
     """
     global _BATTLE_RESET_DONE, _PICKED_VID, _AUTO_PICKED_VID
-    global _LAST_SHOT_TIME, _LAST_MOVEMENT_TIME, _LIVE_MODE_ENABLED
+    global _LAST_SHOT_TIME, _LAST_MOVEMENT_TIME
     if _BATTLE_RESET_DONE:
         return
     _PICKED_VID = None
@@ -640,7 +623,6 @@ def _reset_battle_state():
     _CFG['autoPickEnabled'] = _DEFAULT_AUTO_PICK_ENABLED
     _LAST_SHOT_TIME = 0.0
     _LAST_MOVEMENT_TIME = 0.0
-    _LIVE_MODE_ENABLED = False
     _apply_default_toggles()
     _apply_default_levels()
     _BATTLE_RESET_DONE = True
@@ -714,16 +696,10 @@ _MSA_LINKAGE = 'spotmeter'
 # INCREASES - an unbumped change silently keeps the old menu (e.g. the
 # 'default' class stayed in the dropdown after its removal). User values
 # survive a bump: the new template is seeded from _CFG.
-_MSA_SETTINGS_VERSION = 5
+_MSA_SETTINGS_VERSION = 6
 _MSA_API = None
 _MSA_TEMPLATES = None
 _MSA_REGISTERED = False
-# Tri-state, set by _msa_register(): True = a settings menu was found,
-# False = none found (-> the no-menu chat hint may fire), None = registration
-# not run / crashed (treated as "unknown" -> never nag).
-_SETTINGS_MENU_PRESENT = None
-# Once-per-WoT-session guard for the no-menu chat hint (see _maybe_hint_no_menu).
-_NO_MENU_HINT_DONE = False
 
 _MSA_LANG_VALUES = ('auto', 'en', 'pl')  # dropdown index -> config value
 
@@ -863,7 +839,6 @@ _MSA_HOTKEYS = (
     ('pickerDirectivesKey',    'msa_def_directives'),
     ('pickerFieldUpgradesKey', 'msa_def_fieldUpgrades'),
     ('pickerDiagDumpKey',      'msa_hk_dump'),
-    ('overlayToggleKey',       'msa_hk_live'),
     ('overlayPrintNowKey',     'msa_hk_snapshot'),
     ('reloadKey',              'msa_hk_reload'),
 )
@@ -1273,17 +1248,15 @@ def _msa_on_window_closed(*args, **kwargs):
 
 
 def _msa_register():
-    global _MSA_REGISTERED, _MSA_FORK_LIVE, _SETTINGS_MENU_PRESENT
+    global _MSA_REGISTERED, _MSA_FORK_LIVE
     if _MSA_REGISTERED:
         return
     which = _msa_import()
     if which is None:
-        _SETTINGS_MENU_PRESENT = False
         _logger.info('SpotMeter: no mods-settings menu found - in-garage '
                      'configurator disabled. Edit settings in the JSON config '
                      '(%s); in-battle hotkeys still work.', _APPDATA_CONFIG)
         return
-    _SETTINGS_MENU_PRESENT = True
     # Fork-only live channel: class-dropdown preset editor needs in-place
     # template re-render + uncommitted-change events. Plain izeberg menu
     # falls back to the static two-section preset layout.
@@ -1920,7 +1893,7 @@ def _toggle_auto_pick():
             _tick(plugin)
         except Exception:
             _logger.exception('SpotMeter: tick after auto-pick toggle failed')
-    _post_chat_line('auto-pick: %s' % ('ON' if _CFG['autoPickEnabled'] else 'OFF'))
+    _logger.info('SpotMeter: auto-pick -> %s', 'ON' if _CFG['autoPickEnabled'] else 'OFF')
     _refresh_garage_if_active()
 
 
@@ -2068,10 +2041,6 @@ def _color_for_state(state_name):
 
 def _tick(plugin):
     global _LAST_MOVEMENT_TIME, _LAST_SPOT_RADIUS
-    # One-time per session: nudge no-menu users toward the JSON config. The
-    # flag short-circuits this to a single bool check on every later tick.
-    if not _NO_MENU_HINT_DONE:
-        _maybe_hint_no_menu()
     state = _STATE.get(plugin)
     if state is None:
         return
@@ -2407,7 +2376,6 @@ def _dump_picker_descriptor(plugin):
     """
     if _PICKED_VID is None:
         _logger.warning('SpotMeter: dump requested but no target picked')
-        _post_chat_line('diag: no picker target')
         return
     try:
         arenaDP = plugin.sessionProvider.getArenaDP()
@@ -2478,7 +2446,6 @@ def _dump_picker_descriptor(plugin):
     facts = _picker_descr_facts(plugin, _PICKED_VID)
     if facts is None:
         _logger.warning('SpotMeter: VR breakdown unavailable - facts decode failed')
-        _post_chat_line('diag: dumped %s descriptor to python.log' % short)
         return
 
     base_vr_orig = facts['base_vr']
@@ -2586,8 +2553,6 @@ def _dump_picker_descriptor(plugin):
     lines.append('  final VR  = %.2fm' % final)
     _logger.warning('\n'.join(lines))
 
-    _post_chat_line('diag: dumped %s descriptor + VR breakdown to python.log' % short)
-
 
 def _format_picker_summary(plugin):
     eff_vid, src = _effective_picked_vid()
@@ -2670,7 +2635,6 @@ def _toggle_perk(name):
         defaults[name] = _PICKER_TOGGLES[name]
     plugin = _get_picker_plugin()
     _on_picker_changed(plugin, set())
-    _post_chat_line('%s: %s' % (name, 'ON' if _PICKER_TOGGLES[name] else 'OFF'))
     _refresh_garage_if_active()
 
 
@@ -2719,47 +2683,16 @@ def _cycle_level(name):
     _on_picker_changed(plugin, set())
     lvl = _PICKER_LEVELS[name]
     label = _LEVEL_NAMES[lvl] if lvl < len(_LEVEL_NAMES) else 'L%d' % lvl
-    _post_chat_line('%s: L%d (%s, x%.3f)' % (name, lvl, label, table[lvl]))
+    _logger.info('SpotMeter: %s -> L%d (%s, x%.3f)', name, lvl, label, table[lvl])
     _refresh_garage_if_active()
 
 
-def _toggle_live_mode():
-    """Toggle the auto-refreshing status block. Default OFF; when ON, the
-    block is re-posted every liveModeIntervalSec seconds. The chat will
-    show a refreshing block; older blocks scroll out naturally.
-    """
-    global _LIVE_MODE_ENABLED, _LIVE_MODE_CALLBACK_ID
-    _LIVE_MODE_ENABLED = not _LIVE_MODE_ENABLED
-    plugin = _get_picker_plugin()
-    if _LIVE_MODE_ENABLED:
-        _post_chat_line(_t('chat_live_on')
-                        % float(_CFG.get('liveModeIntervalSec', 3.0)))
-        # Post immediately, then schedule the loop.
-        if plugin is not None:
-            _post_status_block(plugin)
-        try:
-            import BigWorld
-            interval = float(_CFG.get('liveModeIntervalSec', 3.0))
-            if interval < 0.5:
-                interval = 0.5
-            _LIVE_MODE_CALLBACK_ID = BigWorld.callback(interval, _live_mode_tick)
-        except Exception:
-            _logger.exception('SpotMeter: failed to start live-mode loop')
-    else:
-        _post_chat_line('live mode: OFF')
-        # The callback will self-terminate when it fires and sees
-        # _LIVE_MODE_ENABLED is False; we don't bother trying to cancel
-        # it explicitly because BigWorld.cancelCallback is not always
-        # exposed and the next tick will just no-op out.
-        _LIVE_MODE_CALLBACK_ID = None
-
-
 def _print_now():
-    """One-shot snapshot of the status block (NumpadEnter hotkey).
+    """One-shot snapshot of the status block to python.log (NumpadEnter hotkey).
 
-    Same content as live-mode posts, but on demand. The block shows spot
-    distance for all four states (ruch / postoj / siatka 3s / po strzale)
-    plus picker / toggle / own-tank context. See _format_status_block.
+    The block shows spot distance for all four states (ruch / postoj /
+    siatka 3s / po strzale) plus picker / toggle / own-tank context. It goes
+    to python.log - the mod never writes to chat. See _format_status_block.
     """
     plugin = _get_picker_plugin()
     if plugin is None:
@@ -2779,65 +2712,8 @@ def _on_picker_changed(plugin, affected_vids):
             _tick(plugin)
         except Exception:
             _logger.exception('SpotMeter: tick after picker change failed')
-    # User-action confirmation: short one-line message, not the full block.
-    # The picker/toggle change is fully reflected in the next status block
-    # snapshot (NumpadEnter) or live-mode tick.
-    if summary:
-        _post_chat_line('picker -> %s [%s]' % (summary, tags))
-    elif _PICKED_VID is None:
-        _post_chat_line('picker cleared')
-
-
-def _post_chat_line(text):
-    """Single short chat-line message - used for one-time confirmations on
-    user actions (toggle change, picker change, diag dump confirmation).
-    Does NOT loop or auto-fire; only called from user-triggered code paths.
-
-    v6.0.0: silenced when the in-battle panel is enabled - the panel is the
-    user-facing source of truth and chat noise is exactly what we're
-    replacing. To get chat confirmations back, set
-    `"battlePanelEnabled": false` in spotmeter.json.
-    """
-    if not _CFG.get('overlayEnabled', True):
-        return
-    if _CFG.get('battlePanelEnabled', True):
-        return
-    _post_chat_raw(text)
-
-
-def _post_chat_raw(text):
-    """Post one client chat line, bypassing the panel-silence gate in
-    _post_chat_line. For rare, important one-time notices (the no-menu config
-    hint). Returns True only if the messenger accepted the line, so callers can
-    retry on a later tick until the in-battle messenger is ready.
-    """
-    try:
-        from messenger.MessengerEntry import g_instance as _messengerEntry
-        _messengerEntry.gui.addClientMessage('[SpotMeter] ' + text, isCurrentPlayer=True)
-        return True
-    except Exception:
-        # Messenger not ready yet (early in battle load) or unavailable - the
-        # caller may retry. Don't log.exception here: this is an expected,
-        # transient miss on the first ticks, not an error.
-        return False
-
-
-def _maybe_hint_no_menu():
-    """Once per battle session, if NO mods-settings menu was found at startup,
-    tell the user in chat where the JSON config lives - the only way to
-    configure without a menu. Best-effort: retries on later ticks until the
-    messenger accepts it, then never fires again this session. Suppressible via
-    `configHintWhenNoMenu`. Never fires when a menu is present or when
-    registration status is unknown (None)."""
-    global _NO_MENU_HINT_DONE
-    if _SETTINGS_MENU_PRESENT is not False:
-        _NO_MENU_HINT_DONE = True   # menu present / unknown -> never nag
-        return
-    if not _CFG.get('configHintWhenNoMenu', True):
-        _NO_MENU_HINT_DONE = True
-        return
-    if _post_chat_raw(_t('chat_no_menu_hint') % _APPDATA_CONFIG):
-        _NO_MENU_HINT_DONE = True
+    # No chat output: the picker/toggle state is already logged above and is
+    # shown graphically in the battle panel. NumpadEnter logs the full block.
 
 
 def _format_status_block(plugin):
@@ -2924,53 +2800,25 @@ def _format_status_block(plugin):
     own_vr_factor = misc.get('circularVisionRadiusFactor', 1.0)
     own_base_vr = getattr(descr.turret, 'circularVisionRadius', 0.0)
     add_term = misc.get('invisibilityBaseAdditive', 0.0) + misc.get('invisibilityAdditiveTerm', 0.0)
-    lines.append('own:    base_vr=%.0fm * factor=%.3f, camo_add=%.3f, live=%s, auto=%s'
+    lines.append('own:    base_vr=%.0fm * factor=%.3f, camo_add=%.3f, auto=%s'
                  % (own_base_vr, own_vr_factor, add_term,
-                    'ON' if _LIVE_MODE_ENABLED else 'off',
                     'ON' if _CFG.get('autoPickEnabled', False) else 'off'))
 
     return '\n'.join(lines)
 
 
 def _post_status_block(plugin):
-    """Format and post a status block to the chat. No-op on failure.
+    """Log a one-shot status block to python.log (NumpadEnter snapshot).
 
-    v6.0.0: silenced when the in-battle panel is enabled. The panel
-    displays the same picker/toggle state graphically, so the chat block
-    becomes redundant. Set `"battlePanelEnabled": false` to restore.
+    v6.1.0: the mod never writes to chat. The block - spot distance for all
+    four states plus picker/toggle/own-tank context - goes to python.log so it
+    can be read back offline. The battle panel shows the same picker/toggle
+    state graphically in-game.
     """
-    if _CFG.get('battlePanelEnabled', True):
-        return
     text = _format_status_block(plugin)
     if not text:
         return
-    try:
-        from messenger.MessengerEntry import g_instance as _messengerEntry
-        _messengerEntry.gui.addClientMessage(text, isCurrentPlayer=True)
-    except Exception:
-        _logger.exception('SpotMeter: failed to push status block')
-
-
-def _live_mode_tick():
-    """Periodic re-poster for live mode. Reschedules itself while
-    _LIVE_MODE_ENABLED is True; otherwise terminates the loop.
-    """
-    global _LIVE_MODE_CALLBACK_ID
-    _LIVE_MODE_CALLBACK_ID = None
-    if not _LIVE_MODE_ENABLED:
-        return
-    plugin = _get_picker_plugin()
-    if plugin is not None:
-        _post_status_block(plugin)
-    # Reschedule even if plugin was None - we'll retry next tick.
-    try:
-        import BigWorld
-        interval = float(_CFG.get('liveModeIntervalSec', 3.0))
-        if interval < 0.5:
-            interval = 0.5  # safety floor
-        _LIVE_MODE_CALLBACK_ID = BigWorld.callback(interval, _live_mode_tick)
-    except Exception:
-        _logger.exception('SpotMeter: failed to reschedule live-mode tick')
+    _logger.info('SpotMeter status block:\n%s', text)
 
 
 def _force_panel_refresh(affected_vids=None):
@@ -4747,7 +4595,6 @@ def _install_reload_hotkey():
                   'diag-dump')
             _bind('autoPickToggleKey', _toggle_auto_pick, 'auto-pick-toggle')
         if _CFG.get('overlayEnabled', True):
-            _bind('overlayToggleKey', _toggle_live_mode, 'live-mode-toggle')
             _bind('overlayPrintNowKey', _print_now, 'status-snapshot')
 
     _rebuild_bindings()

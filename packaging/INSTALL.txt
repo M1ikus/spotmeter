@@ -72,12 +72,11 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     /      - toggle auto-pick (default OFF) - najblizszy przeciwnik jako cel.
              Wlaczenie stosuje preset per-klasa; reczny wybor 2/8 nadpisuje auto.
 
-  OVERLAY / DIAG (v5.5 - bez spamu na zmiany!):
-    9      - toggle LIVE MODE (default OFF). Gdy ON, bloczek z 4 wartosciami
-             (ruch/postoj/siatka/po-strzale) odswieza sie co 3s w czacie.
-    Enter  - jednorazowy snapshot blocka (zawsze, niezaleznie od live mode)
-    *      - dump descriptora wybranego enemy do python.log (diagnostyka)
+  DIAGNOSTYKA (v6.1 - mod NIGDY nie pisze na czat; wszystko idzie do python.log):
+    Enter  - jednorazowy snapshot blocku 4 wartosci do python.log
+    *      - dump descriptora wybranego enemy + rozbicie VR do python.log
     .      - reload configu
+    (Numpad9 / live mode usuniete - byly tylko na czacie.)
 
   PANEL (v6.1):
     PageDown - pokaz/ukryj panel bitewny. Panel jest TYLKO w bitwie i
@@ -91,19 +90,19 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
   JEZYK: pole "language" w configu - "auto" (jezyk klienta WoT, pl->PL,
   reszta->EN), albo wymus "pl" / "en".
 
-  CO POKAZUJE BLOK STATUSU:
-    [SpotMeter v6.1.0] vs VR=445m (own)
+  CO POKAZUJE BLOK STATUSU (Enter -> python.log):
+    SpotMeter status block:
+    vs VR=445m (own)
       ruch:         287m
       postoj:       295m  <-- AKTUALNY
       siatka 3s+:   275m
       po strzale:   320m
     picker: -- (using own VR)
     toggle: +rations  +BIA  +recon  -directives  -fieldUpgr
-    own:    base_vr=410m * factor=1.103, camo_add=0.025, live=off
+    own:    base_vr=410m * factor=1.103, camo_add=0.025, auto=off
 
-    Wszystkie 4 wartosci VR-spot widzisz na raz. Strzalka pokazuje
-    aktualny stan. Nie ma spamu na kazdy state change ani delta - albo
-    wlaczasz live mode (Numpad9), albo cisniesz Enter zeby raz zobaczyc.
+    Wszystkie 4 wartosci VR-spot na raz. Strzalka pokazuje aktualny stan.
+    Blok trafia do python.log po wcisnieciu Enter (mod nie pisze na czat).
 
 
 CO JEST AUTOMATYCZNE (auto-czytane z descriptora wroga)

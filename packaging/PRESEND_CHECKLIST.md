@@ -55,18 +55,21 @@ The author runs these in a clean WoT 2.3.0.1 with **only** SpotMeter installed.
       switches to that tank's view range; Numpad 5 clears back to own/auto.
 - [ ] **Auto-pick** (Numpad /) tracks the nearest enemy and applies the per-class
       preset.
+- [ ] **Never writes to chat**: the mod posts **nothing** to game chat, ever —
+      no picker/toggle confirmations, no status block, no hints. NumpadEnter
+      logs the status block to `python.log`; NumpadStar logs the descriptor +
+      VR breakdown there too. (Numpad9 / live mode no longer exists.)
 - [ ] **No log spam** during a battle (no per-tick lines unless `logCalcDetails`
-      / live mode is on).
+      is on; on-demand NumpadEnter / NumpadStar entries only when pressed).
 - [ ] **Configurator** (only if a mods-settings menu is installed for the test):
       SpotMeter page appears in the garage; changing panel/loadout/hotkey options
       applies live and writes `spotmeter.json`; the class dropdown switches the
       auto-pick preset being edited; hotkey buttons show compact names
       (`NUM2`, not a clipped `NUMPAD`). Without any menu installed, the mod must
       still load and run normally.
-- [ ] **No-menu hint**: with **no** mods-settings menu installed, the first
-      battle of a session posts exactly **one** chat line pointing to the
-      `spotmeter.json` path; it does not repeat that session and does not appear
-      at all when a menu *is* installed or when `configHintWhenNoMenu` is false.
+- [ ] **No-menu path**: with **no** mods-settings menu installed, the startup
+      `python.log` line names the exact config path; the mod loads and runs
+      normally (no chat hint — chat is never used).
 - [ ] **Config location**: confirm `spotmeter.json` is created/updated under
       `%APPDATA%\Wargaming.net\WorldOfTanks\mods\spotmeter\`; an existing old
       config is migrated, not ignored.

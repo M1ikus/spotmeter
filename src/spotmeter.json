@@ -39,7 +39,7 @@
     "camoNetActivateSec": 3.0,
     "camoNetFallbackBonus": 0.05,
 
-    "_comment_picker_layout": "Numpad layout for picker. NumLock-on or off both work. Defaults: 8/2 cycle enemies, 5 clear; toggles for VR computation: 7 Rations (ON), 3 BIA (ON), 4 Recon+SitAware (ON), 1 Directives (OFF), 0 Field Upgrades BETA (OFF). 9 toggle live mode, * dump enemy descriptor to log, NumpadEnter snapshot, NumpadPeriod reload config. Auto-detected equipment from descriptor: Coated Optics, Stereoscope.",
+    "_comment_picker_layout": "Numpad layout for picker. NumLock-on or off both work. Defaults: 8/2 cycle enemies, 5 clear; toggles for VR computation: 7 Rations (ON), 3 BIA (ON), 4 Recon+SitAware (ON), 1 Directives (OFF), 0 Field Upgrades BETA (OFF). * dump enemy descriptor + VR breakdown to python.log, NumpadEnter snapshot to python.log, NumpadPeriod reload config. Auto-detected equipment from descriptor: Coated Optics, Stereoscope.",
     "pickerEnabled": true,
     "pickerNextKey": "KEY_NUMPAD2",
     "pickerPrevKey": "KEY_NUMPAD8",
@@ -76,15 +76,9 @@
     "pickerCvsFactors":    [1.0, 0.900, 0.875],
     "pickerIncludeDeadEnemies": false,
 
-    "_comment_overlay": "v5.5: status-block model. Block shows spot distance for ALL 4 states at once (ruch/postoj/siatka 3s/po strzale) plus picker+toggle+own-tank context. Two ways to see it: (1) NumpadEnter = on-demand snapshot; (2) Numpad9 = toggle live mode (default OFF) which re-posts the block every liveModeIntervalSec seconds. NO auto-spam on state changes / radius deltas. User-action confirmations (toggle/picker/diag) are short one-line responses, not the full block.",
+    "_comment_overlay": "v6.1.0: the mod NEVER writes to chat. On-demand diagnostics go to python.log instead: NumpadEnter (overlayPrintNowKey) logs a status block (spot distance for all 4 states + picker/toggle/own-tank context); NumpadStar (pickerDiagDumpKey) logs the enemy descriptor + VR breakdown. overlayEnabled gates this on-demand logging. No live/auto-refresh mode, no chat confirmations - the battle panel + minimap circle are the only in-game UI.",
     "overlayEnabled": true,
-
-    "_comment_no_menu_hint": "v6.1.0: if NO mods-settings menu (aslainMenu / ModsSettingsAPI) is installed, the in-garage configurator is unavailable, so the mod posts ONE chat line per battle session telling you where this config file lives. Set false to silence it.",
-    "configHintWhenNoMenu": true,
-
-    "overlayToggleKey": "KEY_NUMPAD9",
     "overlayPrintNowKey": "KEY_NUMPADENTER",
-    "liveModeIntervalSec": 3.0,
     "reloadKey": "KEY_NUMPADPERIOD",
 
     "_comment_auto_pick": "v6.0: continuously track the closest visible enemy as VR target. Default OFF. Toggle in-battle with NumpadSlash. Manual pick (Numpad 2/8) overrides; Numpad 5 clears manual and (when auto on) restores auto. Position cache holds last-known fix for autoPickCacheTimeoutSec so the target doesn't flicker when a spotter blinks. Range is 2D ground distance from your tank.",

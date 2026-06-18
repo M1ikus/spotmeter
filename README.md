@@ -26,9 +26,9 @@ W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + 
 
 > **Weryfikacja własnych field upgrades:** naciśnij **NumpadEnter** (status snapshot) — w chacie pojawi się m.in. linia `myVR: base=410m * factor=1.103` i `myCamo: base(...) + add=0.025`. Jeśli `factor>1.0` lub `add>0.0`, ulepszenia polowe są naliczone w descriptorze.
 
-## Panel SpotMeter (v6.0)
+## Panel SpotMeter (v6.1)
 
-Dwa przeciągalne panele renderowane przez wbudowany fork GUIFlash (`spotmeter_gf` — własny namespace, **nie wymaga** i nie koliduje z `gambiter.guiflash`). Jeden klawisz **PageDown** pokazuje/ukrywa panel — kontekstowo (w bitwie panel bitewny, w garażu garażowy).
+Przeciągalny **panel bitewny** renderowany przez wbudowany fork GUIFlash (`spotmeter_gf` — własny namespace, **nie wymaga** i nie koliduje z `gambiter.guiflash`). **PageDown** pokazuje/ukrywa go w bitwie (domyślnie startuje ukryty). Panel garażowy z v6.0 został usunięty — jego ustawienia są teraz w konfiguratorze (menu ustawień modów). Mod **nigdy nie pisze na czat**.
 
 ### Panel bitewny
 Stale widoczna lista przeciwników. Każdy wiersz: `[klasa] Nazwa xN  T<tier>  VR=XXXm`. Identyczne czołgi są grupowane w jeden wiersz (`battlePanelGroupSameTanks`, np. `Dravec x5`) — jeden przystanek w cyklu Numpad 2/8, bo ten sam model = ten sam VR = ten sam okrąg.
@@ -37,9 +37,6 @@ Stale widoczna lista przeciwników. Każdy wiersz: `[klasa] Nazwa xN  T<tier>  V
 - **Toggle / poziomy** — bieżący stan rations / BIA / recon / optyki / wentylacji / CVS.
 - Wybór celu: **Numpad 2/8** lub klik na wierszu.
 - **Auto-hide**: panel chowa się gdy trzymasz **TAB/N** (tablica wyników) i wraca po puszczeniu; chowa się też gdy otwierasz okna WG (jeśli `autoHidePanelOnWindow`). Stopka pod listą podpowiada `Naciśnij PgDn żeby ukryć panel`.
-
-### Panel garażowy
-Konfiguracja **przed** bitwą. Te same Numpady przełączają opcje na żywo i panel od razu to odzwierciedla. Widać stan AUTO. Auto-chowa się przy wejściu w zakładki (Badania / wyposażenie / amunicja / materiały eksploatacyjne).
 
 ### Auto-dobieranie (NumpadSlash) — „najświeższa akcja wygrywa"
 - Włączenie AUTO → stosuje **preset per-klasa** (`autoPresets`) wg klasy aktualnie namierzonego czołgu. Lekkie: optyka+CVS na slocie + rations/BIA/recon ON; reszta (MT/HT/TD/SPG): optyka+CVS OFF + rations/BIA/recon ON. Preset stosuje się raz przy włączeniu auto (off→on by zaaplikować ponownie).
@@ -150,18 +147,19 @@ Gra automatycznie ładuje wszystkie `.wotmod` z `mods/<wersja>/` po starcie. Bez
 
 ```
 +-----+-----+-----+-----+
-|     |  /  |  *  |  -  |   /=auto-pick  *=dump enemy  -=CVS poziom
+|     |  /  |  *  |  -  |   /=auto-pick  *=dump enemy->log  -=CVS poziom
 +-----+-----+-----+-----+
-|  7  |  8  |  9  |  +  |   7=rations  8=prev  9=live-mode  +=wentylacja poziom
+|  7  |  8  |  9  |  +  |   7=rations  8=prev  9=(wolne)  +=wentylacja poziom
 +-----+-----+-----+-----+
 |  4  |  5  |  6  |     |   4=recon+sitaware  5=clear  6=optyka poziom
 +-----+-----+-----+-----+
-|  1  |  2  |  3  |Enter|   1=directives  2=next  3=BIA  Enter=snapshot
+|  1  |  2  |  3  |Enter|   1=directives  2=next  3=BIA  Enter=snapshot->log
 +-----+-----+-----+-----+
 |     0     |  .  |         0=field-upgrades(BETA)  .=reload-config
 +-----+-----+-----+-----+
 
-   PageDown = pokaż/ukryj panel (bitwa + garaż)
+   PageDown = pokaż/ukryj panel bitewny
+   Mod NIGDY nie pisze na czat - snapshot (Enter) i dump (*) ida do python.log
 ```
 
 | akcja | klawisz | config | default |
@@ -178,11 +176,10 @@ Gra automatycznie ładuje wszystkie `.wotmod` z `mods/<wersja>/` po starcie. Bez
 | toggle Directives | Numpad 1 | `pickerDirectivesKey` | OFF |
 | toggle Field Upgrades (BETA) | Numpad 0 | `pickerFieldUpgradesKey` | OFF |
 | **auto-dobieranie celu** | Numpad / | `autoPickToggleKey` | OFF |
-| toggle live-mode overlay | Numpad 9 | `overlayToggleKey` | OFF |
-| status snapshot | NumpadEnter | `overlayPrintNowKey` | — |
+| status snapshot **do python.log** | NumpadEnter | `overlayPrintNowKey` | — |
 | dump descriptor enemy do logu | Numpad **\*** | `pickerDiagDumpKey` | — |
 | reload configu | NumpadPeriod | `reloadKey` | — |
-| **pokaż/ukryj panel** (bitwa + garaż) | **PageDown** | `panelToggleKey` | — |
+| **pokaż/ukryj panel bitewny** | **PageDown** | `panelToggleKey` | — |
 
 Działa przy **NumLock włączonym i wyłączonym**. **PageDown** jest poza numpadem — `KEY_PGDN` został zwolniony z aliasu Numpad3/BIA (Numpad3 dalej robi BIA), więc służy jako kontekstowy pokaż/ukryj panelu.
 
@@ -216,9 +213,7 @@ Działa przy **NumLock włączonym i wyłączonym**. **PageDown** jest poza nump
 | `pickerAssumeStereoscope` | `true` | jeśli enemy ma lornetkę, zakłada że jest aktywna |
 | `pickerStereoscopeFallback` | `1.25` | mnożnik VR jeśli odczyt z descriptora padnie |
 | `pickerIncludeDeadEnemies` | `false` | czy uwzględniać martwych w cyklu |
-| `overlayEnabled` | `true` | włącza overlay tekstu (chat-line nad minimapą) |
-| `overlayShowOnTickChange` | `true` | automatycznie pokazuje przy istotnej zmianie radiusa |
-| `overlayMinRadiusDelta` | `15.0` | próg zmiany w m do auto-display |
+| `overlayEnabled` | `true` | włącza diagnostykę na żądanie do `python.log` (NumpadEnter snapshot, Numpad\* dump) — **mod nie pisze na czat** |
 | `pickerNextKey` | `KEY_NUMPAD2` | następny przeciwnik |
 | `pickerPrevKey` | `KEY_NUMPAD8` | poprzedni przeciwnik |
 | `pickerClearKey` | `KEY_NUMPAD5` | wyczyść picker |
@@ -227,9 +222,8 @@ Działa przy **NumLock włączonym i wyłączonym**. **PageDown** jest poza nump
 | `pickerReconSitAwareKey` | `KEY_NUMPAD4` | toggle Recon + SitAware |
 | `pickerDirectivesKey` | `KEY_NUMPAD1` | toggle Directives |
 | `pickerFieldUpgradesKey` | `KEY_NUMPAD0` | toggle Field Upgrades (BETA) |
-| `pickerDiagDumpKey` | `KEY_NUMPADSTAR` | dump enemy descriptor do `python.log` |
-| `overlayToggleKey` | `KEY_NUMPAD9` | toggle overlay tekstu |
-| `overlayPrintNowKey` | `KEY_NUMPADENTER` | pokaż pełen status snapshot |
+| `pickerDiagDumpKey` | `KEY_NUMPADSTAR` | dump enemy descriptor + rozbicie VR do `python.log` |
+| `overlayPrintNowKey` | `KEY_NUMPADENTER` | status snapshot do `python.log` |
 | `reloadKey` | `KEY_NUMPADPERIOD` | reload configu |
 | `logCalcDetails` | `false` | wypisuje camo/radius/state do `python.log` |
 
@@ -240,14 +234,12 @@ Nazwy klawiszy: nazwy z modułu `Keys` (np. `KEY_F8`, `KEY_F7`, `KEY_HOME`, `KEY
 | pole | default | opis |
 |---|---|---|
 | `language` | `"auto"` | `auto` = język klienta WoT (`pl`→PL, reszta→EN); wymuś `"pl"` / `"en"` |
-| `panelToggleKey` | `KEY_PGDN` | pokaż/ukryj panel (bitwa + garaż), kontekstowy |
-| `battlePanelEnabled` | `true` | widoczność panelu bitewnego na starcie |
+| `panelToggleKey` | `KEY_PGDN` | pokaż/ukryj panel bitewny |
+| `battlePanelEnabled` | `false` | widoczność panelu bitewnego na starcie (domyślnie ukryty; PageDown przywołuje) |
 | `battlePanelX/Y/W/H` | `10 / 400 / 320 / 380` | pozycja i rozmiar panelu bitewnego (przeciągalny, zapisuje się) |
 | `battlePanelGroupSameTanks` | `true` | grupuje identyczne czołgi w jeden wiersz (`Nazwa xN`) |
 | `autoHidePanelOnWindow` | `true` | chowa panel gdy otwarte okno WG; wraca po zamknięciu |
 | `battleHidePanelKeys` | `["KEY_TAB","KEY_N"]` | trzymanie któregoś chowa panel w bitwie |
-| `garagePanelEnabled` | `true` | widoczność panelu garażowego |
-| `garagePanelX/Y/W/H` | `1500 / 320 / 380 / 320` | pozycja i rozmiar panelu garażowego |
 | `autoPickEnabled` | `false` | auto-dobieranie najbliższego przeciwnika |
 | `autoPickToggleKey` | `KEY_NUMPADSLASH` | klawisz auto-dobierania |
 | `autoPickRangeMeters` | `445.0` | maks. zasięg auto-dobierania |
@@ -302,6 +294,15 @@ W bitwie naciśnij `NumpadPeriod` (lub klawisz z `reloadKey`) — config wczytuj
 
 ## Roadmap
 
+### v6.1 — konfigurator w garażu + ciszej ✅
+
+- **Konfigurator w garażu** przez menu ustawień modów (aslainMenu / ModsSettingsAPI — opcjonalne): widoczność panelu, loadout na start, presety auto-dobierania per klasa (dropdown klas), pełna klawiszologia; zmiany na żywo + zapis do `spotmeter.json`
+- **Panel garażowy usunięty** — ustawienia są w konfiguratorze; z nim zniknął cały watcher okien/route'ów garażu (najbardziej kruchy kod moda)
+- **Panel bitewny domyślnie ukryty** (PageDown przywołuje); wybór ukrycia trwały między bitwami
+- **Mod NIGDY nie pisze na czat** — diagnostyka na żądanie (NumpadEnter snapshot, Numpad\* dump) idzie do `python.log`; live-mode (Numpad9) usunięty
+- **Config w AppData** — przeżywa reinstalacje paczki; stary config migrowany automatycznie
+- `showMinimapCircle` — tryb „sam panel" bez okręgu na minimapie
+
 ### v6.0 — panele GUIFlash + auto-dobieranie ✅
 
 - **Panel bitewny** — stała lista przeciwników z VR, grupowanie identycznych czołgów, linia „Cel" ze spot-distance, stan AUTO; wybór Numpad 2/8 lub klik na wierszu
@@ -332,7 +333,7 @@ W bitwie naciśnij `NumpadPeriod` (lub klawisz z `reloadKey`) — config wczytuj
 
 - Cały picker przeniesiony na klawiaturę numeryczną (działa NumLock ON i OFF)
 - 4 toggle'e dla VR enemy: Rations / Crew Perks bundle / Directives / Field Upgrades
-- Overlay tekstu nad minimapą (chat-line w battle-message-feed)
+- Overlay tekstu nad minimapą (chat-line w battle-message-feed) *(usunięty w v6.1 — mod nie pisze na czat)*
 - NumpadEnter — pełen status snapshot
 - Numpad `*` — dump descryptora enemy do `python.log`
 - NumpadPeriod — hot-reload configu

@@ -45,14 +45,20 @@ Garage configurator + quieter defaults. Scope agreed with Aslain.
   (survives modpack clean-installs). A legacy game-dir config is migrated
   automatically on first load; game-dir paths remain as read fallbacks.
 
-### Added (no-menu polish)
-- When **no** mods-settings menu is installed, the in-garage configurator is
-  unavailable — so the mod now posts **one** chat line per battle session
-  pointing to the auto-created, fully commented `spotmeter.json` (the only way
-  to configure without a menu). Suppressible via `configHintWhenNoMenu`. The
-  startup log line names the exact config path too. The listing now also
-  recommends a (free, optional) mods-settings menu for solo installs that want
-  in-game configuration.
+### Changed (no chat output)
+- **The mod never writes to game chat.** All former chat output is gone:
+  picker/toggle/auto-pick/level confirmations (the battle panel already shows
+  that state), the diagnostic-dump confirmations, and the live-mode block. On-
+  demand diagnostics now go to `python.log` instead — **NumpadEnter** logs a
+  one-shot status block (spot distance for all four states + picker/toggle/own-
+  tank context), **NumpadStar** logs the enemy descriptor + VR breakdown.
+- **Live mode removed** (the old Numpad9 auto-refreshing chat block) along with
+  its config keys `overlayToggleKey` / `liveModeIntervalSec`. `overlayEnabled`
+  now gates the on-demand NumpadEnter logging. The configurator's hotkey list
+  drops the live-mode key accordingly (`_MSA_SETTINGS_VERSION` → 6).
+- When no mods-settings menu is installed, the startup `python.log` line names
+  the exact config path; the listing recommends a (free, optional) menu for
+  solo installs that want in-game configuration.
 
 ### Hardening
 - All client patches are now individually fault-isolated: the `Avatar.shootDualGun`

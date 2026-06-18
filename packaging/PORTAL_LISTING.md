@@ -68,7 +68,7 @@ Pick a specific enemy (click a row in the panel, or Numpad 2/8) and the circle s
 PANEL & SETTINGS
 - In-battle panel: every enemy with its view range; identical tanks grouped (e.g. "Dravec x5"); a target line with the spot-distance; the AUTO state. Click a row or Numpad 2/8 to pick. PageDown shows/hides it; hold TAB/N to peek the team panels.
 - Auto-pick (Numpad /) tracks the nearest enemy, with per-class loadout presets.
-- In-game configurator: install a mods-settings menu (Aslain's aslainMenu or izeberg's ModsSettingsAPI - free, optional) and SpotMeter adds a settings page in the garage: panel options, the assumed loadout, auto-pick presets, language and a full rebindable hotkey list, applied live. Without a menu the mod auto-creates a commented spotmeter.json you can edit (and tells you where it is).
+- In-game configurator: install a mods-settings menu (Aslain's aslainMenu or izeberg's ModsSettingsAPI - free, optional) and SpotMeter adds a settings page in the garage: panel options, the assumed loadout, auto-pick presets, language and a full rebindable hotkey list, applied live. Without a menu the mod auto-creates a commented spotmeter.json you can edit (its exact path is logged to python.log at startup).
 
 LANGUAGE
 English and Polish, auto-detected from your game client.
