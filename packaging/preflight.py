@@ -341,6 +341,23 @@ def check_build_and_wotmod(version):
             ok('wotmod-dirs', 'all intermediate directory entries present')
 
 
+def check_meta_description():
+    """meta.xml <description> ships to the portal + in-client mod lists, so it
+    must not advertise features removed in this version (caught the v6.1.0
+    'garage panels' staleness)."""
+    dead_terms = ['garage panel', 'garage panels', 'panel garazowy', 'panel garażowy']
+    m = re.search(r'<description>(.*?)</description>', _read(META_XML), re.S)
+    if not m:
+        warn('meta-description', 'no <description> in meta.xml')
+        return
+    desc = m.group(1)
+    hits = [t for t in dead_terms if t.lower() in desc.lower()]
+    if hits:
+        fail('meta-description', 'meta.xml description names removed feature(s): %s' % hits)
+    else:
+        ok('meta-description', 'no removed-feature terms (%d chars)' % len(desc))
+
+
 def check_git_clean():
     try:
         out = subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT).decode('utf-8')
@@ -371,6 +388,7 @@ def main():
     _run(check_i18n)
     version = _run(check_versions)
     _run(check_portal_limits)
+    _run(check_meta_description)
     _run(check_msa_settings_version)
     _run(check_build_and_wotmod, version)
     _run(check_git_clean)
