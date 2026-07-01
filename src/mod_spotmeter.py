@@ -1340,10 +1340,15 @@ def init():
         # populate never runs - the View stays a ghost, our cached
         # components never render. Battle path lucked out because
         # something else re-triggered the load; lobby path didn't.
+        # v6.1.0: resolve the GUIFlash source now (prefer a shared
+        # gambiter.guiflash; else eager-import our bundled fork so ITS
+        # onGUISpaceEntered hook subscribes before the first LOBBY event).
+        # When gambiter is used, gambiter itself owns the view lifecycle, so
+        # we only need the instance reference here.
         try:
-            import gui.mods.spotmeter_gf  # noqa: F401
-        except ImportError:
-            _logger.exception('SpotMeter: failed to eager-import spotmeter_gf')
+            _resolve_guiflash()
+        except Exception:
+            _logger.exception('SpotMeter: GUIFlash resolution failed')
         # appLoader.onGUISpaceEntered/Left subscription drives BOTH
         # the in-battle panel and the garage panel show/hide. The
         # legacy menuButtonEnabled flag used to gate this but became
@@ -3744,6 +3749,55 @@ SPOTMETER_PANEL_ROOT = 'spotmeter'
 SPOTMETER_PANEL_REFRESH_SEC = 0.5
 SPOTMETER_MAX_ENEMY_ROWS = 15
 
+# --- GUIFlash source resolution (v6.1.0 coexistence fix) --------------------
+# Our panels render through a GUIFlash view. We ship a private fork
+# (spotmeter_gf) whose SWF is a byte-identical copy of gambiter.guiflash - so
+# it declares the SAME AS3 classes (net.gambiter.*). When a real
+# gambiter.guiflash is ALSO installed (it is, in any modpack: RaJCeL's stats,
+# many others depend on it), two SWFs defining the same classes collide in
+# Scaleform and break the OTHER mod's saved window positions (confirmed by
+# Aslain, 2026-07-01: removing SpotMeter fixed RaJCeL's mod).
+# Fix: prefer the real shared library when present (one definition of
+# net.gambiter.*, no collision, it hosts our components on its shared canvas);
+# fall back to our bundled fork ONLY when gambiter is absent (then nothing else
+# defines net.gambiter.* either, so still no collision). Resolved once.
+_GF = None          # GUIFlash instance in use (gambiter's g_guiFlash or our g_smGuiFlash)
+_GF_EVENT = None    # its COMPONENT_EVENT class
+_GF_SOURCE = None   # 'gambiter' | 'spotmeter_gf' | None
+_GF_RESOLVED = False
+
+
+def _resolve_guiflash():
+    """Return the GUIFlash instance to use, resolving (once) with a preference
+    for a shared gambiter.guiflash over our bundled fork. Returns None if no
+    GUIFlash is available (panels disabled; circle + hotkeys still work)."""
+    global _GF, _GF_EVENT, _GF_SOURCE, _GF_RESOLVED
+    if _GF_RESOLVED:
+        return _GF
+    _GF_RESOLVED = True
+    # 1) Shared gambiter.guiflash - coexists with every other GUIFlash mod
+    #    because there is a single definition of net.gambiter.* .
+    try:
+        from gui.mods.gambiter import g_guiFlash as _inst
+        from gui.mods.gambiter.flash import COMPONENT_EVENT as _ev
+        _GF, _GF_EVENT, _GF_SOURCE = _inst, _ev, 'gambiter'
+        _logger.info('SpotMeter: using shared gambiter.guiflash for panels (coexistence-safe)')
+        return _GF
+    except Exception:
+        pass
+    # 2) Bundled fork - only when gambiter is absent, so nothing else defines
+    #    net.gambiter.* to collide with our byte-identical copy.
+    try:
+        from gui.mods.spotmeter_gf import g_smGuiFlash as _inst
+        from gui.mods.spotmeter_gf.flash import COMPONENT_EVENT as _ev
+        _GF, _GF_EVENT, _GF_SOURCE = _inst, _ev, 'spotmeter_gf'
+        _logger.info('SpotMeter: using bundled spotmeter_gf for panels (no gambiter.guiflash found)')
+        return _GF
+    except Exception:
+        _logger.warning('SpotMeter: no GUIFlash available - in-battle panel disabled '
+                        '(minimap circle + hotkeys still work)')
+        return None
+
 # v6.1.0: the v6.0 garage info panel is GONE - its settings (loadout defaults,
 # panel visibility, hotkey) moved into the mods-settings configurator and the
 # battle panel covers the in-battle state. The SpotMeter panel is battle-only.
@@ -3817,12 +3871,11 @@ def _show_battle_view(force=False):
     if _BATTLE_PANEL_ACTIVE:
         return
 
-    try:
-        from gui.mods.spotmeter_gf import g_smGuiFlash
-    except ImportError:
+    g_smGuiFlash = _resolve_guiflash()
+    if g_smGuiFlash is None:
         _logger.warning(
-            'SpotMeter: spotmeter_gf wrapper not importable - in-battle '
-            'panel disabled. Reinstall the wotmod.')
+            'SpotMeter: no GUIFlash library - in-battle panel disabled '
+            '(minimap circle + hotkeys still work).')
         return
 
     _install_guiflash_event_hook()
@@ -3933,7 +3986,9 @@ def _hide_battle_view():
             pass
         _BATTLE_PANEL_REFRESH_CB = None
     try:
-        from gui.mods.spotmeter_gf import g_smGuiFlash
+        g_smGuiFlash = _resolve_guiflash()
+        if g_smGuiFlash is None:
+            raise RuntimeError('GUIFlash unavailable at teardown')
         # Delete child enemy components first so the cache stays consistent.
         for vid in list(_BATTLE_PANEL_ENEMY_VIDS):
             try:
@@ -3967,79 +4022,95 @@ def _install_guiflash_event_hook():
     global _GUIFLASH_HOOK_INSTALLED
     if _GUIFLASH_HOOK_INSTALLED:
         return
-    try:
-        from gui.mods.spotmeter_gf.flash import COMPONENT_EVENT
-    except ImportError:
-        _logger.warning('SpotMeter: spotmeter_gf.flash COMPONENT_EVENT not importable')
+    _resolve_guiflash()
+    ev = _GF_EVENT
+    if ev is None:
+        _logger.warning('SpotMeter: GUIFlash COMPONENT_EVENT unavailable - drag/click events off')
         return
     try:
-        COMPONENT_EVENT.UPDATED += _on_guiflash_component_updated
-        COMPONENT_EVENT.CLICKED += _on_guiflash_component_clicked
+        ev.UPDATED += _on_guiflash_component_updated
+        # CLICKED exists only on our fork; the real gambiter.guiflash has no
+        # click channel (and our byte-identical SWF never fired it anyway).
+        if hasattr(ev, 'CLICKED'):
+            ev.CLICKED += _on_guiflash_component_clicked
         _GUIFLASH_HOOK_INSTALLED = True
-        _logger.info('SpotMeter: subscribed to spotmeter_gf COMPONENT_EVENT')
+        _logger.info('SpotMeter: subscribed to %s COMPONENT_EVENT', _GF_SOURCE)
     except Exception:
-        _logger.exception('SpotMeter: failed to subscribe to spotmeter_gf events')
+        _logger.exception('SpotMeter: failed to subscribe to GUIFlash events')
 
 
 def _on_guiflash_component_clicked(alias):
     """Dispatch click on any panel component to the right picker handler.
     Aliases like 'spotmeter.tog_rations.label' also dispatch to the same
     handler as the bare 'spotmeter.tog_rations' so clicks on inner text
-    work too (though our current layout has no inner children)."""
-    if not alias or not alias.startswith(SPOTMETER_PANEL_ROOT + '.'):
-        return
-    leaf = alias[len(SPOTMETER_PANEL_ROOT) + 1:].split('.', 1)[0]
-    if leaf == 'auto':
-        _toggle_auto_pick()
-        return
-    for key, suffix, _hotkey, _disp in _TOGGLE_ROWS:
-        if leaf == suffix:
-            _toggle_perk(key)
+    work too (though our current layout has no inner children).
+
+    Coexistence: when we use a shared gambiter.guiflash, this fires for EVERY
+    GUIFlash mod's clicks. We ignore foreign aliases and wrap the whole body so
+    an error can never escape into the shared Event chain and break another
+    mod's handler."""
+    try:
+        if not alias or not alias.startswith(SPOTMETER_PANEL_ROOT + '.'):
             return
-    for key, suffix, _hotkey, _disp in _LEVEL_ROWS:
-        if leaf == suffix:
-            _cycle_level(key)
+        leaf = alias[len(SPOTMETER_PANEL_ROOT) + 1:].split('.', 1)[0]
+        if leaf == 'auto':
+            _toggle_auto_pick()
             return
-    if leaf.startswith('enemy_'):
-        try:
-            vid = int(leaf[len('enemy_'):])
-        except ValueError:
+        for key, suffix, _hotkey, _disp in _TOGGLE_ROWS:
+            if leaf == suffix:
+                _toggle_perk(key)
+                return
+        for key, suffix, _hotkey, _disp in _LEVEL_ROWS:
+            if leaf == suffix:
+                _cycle_level(key)
+                return
+        if leaf.startswith('enemy_'):
+            try:
+                vid = int(leaf[len('enemy_'):])
+            except ValueError:
+                return
+            _battle_panel_on_pick(vid)
             return
-        _battle_panel_on_pick(vid)
-        return
-    # Title / target are explicitly non-interactive (no handler).
+        # Title / target are explicitly non-interactive (no handler).
+    except Exception:
+        _logger.exception('SpotMeter: error in GUIFlash CLICKED handler (swallowed)')
 
 
 def _on_guiflash_component_updated(alias, props):
     """Called whenever any GUIFlash component changes. We persist drag-end
-    coords for our draggable root panels (battle + garage). Other updates
-    are ignored - we don't react to text-change or property-change events
-    coming back to Python."""
-    if not isinstance(props, dict):
-        return
-    if 'x' not in props and 'y' not in props:
-        return
-    # Only the battle panel is draggable (the garage panel is gone in v6.1.0).
-    if alias == SPOTMETER_PANEL_ROOT:
+    coords for our draggable battle panel; other updates are ignored.
+
+    Coexistence: on a shared gambiter.guiflash this fires for EVERY mod's
+    components (including their own draggable windows). We act only on our own
+    root alias and wrap the whole body so an error can never escape into the
+    shared Event chain and break another mod's position-save handler."""
+    try:
+        if not isinstance(props, dict):
+            return
+        if 'x' not in props and 'y' not in props:
+            return
+        # Only our battle panel is draggable (the garage panel is gone in v6.1.0).
+        if alias != SPOTMETER_PANEL_ROOT:
+            return
         cfg_x_key, cfg_y_key, label = 'battlePanelX', 'battlePanelY', 'battle'
-    else:
-        return
-    new_x = props.get('x', _CFG.get(cfg_x_key))
-    new_y = props.get('y', _CFG.get(cfg_y_key))
-    try:
-        cx = int(round(float(new_x)))
-        cy = int(round(float(new_y)))
-    except (TypeError, ValueError):
-        return
-    if cx == _CFG.get(cfg_x_key) and cy == _CFG.get(cfg_y_key):
-        return  # no actual change
-    _CFG[cfg_x_key] = cx
-    _CFG[cfg_y_key] = cy
-    _logger.info('SpotMeter: %s panel dragged to (%d, %d), saving config', label, cx, cy)
-    try:
-        _write_config()
+        new_x = props.get('x', _CFG.get(cfg_x_key))
+        new_y = props.get('y', _CFG.get(cfg_y_key))
+        try:
+            cx = int(round(float(new_x)))
+            cy = int(round(float(new_y)))
+        except (TypeError, ValueError):
+            return
+        if cx == _CFG.get(cfg_x_key) and cy == _CFG.get(cfg_y_key):
+            return  # no actual change
+        _CFG[cfg_x_key] = cx
+        _CFG[cfg_y_key] = cy
+        _logger.info('SpotMeter: %s panel dragged to (%d, %d), saving config', label, cx, cy)
+        try:
+            _write_config()
+        except Exception:
+            _logger.exception('SpotMeter: failed to persist %s panel position', label)
     except Exception:
-        _logger.exception('SpotMeter: failed to persist %s panel position', label)
+        _logger.exception('SpotMeter: error in GUIFlash UPDATED handler (swallowed)')
 
 
 def _schedule_panel_refresh():
@@ -4076,9 +4147,8 @@ def _refresh_panel_state():
     that actually changed. Also reconciles the dynamic enemy_<vid> rows
     against the current enemy listing - creating new ones, deleting
     dead ones, updating survivors."""
-    try:
-        from gui.mods.spotmeter_gf import g_smGuiFlash
-    except ImportError:
+    g_smGuiFlash = _resolve_guiflash()
+    if g_smGuiFlash is None:
         return
     plugin = _get_picker_plugin()
 

@@ -7,6 +7,21 @@ history is in the git tags (`v5.1.0` … `v6.1.0`).
 
 Garage configurator + quieter defaults. Scope agreed with Aslain.
 
+### Fixed (GUIFlash coexistence — important)
+- **SpotMeter no longer breaks other GUIFlash mods' saved window positions.**
+  Our bundled panel library shipped a SWF that was a byte-identical copy of
+  `gambiter.guiflash` and therefore declared the same AS3 classes
+  (`net.gambiter.*`). With a real `gambiter.guiflash` also installed (any
+  modpack), the duplicate class definitions collided in Scaleform and stopped
+  another mod (e.g. RaJCeL's in-battle statistics) from saving its dragged
+  position (reported/confirmed by Aslain). Fix: SpotMeter now **prefers a
+  shared `gui.mods.gambiter` when present** — one definition of the classes, no
+  collision, our components live on its shared canvas — and only falls back to
+  the bundled fork when gambiter is absent (then nothing else defines those
+  classes either). Our GUIFlash event handlers were also made fully
+  exception-isolated so they can never break another mod's handler in the
+  shared event chain.
+
 ### Added
 - **In-game configurator** — when a mods-settings API is installed (Aslain's
   `aslainMenu`, fallback to izeberg's `ModsSettingsAPI` — both optional, the

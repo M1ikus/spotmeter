@@ -21,6 +21,10 @@ Per release:
 NONE - SpotMeter is fully self-contained in the single .wotmod:
 - bundles mod_spotmeter.pyc + a private GUIFlash fork (gui.mods.spotmeter_gf + its SWF)
 - does NOT require gambiter.guiflash, XVM, XFW or any shared library
+- GUIFlash coexistence: if a shared gambiter.guiflash IS installed (any modpack),
+  SpotMeter uses THAT for its panels instead of loading its bundled copy - so it
+  never duplicates the net.gambiter.* classes and never disturbs other GUIFlash
+  mods' saved window positions. The bundled fork is only used when gambiter is absent.
 - spotmeter.json config is optional (built-in defaults if absent)
 - a mods-settings menu (Aslain's aslainMenu / izeberg's ModsSettingsAPI) is
   OPTIONAL too - it only adds the in-garage settings page; the mod runs fully

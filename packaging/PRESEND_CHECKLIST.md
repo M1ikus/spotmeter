@@ -73,6 +73,12 @@ The author runs these in a clean WoT 2.3.0.1 with **only** SpotMeter installed.
 - [ ] **Config location**: confirm `spotmeter.json` is created/updated under
       `%APPDATA%\Wargaming.net\WorldOfTanks\mods\spotmeter\`; an existing old
       config is migrated, not ignored.
+- [ ] **GUIFlash coexistence** (the important one — Aslain's env): with
+      **gambiter.guiflash + another GUIFlash mod** installed (e.g. RaJCeL's
+      in-battle statistics), SpotMeter's panel works AND the other mod still
+      **saves its dragged position** across battles. `python.log` shows
+      `SpotMeter: using shared gambiter.guiflash for panels`. With gambiter
+      absent, log shows `using bundled spotmeter_gf` and our panel still works.
 
 ---
 

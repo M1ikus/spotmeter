@@ -370,6 +370,25 @@ def check_git_clean():
         ok('git-clean', 'working tree clean')
 
 
+def check_guiflash_resolver():
+    """Coexistence invariant: the GUIFlash resolver must PREFER a shared
+    gui.mods.gambiter over the bundled spotmeter_gf. If a future edit flips the
+    order, our byte-identical copy of net.gambiter.* would load alongside the
+    real one and again break other GUIFlash mods' saved positions."""
+    src = _read(SRC_MAIN)
+    gambiter = src.find('from gui.mods.gambiter import')
+    bundled = src.find('from gui.mods.spotmeter_gf import')
+    if gambiter < 0 or bundled < 0:
+        fail('guiflash-resolver', 'resolver must import BOTH gambiter and spotmeter_gf '
+             '(gambiter@%d, spotmeter_gf@%d)' % (gambiter, bundled))
+        return
+    if gambiter > bundled:
+        fail('guiflash-resolver', 'spotmeter_gf is imported before gambiter - the resolver '
+             'MUST prefer the shared gambiter.guiflash to stay coexistence-safe')
+        return
+    ok('guiflash-resolver', 'shared gambiter.guiflash preferred over bundled fork')
+
+
 def _run(fn, *a):
     """Run a check; a crash inside it becomes a FAIL, never aborts the gate."""
     try:
@@ -384,6 +403,7 @@ def main():
     _run(check_py27_compile)
     _run(check_ast_and_json)
     _run(check_dead_symbols)
+    _run(check_guiflash_resolver)
     _run(check_config_parity)
     _run(check_i18n)
     version = _run(check_versions)

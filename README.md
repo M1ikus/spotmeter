@@ -28,7 +28,9 @@ W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + 
 
 ## Panel SpotMeter (v6.1)
 
-Przeciągalny **panel bitewny** renderowany przez wbudowany fork GUIFlash (`spotmeter_gf` — własny namespace, **nie wymaga** i nie koliduje z `gambiter.guiflash`). **PageDown** pokazuje/ukrywa go w bitwie (domyślnie startuje ukryty). Panel garażowy z v6.0 został usunięty — jego ustawienia są teraz w konfiguratorze (menu ustawień modów). Mod **nigdy nie pisze na czat**.
+Przeciągalny **panel bitewny** renderowany przez GUIFlash. **PageDown** pokazuje/ukrywa go w bitwie (domyślnie startuje ukryty). Panel garażowy z v6.0 został usunięty — jego ustawienia są teraz w konfiguratorze (menu ustawień modów). Mod **nigdy nie pisze na czat**.
+
+**Koegzystencja GUIFlash (v6.1):** jeśli w grze jest współdzielony `gambiter.guiflash` (dowolna paczka), SpotMeter używa **jego** do paneli i **nie ładuje własnej kopii** — dzięki temu nie duplikuje klas `net.gambiter.*` i nie psuje zapisu pozycji innych modów na GUIFlash. Gdy `gambiter.guiflash` nie ma, używany jest wbudowany fork (`spotmeter_gf`) — wtedy nic innego tych klas nie deklaruje, więc też brak kolizji. Zero twardej zależności.
 
 ### Panel bitewny
 Stale widoczna lista przeciwników. Każdy wiersz: `[klasa] Nazwa xN  T<tier>  VR=XXXm`. Identyczne czołgi są grupowane w jeden wiersz (`battlePanelGroupSameTanks`, np. `Dravec x5`) — jeden przystanek w cyklu Numpad 2/8, bo ten sam model = ten sam VR = ten sam okrąg.
@@ -302,6 +304,7 @@ W bitwie naciśnij `NumpadPeriod` (lub klawisz z `reloadKey`) — config wczytuj
 - **Mod NIGDY nie pisze na czat** — diagnostyka na żądanie (NumpadEnter snapshot, Numpad\* dump) idzie do `python.log`; live-mode (Numpad9) usunięty
 - **Config w AppData** — przeżywa reinstalacje paczki; stary config migrowany automatycznie
 - `showMinimapCircle` — tryb „sam panel" bez okręgu na minimapie
+- **Fix koegzystencji GUIFlash** — nasz SWF był bajt-w-bajt kopią `gambiter.guiflash` (te same klasy `net.gambiter.*`) i psuł zapis pozycji innych modów; teraz używamy współdzielonego `gambiter.guiflash` gdy jest, a bundled tylko w fallbacku
 
 ### v6.0 — panele GUIFlash + auto-dobieranie ✅
 
