@@ -3,7 +3,7 @@
 All notable changes to **SpotMeter**. Dates are ISO (YYYY-MM-DD). Full per-commit
 history is in the git tags (`v5.1.0` … `v6.1.0`).
 
-## [6.1.0] — 2026-06-14
+## [6.1.0] — 2026-07-08
 
 Garage configurator + quieter defaults. Scope agreed with Aslain.
 
