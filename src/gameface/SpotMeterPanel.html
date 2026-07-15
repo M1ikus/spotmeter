@@ -1,0 +1,186 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  #panel {
+    width: 300px;
+    font-family: Arial, "Segoe UI", sans-serif;
+    color: #ffffff;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 4px;
+    padding: 5px 8px 6px;
+    box-sizing: border-box;
+    text-shadow: 0 0 3px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.9);
+    user-select: none;
+    pointer-events: none;
+  }
+  #head {
+    display: flex; justify-content: space-between; align-items: center;
+    pointer-events: auto; cursor: move; padding-bottom: 2px;
+  }
+  #title { font-size: 12px; font-weight: bold; letter-spacing: .3px; }
+  #hright { display: inline-flex; align-items: center; }
+  #ver { font-size: 9px; color: rgba(255,255,255,0.55); }
+  /* collapse toggle - a CSS triangle (no font dependency) */
+  #collapse { pointer-events: auto; cursor: pointer; padding: 3px 2px 3px 8px; display: inline-flex; align-items: center; }
+  #arrow {
+    width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid #ffffff;                 /* down = expanded */
+  }
+  #panel.collapsed #arrow {
+    border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+    border-left: 5px solid #ffffff; border-right: none;   /* right = collapsed */
+  }
+  #panel.collapsed #auto,
+  #panel.collapsed #cells,
+  #panel.collapsed #rows,
+  #panel.collapsed #hint { display: none; }
+  #target { font-size: 12px; margin: 3px 0 2px; min-height: 15px; }
+  #target .spot { font-weight: bold; }
+  #target .ctx { color: rgba(255,255,255,0.75); }
+  #auto {
+    font-size: 11px; margin-bottom: 5px; cursor: pointer; padding: 1px 3px;
+    border-radius: 3px; display: inline-block; color: #ffffff; pointer-events: auto;
+  }
+  #auto.on { color: #6dff8f; }
+  #auto:hover { background: rgba(255,255,255,0.18); }
+  #cells { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 5px; }
+  .cell {
+    flex: 1 1 30%; box-sizing: border-box; font-size: 10px; cursor: pointer;
+    padding: 2px 3px; border-radius: 2px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; color: #ffffff; pointer-events: auto;
+  }
+  .cell.on { color: #6dff8f; }
+  .cell:hover { background: rgba(255,255,255,0.20); }
+  .cell .hk { color: rgba(255,255,255,0.5); }
+  .row {
+    display: flex; align-items: center; padding: 2px 4px; font-size: 12px;
+    cursor: pointer; border-radius: 2px; border-left: 2px solid transparent;
+    color: #ffffff; pointer-events: auto;
+  }
+  .row:hover { background: rgba(255,255,255,0.14); }
+  .row.picked { background: rgba(255,255,255,0.18); border-left-color: #ffffff; }
+  .row .cls { color: rgba(255,255,255,0.75); font-size: 10px; width: 42px; }
+  .row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .cnt { margin: 0 5px; }
+  .row .vr { font-variant-numeric: tabular-nums; }
+  #hint { font-size: 9px; color: rgba(255,255,255,0.5); font-style: italic; margin-top: 3px; }
+</style>
+</head>
+<body>
+  <div id="panel">
+    <div id="head">
+      <span id="title">SpotMeter</span>
+      <span id="hright"><span id="ver">v7.0</span><span id="collapse"><span id="arrow"></span></span></span>
+    </div>
+    <div id="target">--</div>
+    <div id="auto">[Auto-pick: OFF]</div>
+    <div id="cells"></div>
+    <div id="rows"></div>
+    <div id="hint">PageDown - ukryj  |  chwyt: naglowek  |  strzalka: zwin</div>
+  </div>
+  <script>
+    (function () {
+      var collapsed = false, collapseInit = false;
+      function model() { try { return window.model || null; } catch (e) { return null; } }
+      function applyCollapse() {
+        document.getElementById('panel').className = collapsed ? 'collapsed' : '';
+      }
+      function measureAndSize() {
+        try {
+          var r = document.getElementById('panel').getBoundingClientRect();
+          if (window.viewEnv && viewEnv.resizeViewPx && r.width && r.height) {
+            viewEnv.resizeViewPx(Math.ceil(r.width), Math.ceil(r.height));
+          }
+        } catch (e) {}
+      }
+      function cmd(name, arg) {
+        var m = model();
+        if (m && typeof m[name] === 'function') { try { m[name](arg); } catch (e) {} }
+      }
+      function render() {
+        var m = model(), s;
+        try { s = JSON.parse((m && m.state) || '{}'); } catch (e) { s = {}; }
+
+        // apply the saved collapse state once (first time it arrives from config)
+        if (!collapseInit && typeof s.collapsed !== 'undefined') {
+          collapsed = !!s.collapsed; applyCollapse(); collapseInit = true;
+        }
+
+        document.getElementById('target').innerHTML = s.target || '<span class="ctx">--</span>';
+
+        var auto = s.auto || { on: false, text: 'OFF' };
+        var ae = document.getElementById('auto');
+        ae.className = auto.on ? 'on' : '';
+        ae.textContent = '[Auto-pick: ' + (auto.text || (auto.on ? 'ON' : 'OFF')) + ']';
+
+        var cbox = document.getElementById('cells');
+        cbox.innerHTML = '';
+        (s.cells || []).forEach(function (c) {
+          var d = document.createElement('div');
+          d.className = 'cell ' + (c.on ? 'on' : 'off');
+          d.innerHTML = c.label + (c.hotkey ? ' <span class="hk">' + c.hotkey + '</span>' : '');
+          d.addEventListener('click', function () { cmd('onAction', { key: c.key }); });
+          cbox.appendChild(d);
+        });
+
+        var rbox = document.getElementById('rows');
+        rbox.innerHTML = '';
+        (s.enemies || []).forEach(function (e) {
+          var d = document.createElement('div');
+          d.className = 'row' + (e.picked ? ' picked' : '');
+          var cnt = (e.count && e.count > 1) ? '<span class="cnt">x' + e.count + '</span>' : '';
+          d.innerHTML =
+            '<span class="cls">' + (e.cls || '') + (e.level ? ' T' + e.level : '') + '</span>' +
+            '<span class="nm">' + (e.name || '?') + '</span>' + cnt +
+            '<span class="vr">VR ' + (e.vr || '?') + '</span>';
+          d.addEventListener('click', function () { cmd('onRowClick', { vid: e.vid }); });
+          rbox.appendChild(d);
+        });
+
+        requestAnimationFrame(measureAndSize);
+      }
+      function boot() {
+        try {
+          if (window.viewEnv && viewEnv.addDataChangedCallback) viewEnv.addDataChangedCallback('model', 0, true);
+          if (window.engine && engine.on) engine.on('viewEnv.onDataChanged', render);
+          if (window.engine && engine.on) engine.on('self.onScaleUpdated', function () { requestAnimationFrame(measureAndSize); });
+        } catch (e) {}
+        // drag: header mousedown starts, document mouseup ends (Python moves the window)
+        var head = document.getElementById('head');
+        if (head) head.addEventListener('mousedown', function (ev) {
+          cmd('onDrag', { phase: 'start' });
+          if (ev && ev.preventDefault) ev.preventDefault();
+        });
+        document.addEventListener('mouseup', function () { cmd('onDrag', { phase: 'end' }); });
+        // collapse toggle (does NOT start a drag)
+        var col = document.getElementById('collapse');
+        if (col) {
+          col.addEventListener('mousedown', function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); });
+          col.addEventListener('click', function (ev) {
+            collapsed = !collapsed;
+            collapseInit = true;
+            applyCollapse();
+            cmd('onCollapse', { on: collapsed });   // persist to config
+            if (ev && ev.stopPropagation) ev.stopPropagation();
+            requestAnimationFrame(measureAndSize);
+          });
+        }
+        // auto-resize on content-size changes (enemy list grows early in battle)
+        try {
+          if (window.ResizeObserver) new ResizeObserver(function () { measureAndSize(); }).observe(document.getElementById('panel'));
+        } catch (e) {}
+        var go = function () { requestAnimationFrame(function () { requestAnimationFrame(function () { render(); measureAndSize(); }); }); };
+        if (window.isDomBuilt) go(); else setTimeout(go, 0);
+        [150, 400, 900, 1800].forEach(function (ms) { setTimeout(function () { render(); measureAndSize(); }, ms); });
+      }
+      if (window.engine && window.engine.whenReady) window.engine.whenReady.then(boot);
+      else window.addEventListener('load', boot);
+    })();
+  </script>
+</body>
+</html>

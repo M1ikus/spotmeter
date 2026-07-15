@@ -1,0 +1,12 @@
+[
+  {
+    "itemID": "mods/spotmeter/panelLayout",
+    "type": "Layout",
+    "path": "coui://gui/gameface/mods/spotmeter/SpotMeterPanel.html",
+    "parameters": {
+      "extension": "",
+      "entrance": "SpotMeterPanel",
+      "impl": "gameface"
+    }
+  }
+]

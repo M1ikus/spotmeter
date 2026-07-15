@@ -31,12 +31,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY27 = os.environ.get('PY27', r'C:\Users\23120\miniforge3\envs\py27\python.exe')
 
 SRC_MAIN = os.path.join(ROOT, 'src', 'mod_spotmeter.py')
-SRC_FORK = [os.path.join(ROOT, 'src', 'spotmeter_gf', f)
-            for f in ('__init__.py', 'flash.py', 'utils.py')]
+SRC_GFPANEL = os.path.join(ROOT, 'src', 'spotmeter_gfpanel.py')
+SRC_HTML = os.path.join(ROOT, 'src', 'gameface', 'SpotMeterPanel.html')
+SRC_RESMAP = os.path.join(ROOT, 'src', 'res_map', 'net.spotmeter.panel.json')
 CONFIG_JSON = os.path.join(ROOT, 'src', 'spotmeter.json')
 META_XML = os.path.join(ROOT, 'packaging', 'meta.xml')
 BUILD_PYC = os.path.join(ROOT, 'build', 'mod_spotmeter.pyc')
-BUILD_FORK_DIR = os.path.join(ROOT, 'build', 'spotmeter_gf')
+BUILD_GFPANEL_PYC = os.path.join(ROOT, 'build', 'spotmeter_gfpanel.pyc')
 
 # Symbols deleted in v6.1.0 (garage panel + lobby window-watch). A LIVE code
 # reference to any of these is a NameError at runtime -> hard fail.
@@ -49,6 +50,14 @@ DEAD_SYMBOLS = {
     '_ww_is_real_window', '_ww_window_alias', '_ww_window_layer',
     '_ww_windows_manager', '_ww_lobby_sm', '_ww_on_window_status',
     '_ww_on_route_changed', '_WW_ROUTE_BUSY', '_WW_IGNORE_ALIASES',
+    # v7.0.0 - GUIFlash panel removed (Gameface backend); a live ref = NameError.
+    '_resolve_guiflash', '_gf_backend', '_install_guiflash_event_hook',
+    '_on_guiflash_component_clicked', '_on_guiflash_component_updated',
+    '_maybe_update_label', '_refresh_enemy_rows', '_purge_enemy_rows',
+    '_fmt_target_label', '_fmt_auto_label', '_fmt_toggle_label',
+    '_fmt_level_label', '_fmt_enemy_row', 'SPOTMETER_PANEL_ROOT',
+    '_BATTLE_PANEL_LAST', '_BATTLE_PANEL_ENEMY_VIDS', '_GUIFLASH_HOOK_INSTALLED',
+    '_GF_EVENT', '_GF_SOURCE', '_GF_RESOLVED', 'SPOTMETER_GF_ALIAS',
 }
 
 PORTAL_LIMITS = (1000, 3000, 1000)  # version changes / mod description / installation
@@ -91,12 +100,13 @@ def check_py27_compile():
         warn('py27-compile', 'py27 interpreter not found at %s (set PY27 env) - '
              'SKIPPED the authoritative py2 syntax/compile check!' % PY27)
         return
-    targets = [(SRC_MAIN, BUILD_PYC, 'mod_spotmeter.py')]
-    for src in SRC_FORK:
-        targets.append((src, os.path.join(BUILD_FORK_DIR, os.path.basename(src) + 'c'),
-                        'spotmeter_gf/' + os.path.basename(src)))
-    if not os.path.isdir(BUILD_FORK_DIR):
-        os.makedirs(BUILD_FORK_DIR)
+    targets = [
+        (SRC_MAIN, BUILD_PYC, 'mod_spotmeter.py'),
+        (SRC_GFPANEL, BUILD_GFPANEL_PYC, 'spotmeter_gfpanel.py'),
+    ]
+    build_dir = os.path.dirname(BUILD_PYC)
+    if not os.path.isdir(build_dir):
+        os.makedirs(build_dir)
     for src, cfile, dfile in targets:
         code = ("import py_compile,sys\n"
                 "try:\n"
@@ -109,7 +119,7 @@ def check_py27_compile():
             fail('py27-compile', '%s did not compile under py2.7: %s'
                  % (dfile, err.decode('utf-8', 'replace').strip()))
             return
-    ok('py27-compile', 'mod + fork compile under py2.7 (fresh bytecode written to build/)')
+    ok('py27-compile', 'mod + gfpanel compile under py2.7 (fresh bytecode written to build/)')
 
 
 def check_ast_and_json():
@@ -301,10 +311,9 @@ def check_build_and_wotmod(version):
     expected = {
         'meta.xml',
         'res/scripts/client/gui/mods/mod_spotmeter.pyc',
-        'res/scripts/client/gui/mods/spotmeter_gf/__init__.pyc',
-        'res/scripts/client/gui/mods/spotmeter_gf/flash.pyc',
-        'res/scripts/client/gui/mods/spotmeter_gf/utils.pyc',
-        'res/gui/flash/spotmeter_guiflash.swf',
+        'res/scripts/client/gui/mods/spotmeter_gfpanel.pyc',
+        'res/gui/gameface/mods/spotmeter/SpotMeterPanel.html',
+        'res/mods/configs/res_map/net.spotmeter.panel.json',
     }
     with zipfile.ZipFile(wotmod) as z:
         if z.testzip() is not None:
@@ -326,7 +335,7 @@ def check_build_and_wotmod(version):
         elif extra:
             fail('wotmod-payload', 'unexpected extra files: %s' % sorted(extra))
         else:
-            ok('wotmod-payload', 'exact expected 6-file payload')
+            ok('wotmod-payload', 'exact expected 5-entry Gameface payload (no SWF/fork)')
         # every intermediate directory present as its own entry
         needed_dirs = set()
         for f in expected:
@@ -370,23 +379,44 @@ def check_git_clean():
         ok('git-clean', 'working tree clean')
 
 
-def check_guiflash_resolver():
-    """Coexistence invariant: the GUIFlash resolver must PREFER a shared
-    gui.mods.gambiter over the bundled spotmeter_gf. If a future edit flips the
-    order, our byte-identical copy of net.gambiter.* would load alongside the
-    real one and again break other GUIFlash mods' saved positions."""
-    src = _read(SRC_MAIN)
-    gambiter = src.find('from gui.mods.gambiter import')
-    bundled = src.find('from gui.mods.spotmeter_gf import')
-    if gambiter < 0 or bundled < 0:
-        fail('guiflash-resolver', 'resolver must import BOTH gambiter and spotmeter_gf '
-             '(gambiter@%d, spotmeter_gf@%d)' % (gambiter, bundled))
+def check_res_map():
+    """The Gameface panel registers via the res_map JSON. Its itemID must match
+    LAYOUT_KEY in spotmeter_gfpanel.py and its coui:// path must point at the
+    shipped HTML - a mismatch means res_id_by_key returns INVALID_RES_ID and the
+    panel silently never appears in battle."""
+    try:
+        entries = json.loads(_read(SRC_RESMAP))
+    except ValueError as e:
+        fail('res-map', 'res_map JSON invalid: %s' % e)
         return
-    if gambiter > bundled:
-        fail('guiflash-resolver', 'spotmeter_gf is imported before gambiter - the resolver '
-             'MUST prefer the shared gambiter.guiflash to stay coexistence-safe')
+    if not isinstance(entries, list) or not entries or not isinstance(entries[0], dict):
+        fail('res-map', 'res_map must be a non-empty list of objects')
         return
-    ok('guiflash-resolver', 'shared gambiter.guiflash preferred over bundled fork')
+    item = entries[0]
+    layout_key = None
+    for line in _read(SRC_GFPANEL).splitlines():
+        m = re.match(r"\s*LAYOUT_KEY\s*=\s*'([^']+)'", line)
+        if m:
+            layout_key = m.group(1)
+            break
+    if layout_key is None:
+        fail('res-map', 'LAYOUT_KEY not found in spotmeter_gfpanel.py')
+        return
+    if item.get('itemID') != layout_key:
+        fail('res-map', 'res_map itemID %r != LAYOUT_KEY %r' % (item.get('itemID'), layout_key))
+        return
+    params = item.get('parameters', {})
+    if params.get('impl') != 'gameface':
+        fail('res-map', "parameters.impl must be 'gameface' (got %r)" % params.get('impl'))
+        return
+    path = item.get('path', '')
+    if not path.startswith('coui://gui/gameface/mods/spotmeter/') or not path.endswith('.html'):
+        fail('res-map', 'unexpected coui:// path: %r' % path)
+        return
+    if not os.path.exists(SRC_HTML):
+        fail('res-map', 'panel HTML missing: %s' % SRC_HTML)
+        return
+    ok('res-map', 'layout %r -> %s (+ HTML present, impl=gameface)' % (layout_key, path))
 
 
 def _run(fn, *a):
@@ -403,7 +433,7 @@ def main():
     _run(check_py27_compile)
     _run(check_ast_and_json)
     _run(check_dead_symbols)
-    _run(check_guiflash_resolver)
+    _run(check_res_map)
     _run(check_config_parity)
     _run(check_i18n)
     version = _run(check_versions)

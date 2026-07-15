@@ -6,7 +6,7 @@
 # Works alongside the game's existing view-range circles (does not replace them).
 #
 # Loader entry: scripts/client/gui/mods/mod_spotmeter.pyc
-# Game version: World of Tanks 2.3.0.1 (Python 2.7 bytecode)
+# Game version: World of Tanks 2.3.1.0 (Python 2.7 bytecode)
 import json
 import logging
 import os
@@ -23,13 +23,13 @@ _logger = logging.getLogger('SpotMeter')
 # WARNING-level so the line shows up in python.log even if the user's logging
 # level is filtering INFO out. This proves the mod was at least imported by
 # the loader; if you don't see this line, the .wotmod isn't being picked up.
-MOD_VERSION = '6.1.0'
+MOD_VERSION = '7.0.0'
 # Short "major.minor" form shown in panel titles ("6.0.0" -> "6.0"); the
 # full MOD_VERSION still drives logs / version reporting / meta.xml. Bumping
 # the patch (6.0.1) keeps the panel at "6.0"; a minor bump (6.1.0) -> "6.1".
 MOD_VERSION_SHORT = '.'.join(MOD_VERSION.split('.')[:2])
 MOD_AUTHOR = 'ISEDR_Mikus'  # small credit line shown in the panels
-_logger.warning('SpotMeter: module loaded (version=%s)', MOD_VERSION)
+_logger.info('SpotMeter: module loaded (version=%s)', MOD_VERSION)
 
 
 # ---------------------------------------------------------------------------
@@ -351,21 +351,13 @@ DEFAULT_CONFIG = {
         'vents':  0,
         'cvs':    0,
     },
-    # v6.0 in-garage menu button. Floating Scaleform overlay on the hangar
-    # view; drag with mouse to reposition. Coords are absolute pixels from
-    # the screen top-left and persist via Save action in the menu (or
-    # automatic save on drag-release, see Phase 3.3). Defaults aim at the
-    # bottom-of-hangar area near the customization brush icon at 1920x1080;
-    # at other resolutions, _clamp_button_pos() rebases to visible bounds
-    # on each Hangar populate.
-    # v6.0.0 MVP1 ship: garage UI deferred (the new WG IGui View
-    # framework gate). In-battle panel ships via a byte-identical copy
-    # of GambitER / CH4MPi's GUIFlash 0.6.4 (MIT), bundled under our
-    # private gui.mods.spotmeter_gf namespace + 'SpotMeterGuiFlashView'
-    # alias. Display-only - any FFDec recompile attempting to add click
-    # events crashes WoT during AVM2 verify, so clicks are NOT wired:
-    # interaction stays on Numpad keys (2/8 cycle target, 5 clear,
-    # 1/3/4/7/0 toggle perks, NumpadSlash auto-pick).
+    # DEAD legacy keys (v6.0 in-garage menu button). The floating garage
+    # menu-button + garage panel were removed in v6.1; v7 has no garage UI at
+    # all and the in-battle panel is now a Gameface overlay (see spotmeter_gfpanel
+    # / the _gf_* backend), NOT a GUIFlash/SWF view. These keys are kept only so
+    # config-parity holds with old spotmeter.json files; nothing reads them for
+    # any effect (menuButtonEnabled is .get()-defaulted False and just logged).
+    # Safe to drop in a future cleanup once we don't care about old configs.
     'menuButtonEnabled': False,
     'menuButtonX': 720,
     'menuButtonY': 850,
@@ -379,8 +371,7 @@ DEFAULT_CONFIG = {
     'battlePanelEnabled': False,
     'battlePanelX': 10,
     'battlePanelY': 400,
-    'battlePanelW': 320,
-    'battlePanelH': 380,
+    'battlePanelCollapsed': False,   # v7: remember the collapse-arrow state
     # Collapse identical enemy tanks into one panel row + one cycle stop
     # (same model = same view range = same circle). Numpad 2/8 then steps
     # types, not individuals. False = list every enemy separately.
@@ -451,7 +442,6 @@ _ENEMY_POS_CACHE = {}  # vid -> (x, z, timestamp) last-known 2D positions for au
 # within a single battle (respawns, scenario reloads). Cleared on stop.
 _DEFAULT_AUTO_PICK_ENABLED = False
 _BATTLE_RESET_DONE = False
-_LOADER_DIAG_INSTALLED = False
 
 
 def _read_config():
@@ -1281,7 +1271,7 @@ def _msa_register():
     saved = _MSA_API.setModTemplate(_MSA_LINKAGE, _msa_build_template(),
                                     _msa_on_settings_changed)
     _MSA_REGISTERED = True
-    _logger.warning('SpotMeter: configurator registered via %s (saved settings: %s)',
+    _logger.info('SpotMeter: configurator registered via %s (saved settings: %s)',
                     which, 'yes' if saved else 'fresh')
     if saved:
         # The menu's stored copy wins for the exposed subset (it is what the
@@ -1291,35 +1281,22 @@ def _msa_register():
 
 def init():
     global _DEFAULT_AUTO_PICK_ENABLED
-    _logger.warning('SpotMeter: init() called')
+    _logger.info('SpotMeter: init() called')
     try:
         _read_config()
         if not _CFG.get('enabled', True):
-            _logger.warning('SpotMeter: disabled by config')
+            _logger.info('SpotMeter: disabled by config')
             return
         _apply_default_toggles()
         _apply_default_levels()
         # Capture user's preferred auto-pick state once at WoT startup so
         # _reset_battle_state can restore it cleanly between battles.
         _DEFAULT_AUTO_PICK_ENABLED = bool(_CFG.get('autoPickEnabled', False))
-        # v6.0.0 Phase 5.1 / WoT 2.x: register the floating views with
-        # g_entitiesFactories at INIT time, not lazily on hangar populate.
-        # The lobby app's loader snapshots known aliases at startup; late
-        # registrations are silently ignored. Registration failures here
-        # are not fatal - they just mean the menu UI is disabled for this
-        # session. The minimap circle (the core feature) keeps working.
-        try:
-            _register_button_view()
-        except Exception:
-            _logger.exception('SpotMeter: early button view registration failed')
-        try:
-            _register_menu_view()
-        except Exception:
-            _logger.exception('SpotMeter: early menu view registration failed')
-        try:
-            _register_battle_view()
-        except Exception:
-            _logger.exception('SpotMeter: early battle view registration failed')
+        # v7.0.0: the in-battle panel is a Gameface overlay (spotmeter_gfpanel),
+        # so there is no Scaleform view to register. The old v6.0 native-SWF
+        # button/menu/battle IViews are dead code (never shipped a SWF) and are
+        # no longer registered here - that removes the misleading "url=...swf"
+        # log lines for SWFs that don't exist.
         # Each patch is independent - one failing on an unexpected WoT build
         # must not abort the rest of init (the minimap circle is the core).
         try:
@@ -1330,25 +1307,13 @@ def init():
             _patch_avatar_shoot()
         except Exception:
             _logger.exception('SpotMeter: avatar shoot patch failed')
-        # v6.0.0: eager-import our private GUIFlash so it's ready to
-        # catch the LOBBY space-entered event WoT fires right after
-        # init. The library auto-subscribes its own onGUISpaceEntered
-        # hook in its __init__ - that hook is what actually triggers
-        # the SWF View to load via app.loadView. If we lazy-imported
-        # it later (e.g. inside _show_garage_panel), the subscription
-        # would register AFTER the LOBBY event fired and Flash_UI._
-        # populate never runs - the View stays a ghost, our cached
-        # components never render. Battle path lucked out because
-        # something else re-triggered the load; lobby path didn't.
-        # v6.1.0: resolve the GUIFlash source now (prefer a shared
-        # gambiter.guiflash; else eager-import our bundled fork so ITS
-        # onGUISpaceEntered hook subscribes before the first LOBBY event).
-        # When gambiter is used, gambiter itself owns the view lifecycle, so
-        # we only need the instance reference here.
+        # v7.0: wire the Gameface panel backend + resolve its layout now, so
+        # net.openwg.gameface's res_map machinery (incl. its one-time client
+        # restart) runs at startup rather than mid-battle.
         try:
-            _resolve_guiflash()
+            _gf_ensure_setup()
         except Exception:
-            _logger.exception('SpotMeter: GUIFlash resolution failed')
+            _logger.exception('SpotMeter: Gameface backend init failed')
         # appLoader.onGUISpaceEntered/Left subscription drives BOTH
         # the in-battle panel and the garage panel show/hide. The
         # legacy menuButtonEnabled flag used to gate this but became
@@ -1369,7 +1334,7 @@ def init():
             _msa_register()
         except Exception:
             _logger.exception('SpotMeter: ModsSettingsAPI registration failed')
-        _logger.warning(
+        _logger.info(
             'SpotMeter: initialised (version=%s, useOwnViewRange=%s, fire=%s, picker=%s)',
             MOD_VERSION, _CFG['useOwnViewRange'],
             _CFG['applyFirePenalty'], _CFG['pickerEnabled'])
@@ -2380,7 +2345,7 @@ def _dump_picker_descriptor(plugin):
     Bound to pickerDiagDumpKey (default Numpad *).
     """
     if _PICKED_VID is None:
-        _logger.warning('SpotMeter: dump requested but no target picked')
+        _logger.info('SpotMeter: dump requested but no target picked')
         return
     try:
         arenaDP = plugin.sessionProvider.getArenaDP()
@@ -2427,7 +2392,7 @@ def _dump_picker_descriptor(plugin):
         misc_full_lines.append('    (failed to iterate)')
     misc_full = '\n'.join(misc_full_lines) if misc_full_lines else '    (empty)'
 
-    _logger.warning(
+    _logger.info(
         'SpotMeter: descriptor dump for vid=%s name=%s\n'
         '  turret.circularVisionRadius        = %s\n'
         '  miscAttrs.circularVisionRadiusFactor = %s\n'
@@ -2556,7 +2521,7 @@ def _dump_picker_descriptor(plugin):
 
     lines.append('  ============================================')
     lines.append('  final VR  = %.2fm' % final)
-    _logger.warning('\n'.join(lines))
+    _logger.info('\n'.join(lines))
 
 
 def _format_picker_summary(plugin):
@@ -2629,7 +2594,7 @@ def _toggle_perk(name):
         return
     _PICKER_TOGGLES[name] = not _PICKER_TOGGLES[name]
     in_garage = _is_in_garage()
-    _logger.warning('SpotMeter: toggle %s -> %s (in_garage=%s)',
+    _logger.info('SpotMeter: toggle %s -> %s (in_garage=%s)',
                     name, _PICKER_TOGGLES[name], in_garage)
     # In the garage, also update the in-memory defaults so that the
     # next battle's _reset_battle_state picks up the new state instead
@@ -2677,7 +2642,7 @@ def _cycle_level(name):
         return
     _PICKER_LEVELS[name] = (int(_PICKER_LEVELS.get(name, 0)) + 1) % n
     in_garage = _is_in_garage()
-    _logger.warning('SpotMeter: cycle %s -> L%d (in_garage=%s)',
+    _logger.info('SpotMeter: cycle %s -> L%d (in_garage=%s)',
                     name, _PICKER_LEVELS[name], in_garage)
     # Same garage-side defaults sync as _toggle_perk - so cycling in the
     # lobby actually configures the next battle's starting level.
@@ -2842,7 +2807,6 @@ def _force_panel_refresh(affected_vids=None):
 # window list on every status change (stateless). Pure subscription + our
 # existing hide/show, all try/except, NO view-layer changes, so it can never
 # hang load like the SUB_VIEW experiment did. -----
-SPOTMETER_GF_ALIAS = 'SpotMeterGuiFlashView'  # our own GUIFlash view - never hide on it
 _PANEL_AUTO_HIDDEN = False   # True when WE hid the panel because a window is open
 _PANEL_USER_HIDDEN = False   # True when the USER explicitly hid the panel via the
                              # toggle key (PgDn). Blocks the auto-show paths
@@ -3007,7 +2971,7 @@ def _patch_hangar_lifecycle():
 
     def _onSpaceEntered(spaceID):
         try:
-            _logger.warning('SpotMeter: onGUISpaceEntered spaceID=%s', spaceID)
+            _logger.info('SpotMeter: onGUISpaceEntered spaceID=%s', spaceID)
             if spaceID == SPACE_ID.LOBBY:
                 _on_hangar_populate(None)
             elif spaceID == SPACE_ID.BATTLE:
@@ -3018,7 +2982,7 @@ def _patch_hangar_lifecycle():
 
     def _onSpaceLeft(spaceID):
         try:
-            _logger.warning('SpotMeter: onGUISpaceLeft spaceID=%s', spaceID)
+            _logger.info('SpotMeter: onGUISpaceLeft spaceID=%s', spaceID)
             if spaceID == SPACE_ID.LOBBY:
                 _on_hangar_dispose(None)
             elif spaceID == SPACE_ID.BATTLE:
@@ -3034,19 +2998,18 @@ def _patch_hangar_lifecycle():
         return
 
     _HANGAR_PATCHED = True
-    _logger.warning('SpotMeter: subscribed to appLoader.onGUISpaceEntered/Left (lobby+battle)')
+    _logger.info('SpotMeter: subscribed to appLoader.onGUISpaceEntered/Left (lobby+battle)')
 
 
 def _on_hangar_populate(hangar_view):
-    """Called once on every garage entry. v6.0.0 MVP1: garage UI is
-    deferred (the legacy floating-button Scaleform view doesn't satisfy
-    WG's IView contract on WoT 2.x). The only thing the hangar hook
-    currently does is mark the lifecycle in the log so we can verify
-    the appLoader event subscription is alive. MVP2 brings the garage
-    UI back via the GUIFlash-based pattern proven by the battle panel.
+    """Called once on every garage entry. v7 has NO garage UI (the v6.0
+    floating menu-button + garage panel were removed in v6.1; the in-battle
+    panel is a Gameface overlay and is battle-only). The hangar hook now only
+    marks the lifecycle in the log so we can verify the appLoader event
+    subscription is alive. Garage settings live in the mods-settings menu.
     """
     if _CFG.get('menuButtonEnabled', False):
-        _logger.warning('SpotMeter: hangar populated - menuButtonEnabled=True ignored, garage UI is deferred to MVP2')
+        _logger.info('SpotMeter: hangar populated - legacy menuButtonEnabled=True ignored (no garage UI in v7)')
     else:
         _logger.info('SpotMeter: hangar populated (no UI - menuButtonEnabled=False)')
 
@@ -3055,767 +3018,17 @@ def _on_hangar_dispose(hangar_view):
     _logger.info('SpotMeter: hangar disposed')
 
 
-# ============================================================================
-# v6.0 menu button - floating Scaleform view loaded over the hangar.
-#
-# Architecture: we register a custom View subclass with WG's framework
-# (g_entitiesFactories.addSettings) bound to spotmeter_button.swf. When the
-# hangar populates, we fire a LoadViewEvent to load our view; the framework
-# instantiates our Python class, calls _populate, and binds the AS3 SWF as
-# self.flashObject.
-#
-# Python <-> AS3 communication:
-#   - Python -> AS3:  self.flashObject.as_<methodName>(args)  (synchronous)
-#   - AS3 -> Python:  POLLING via BigWorld.callback at 5 Hz. ExternalInterface
-#                     is not bridged in Scaleform GFx, and generating a DAAPI
-#                     Meta class would require build-time tooling we don't
-#                     have. Polling is reliable, adds 200 ms click latency
-#                     which is imperceptible for an "open settings" button.
-# ============================================================================
-
-SPOTMETER_BUTTON_ALIAS   = 'SpotMeterButtonView'
-SPOTMETER_BUTTON_SWF_URL = 'spotmeter_button.swf'
-
-_button_view_class       = None   # cached after first build (subclass of View)
-_button_view_registered  = False  # ViewSettings added to g_entitiesFactories
-_active_button_view      = None   # the currently populated view instance
-
-
-def _build_button_view_class():
-    """Define and return the View subclass that wraps spotmeter_button.swf.
-
-    Imports the View base class lazily - if it ever moves between WoT
-    versions, the failure is contained to "menu button disabled" rather
-    than crashing module load."""
-    global _button_view_class
-    if _button_view_class is not None:
-        return _button_view_class
-    try:
-        from gui.Scaleform.framework.entities.View import View as _BaseView
-    except ImportError:
-        _logger.warning('SpotMeter: gui.Scaleform.framework.entities.View unavailable; menu disabled')
-        return None
-
-    class SpotMeterButtonView(_BaseView):
-
-        def __init__(self, *args, **kwargs):
-            super(SpotMeterButtonView, self).__init__(*args, **kwargs)
-            self._sm_poll_cb_id = None
-            self._sm_initialized = False
-            _logger.warning('SpotMeter: SpotMeterButtonView.__init__ called')
-
-        def _populate(self):
-            global _active_button_view
-            _logger.warning('SpotMeter: SpotMeterButtonView._populate entering')
-            super(SpotMeterButtonView, self)._populate()
-            _active_button_view = self
-            try:
-                w = float(_CFG.get('menuButtonW', 90))
-                h = float(_CFG.get('menuButtonH', 28))
-                x = float(_CFG.get('menuButtonX', 720))
-                y = float(_CFG.get('menuButtonY', 850))
-                # AS3 clamps to stage bounds inside as_setPosition, so we
-                # don't need to know screen dimensions here.
-                fo = self.flashObject
-                _logger.warning('SpotMeter: button flashObject=%r', fo)
-                fo.as_setSize(w, h)
-                fo.as_setPosition(x, y)
-                fo.as_setLabel('SpotMeter')
-                self._sm_initialized = True
-                _logger.warning('SpotMeter: button view initialised at (%s,%s) size (%s,%s)', x, y, w, h)
-            except Exception:
-                _logger.exception('SpotMeter: failed to init button SWF')
-            self._sm_poll_cb_id = BigWorld.callback(0.2, self._sm_poll)
-
-        def _destroy(self):
-            global _active_button_view
-            if self._sm_poll_cb_id is not None:
-                try:
-                    BigWorld.cancelCallback(self._sm_poll_cb_id)
-                except Exception:
-                    pass
-                self._sm_poll_cb_id = None
-            if _active_button_view is self:
-                _active_button_view = None
-            super(SpotMeterButtonView, self)._destroy()
-
-        def _sm_poll(self):
-            """5 Hz tick: read consume-on-read flags from AS3 and dispatch
-            to Python handlers. Reschedules itself indefinitely until the
-            view is destroyed."""
-            self._sm_poll_cb_id = None
-            try:
-                fo = self.flashObject
-                if fo is not None and self._sm_initialized:
-                    if fo.as_consumeClick():
-                        _on_menu_button_click()
-                    if fo.as_consumeDragEnd():
-                        nx = fo.as_getX()
-                        ny = fo.as_getY()
-                        _on_menu_button_drag_end(nx, ny)
-            except Exception:
-                _logger.exception('SpotMeter: button poll failed')
-            # Reschedule unless we've been torn down between ticks
-            if _active_button_view is self:
-                self._sm_poll_cb_id = BigWorld.callback(0.2, self._sm_poll)
-
-    _button_view_class = SpotMeterButtonView
-    return _button_view_class
-
-
-def _register_button_view():
-    """One-time view registration. Idempotent."""
-    global _button_view_registered
-    if _button_view_registered:
-        _logger.warning('SpotMeter: button view already registered')
-        return True
-    cls = _build_button_view_class()
-    if cls is None:
-        _logger.warning('SpotMeter: button view class build failed')
-        return False
-    try:
-        from gui.Scaleform.framework import g_entitiesFactories, ViewSettings, ScopeTemplates
-        from frameworks.wulf import WindowLayer
-    except ImportError:
-        _logger.warning('SpotMeter: framework not importable, menu button disabled')
-        return False
-    try:
-        settings = ViewSettings(
-            alias=SPOTMETER_BUTTON_ALIAS,
-            clazz=cls,
-            url=SPOTMETER_BUTTON_SWF_URL,
-            layer=WindowLayer.WINDOW,
-            scope=ScopeTemplates.GLOBAL_SCOPE,
-            canDrag=False,
-            canClose=False,
-            isModal=False,
-            isCentered=False,
-        )
-        g_entitiesFactories.addSettings(settings)
-        _button_view_registered = True
-        _logger.warning('SpotMeter: button view ViewSettings ADDED to g_entitiesFactories (alias=%s, url=%s)',
-                        SPOTMETER_BUTTON_ALIAS, SPOTMETER_BUTTON_SWF_URL)
-        return True
-    except Exception:
-        _logger.exception('SpotMeter: addSettings failed for button view')
-        return False
-
-
-def _show_button_view():
-    """Load the floating SpotMeter button view over the current Scaleform
-    app (lobby). WoT 2.x pattern (reverse-engineered from GUIFlash /
-    Spoter MoE):
-
-      app = ServicesLocator.appLoader.getApp()
-      app.loadView(SFViewLoadParams(alias, parent=getParentWindow()))
-
-    The legacy `g_eventBus.handleEvent(LoadViewEvent(...))` path used by
-    WG's own internal code is silently dropped for third-party views in
-    2.x - direct loadView is what actually reaches the LoaderManager.
-    """
-    _logger.warning('SpotMeter: _show_button_view called')
-    if not _register_button_view():
-        _logger.warning('SpotMeter: _show_button_view aborted - registration failed')
-        return
-    if _active_button_view is not None:
-        _logger.warning('SpotMeter: _show_button_view - view already up, skipping')
-        return
-    try:
-        from gui.shared.personality import ServicesLocator
-        from gui.Scaleform.framework.managers.loaders import SFViewLoadParams
-    except ImportError:
-        _logger.warning('SpotMeter: ServicesLocator / SFViewLoadParams unavailable')
-        return
-    try:
-        app = ServicesLocator.appLoader.getApp()
-    except Exception:
-        _logger.exception('SpotMeter: ServicesLocator.appLoader.getApp() failed')
-        return
-    if app is None:
-        _logger.warning('SpotMeter: no active app, button load skipped')
-        return
-    parent = _get_parent_window()
-    _logger.warning('SpotMeter: calling app.loadView (button) parent=%r app=%r', parent, app)
-    try:
-        app.loadView(SFViewLoadParams(SPOTMETER_BUTTON_ALIAS, parent=parent))
-        _logger.warning('SpotMeter: app.loadView returned for button')
-    except Exception:
-        _logger.exception('SpotMeter: app.loadView failed for button')
-
-
-def _get_parent_window():
-    """Return the active main window via the Wulf IGuiLoader (the path
-    that actually works in WoT 2.x). The legacy AS3_AppFactory().getMainWindow()
-    returns the MainWindow object too, but the value isn't accepted by
-    app.loadView - the Spoter/GUIFlash pattern resolves it through the
-    DI-injected IGuiLoader skeleton instead.
-
-    Returns None if the windows manager isn't ready yet (e.g. early init).
-    """
-    try:
-        from skeletons.gui.impl import IGuiLoader
-        from helpers import dependency
-    except ImportError:
-        _logger.warning('SpotMeter: IGuiLoader / dependency unavailable')
-        return None
-    try:
-        uiLoader = dependency.instance(IGuiLoader)
-    except Exception:
-        _logger.exception('SpotMeter: failed to obtain IGuiLoader instance')
-        return None
-    if uiLoader is None:
-        return None
-    wm = getattr(uiLoader, 'windowsManager', None)
-    if wm is None:
-        return None
-    try:
-        return wm.getMainWindow()
-    except Exception:
-        _logger.exception('SpotMeter: windowsManager.getMainWindow failed')
-        return None
-
-
-# Back-compat aliases for any code path that still references the old names.
-def _get_lobby_main_window():
-    return _get_parent_window()
-
-def _get_battle_main_window():
-    return _get_parent_window()
-
-
-def _install_loader_diagnostics():
-    """Subscribe to LoaderManager events so we can see in python.log
-    whether the framework even tries to load our view after LoadViewEvent
-    is dispatched. Without this, a silent drop is indistinguishable from
-    a successful-but-invisible load.
-
-    Idempotent via the module-level flag.
-    """
-    global _LOADER_DIAG_INSTALLED
-    if _LOADER_DIAG_INSTALLED:
-        return
-    try:
-        from gui.app_loader import g_appLoader
-    except ImportError:
-        return
-    try:
-        app = g_appLoader.getApp()
-    except Exception:
-        app = None
-    if app is None:
-        _logger.warning('SpotMeter: loader-diag: no app yet, will retry later')
-        BigWorld.callback(0.5, _install_loader_diagnostics)
-        return
-    try:
-        loader = getattr(app, 'loaderManager', None)
-        if loader is None:
-            _logger.warning('SpotMeter: loader-diag: app has no loaderManager')
-            return
-        def _log_init(*a, **kw):
-            _logger.warning('SpotMeter: LoaderManager.onViewLoadInit args=%r kw=%r', a, kw)
-        def _log_loaded(*a, **kw):
-            _logger.warning('SpotMeter: LoaderManager.onViewLoaded args=%r kw=%r', a, kw)
-        def _log_err(*a, **kw):
-            _logger.warning('SpotMeter: LoaderManager.onViewLoadError args=%r kw=%r', a, kw)
-        def _log_cancel(*a, **kw):
-            _logger.warning('SpotMeter: LoaderManager.onViewLoadCanceled args=%r kw=%r', a, kw)
-        loader.onViewLoadInit     += _log_init
-        loader.onViewLoaded       += _log_loaded
-        loader.onViewLoadError    += _log_err
-        loader.onViewLoadCanceled += _log_cancel
-        _LOADER_DIAG_INSTALLED = True
-        _logger.warning('SpotMeter: loader-diag subscribed to LoaderManager events')
-    except Exception:
-        _logger.exception('SpotMeter: loader-diag install failed')
-
-
-def _hide_button_view():
-    """Explicit destroy as a safety net. The framework usually tears the view
-    down when its scope ends (hangar dispose), but if the scope outlives the
-    hangar for some reason we don't want a stale button floating around."""
-    view = _active_button_view
-    if view is None:
-        return
-    try:
-        view.destroy()
-    except Exception:
-        _logger.exception('SpotMeter: explicit button view destroy failed')
-
-
-def _on_menu_button_click():
-    """User clicked the floating SpotMeter button. Open the settings dialog
-    (Phase 3.4: empty frame; Phase 4: widgets). Idempotent - if the dialog
-    is already up, this is a no-op."""
-    _logger.warning('SpotMeter: menu button clicked')
-    try:
-        _show_menu_view()
-    except Exception:
-        _logger.exception('SpotMeter: _show_menu_view failed')
-
-
-def _on_menu_button_drag_end(new_x, new_y):
-    """Persist new button position to JSON. _write_config is atomic
-    (write to .tmp + rename) so a crash mid-write won't corrupt the file."""
-    try:
-        cx = int(round(float(new_x)))
-        cy = int(round(float(new_y)))
-    except (TypeError, ValueError):
-        return
-    _CFG['menuButtonX'] = cx
-    _CFG['menuButtonY'] = cy
-    _logger.info('SpotMeter: button position saved -> (%d, %d)', cx, cy)
-    try:
-        _write_config()
-    except Exception:
-        _logger.exception('SpotMeter: failed to persist button position')
-
-
-# ============================================================================
-# v6.0 menu dialog - opened by clicking the floating SpotMeter button.
-#
-# Phase 3.4 ships an empty modal-style frame (dim background + centered panel
-# + title + close button + ESC handling). Phase 4 fills the content area with
-# tabs and widgets. Same polling architecture as the button (5 Hz poll on
-# self.flashObject.as_consumeClose).
-# ============================================================================
-
-SPOTMETER_MENU_ALIAS   = 'SpotMeterMenuView'
-SPOTMETER_MENU_SWF_URL = 'spotmeter_menu.swf'
-
-_menu_view_class       = None
-_menu_view_registered  = False
-_active_menu_view      = None
-
-
-def _build_menu_view_class():
-    global _menu_view_class
-    if _menu_view_class is not None:
-        return _menu_view_class
-    try:
-        from gui.Scaleform.framework.entities.View import View as _BaseView
-    except ImportError:
-        _logger.warning('SpotMeter: View base class unavailable; menu dialog disabled')
-        return None
-
-    class SpotMeterMenuView(_BaseView):
-
-        def __init__(self, *args, **kwargs):
-            super(SpotMeterMenuView, self).__init__(*args, **kwargs)
-            self._sm_poll_cb_id = None
-            self._sm_initialized = False
-
-        def _populate(self):
-            global _active_menu_view
-            super(SpotMeterMenuView, self)._populate()
-            _active_menu_view = self
-            try:
-                # The SWF reads stage size in as_populate; we pass it explicitly
-                # too in case the stage isn't attached at __init__ time. Defaults
-                # are conservative; AS3 re-layouts on as_setStageSize anyway.
-                self.flashObject.as_setStageSize(1920.0, 1080.0)
-                self.flashObject.as_setTitle('SpotMeter Settings')
-                self._sm_initialized = True
-            except Exception:
-                _logger.exception('SpotMeter: failed to init menu SWF')
-            self._sm_poll_cb_id = BigWorld.callback(0.2, self._sm_poll)
-
-        def _destroy(self):
-            global _active_menu_view
-            if self._sm_poll_cb_id is not None:
-                try:
-                    BigWorld.cancelCallback(self._sm_poll_cb_id)
-                except Exception:
-                    pass
-                self._sm_poll_cb_id = None
-            if _active_menu_view is self:
-                _active_menu_view = None
-            super(SpotMeterMenuView, self)._destroy()
-
-        def _sm_poll(self):
-            self._sm_poll_cb_id = None
-            try:
-                fo = self.flashObject
-                if fo is not None and self._sm_initialized:
-                    if fo.as_consumeClose():
-                        _on_menu_close()
-                        return  # don't reschedule - we're closing
-            except Exception:
-                _logger.exception('SpotMeter: menu poll failed')
-            if _active_menu_view is self:
-                self._sm_poll_cb_id = BigWorld.callback(0.2, self._sm_poll)
-
-    _menu_view_class = SpotMeterMenuView
-    return _menu_view_class
-
-
-def _register_menu_view():
-    global _menu_view_registered
-    if _menu_view_registered:
-        return True
-    cls = _build_menu_view_class()
-    if cls is None:
-        return False
-    try:
-        from gui.Scaleform.framework import g_entitiesFactories, ViewSettings, ScopeTemplates
-        from frameworks.wulf import WindowLayer
-    except ImportError:
-        _logger.warning('SpotMeter: framework not importable, menu dialog disabled')
-        return False
-    try:
-        settings = ViewSettings(
-            alias=SPOTMETER_MENU_ALIAS,
-            clazz=cls,
-            url=SPOTMETER_MENU_SWF_URL,
-            # TOP_WINDOW so the menu draws above the floating button (WINDOW layer).
-            # If TOP_WINDOW isn't right, try WINDOW or OVERLAY; AS3 dim layer
-            # already gives modal feel regardless of z-order.
-            layer=WindowLayer.TOP_WINDOW,
-            scope=ScopeTemplates.GLOBAL_SCOPE,
-            canDrag=False,
-            canClose=True,
-            isModal=True,
-            isCentered=True,
-        )
-        g_entitiesFactories.addSettings(settings)
-        _menu_view_registered = True
-        _logger.warning('SpotMeter: menu view registered (alias=%s, url=%s)',
-                        SPOTMETER_MENU_ALIAS, SPOTMETER_MENU_SWF_URL)
-        return True
-    except Exception:
-        _logger.exception('SpotMeter: addSettings failed for menu view')
-        return False
-
-
-def _show_menu_view():
-    if _active_menu_view is not None:
-        return  # already open
-    if not _register_menu_view():
-        return
-    try:
-        from gui.shared.personality import ServicesLocator
-        from gui.Scaleform.framework.managers.loaders import SFViewLoadParams
-    except ImportError:
-        _logger.warning('SpotMeter: ServicesLocator / SFViewLoadParams unavailable (menu)')
-        return
-    try:
-        app = ServicesLocator.appLoader.getApp()
-    except Exception:
-        _logger.exception('SpotMeter: getApp failed for menu')
-        return
-    if app is None:
-        _logger.warning('SpotMeter: no active app, menu load skipped')
-        return
-    parent = _get_parent_window()
-    try:
-        app.loadView(SFViewLoadParams(SPOTMETER_MENU_ALIAS, parent=parent))
-        _logger.warning('SpotMeter: app.loadView returned for menu parent=%r', parent)
-    except Exception:
-        _logger.exception('SpotMeter: app.loadView failed (menu)')
-
-
-def _hide_menu_view():
-    view = _active_menu_view
-    if view is None:
-        return
-    try:
-        view.destroy()
-    except Exception:
-        _logger.exception('SpotMeter: explicit menu view destroy failed')
-
-
-def _on_menu_close():
-    """User asked to close the dialog (X / Close button / dim background / ESC).
-    Tear down the view; Phase 4 will also persist any pending widget edits here."""
-    _logger.info('SpotMeter: menu close requested')
-    _hide_menu_view()
-
-
-# ============================================================================
-# v6.0 in-battle picker panel - always-visible floating Scaleform view loaded
-# over the battle HUD. Replaces the chat-based status block as the primary
-# picker interface: enemy list (click row -> pick), VR readout, toggle
-# checkboxes, auto-pick checkbox.
-#
-# Lifecycle: piggybacks on the existing PersonalEntriesPlugin patches.
-# patched_invalidateMarkup loads the panel; patched_hideMarkup / patched_stop
-# tear it down. This is more reliable than hooking BattlePage directly
-# because the minimap plugin is the canonical "battle UI is alive" signal
-# that's already proven across siege / postmortem / scenario transitions.
-#
-# Python <-> AS3 push/pull:
-#   - Each 5 Hz poll tick:
-#       a) Read consume-on-read flags (vid click, toggle click, autopick click,
-#          drag end) and dispatch to the existing picker functions.
-#       b) Push current state (enemy list, selected, toggles, autopick) so the
-#          panel always reflects keyboard-driven changes (Numpad hotkeys still
-#          work alongside mouse clicks).
-# ============================================================================
-
-SPOTMETER_BATTLE_ALIAS   = 'SpotMeterBattleView'
-SPOTMETER_BATTLE_SWF_URL = 'spotmeter_battle.swf'
-
-_battle_view_class       = None
-_battle_view_registered  = False
-_active_battle_view      = None
-
-
-def _build_battle_view_class():
-    global _battle_view_class
-    if _battle_view_class is not None:
-        return _battle_view_class
-    try:
-        from gui.Scaleform.framework.entities.View import View as _BaseView
-    except ImportError:
-        _logger.warning('SpotMeter: View base class unavailable; battle panel disabled')
-        return None
-
-    class SpotMeterBattleView(_BaseView):
-
-        def __init__(self, *args, **kwargs):
-            super(SpotMeterBattleView, self).__init__(*args, **kwargs)
-            self._sm_poll_cb_id = None
-            self._sm_initialized = False
-            # Cache the last pushed payload so we don't burn AS3 calls on
-            # unchanged state. Each entry is the serializable shape passed
-            # into as_set*; we compare with the new shape before pushing.
-            self._sm_last_enemies = None    # (vids_tuple, labels_tuple, classes_tuple)
-            self._sm_last_selected = None   # (vid, name, vr_int)
-            self._sm_last_toggles = None    # (r, b, rs, d, fu)
-            self._sm_last_autopick = None   # bool
-
-        def _populate(self):
-            global _active_battle_view
-            super(SpotMeterBattleView, self)._populate()
-            _active_battle_view = self
-            try:
-                w = float(_CFG.get('battlePanelW', 280))
-                h = float(_CFG.get('battlePanelH', 360))
-                x = float(_CFG.get('battlePanelX', 10))
-                y = float(_CFG.get('battlePanelY', 400))
-                self.flashObject.as_setSize(w, h)
-                self.flashObject.as_setPosition(x, y)
-                self._sm_initialized = True
-            except Exception:
-                _logger.exception('SpotMeter: failed to init battle panel SWF')
-            self._sm_poll_cb_id = BigWorld.callback(0.2, self._sm_poll)
-
-        def _destroy(self):
-            global _active_battle_view
-            if self._sm_poll_cb_id is not None:
-                try:
-                    BigWorld.cancelCallback(self._sm_poll_cb_id)
-                except Exception:
-                    pass
-                self._sm_poll_cb_id = None
-            if _active_battle_view is self:
-                _active_battle_view = None
-            super(SpotMeterBattleView, self)._destroy()
-
-        def _sm_poll(self):
-            self._sm_poll_cb_id = None
-            try:
-                fo = self.flashObject
-                if fo is not None and self._sm_initialized:
-                    self._sm_handle_inputs(fo)
-                    self._sm_push_state(fo)
-            except Exception:
-                _logger.exception('SpotMeter: battle panel poll failed')
-            if _active_battle_view is self:
-                self._sm_poll_cb_id = BigWorld.callback(0.2, self._sm_poll)
-
-        # ---- input dispatch ----
-
-        def _sm_handle_inputs(self, fo):
-            try:
-                vid_raw = fo.as_consumeSelectedVid()
-                vid = int(vid_raw) if vid_raw else 0
-                if vid > 0:
-                    _battle_panel_on_pick(vid)
-            except Exception:
-                _logger.exception('SpotMeter: battle panel consumeSelectedVid failed')
-            try:
-                tname = fo.as_consumeToggleName()
-                if tname:
-                    _battle_panel_on_toggle(str(tname))
-            except Exception:
-                _logger.exception('SpotMeter: battle panel consumeToggleName failed')
-            try:
-                if fo.as_consumeAutoPickClick():
-                    _battle_panel_on_auto_click()
-            except Exception:
-                _logger.exception('SpotMeter: battle panel consumeAutoPickClick failed')
-            try:
-                if fo.as_consumeDragEnd():
-                    nx = fo.as_getX()
-                    ny = fo.as_getY()
-                    _battle_panel_on_drag_end(nx, ny)
-            except Exception:
-                _logger.exception('SpotMeter: battle panel consumeDragEnd failed')
-
-        # ---- state push (diff to avoid churn) ----
-
-        def _sm_push_state(self, fo):
-            plugin = _get_picker_plugin()
-            # Enemies: tuples of (vids, labels, class_codes). Skip the AS3
-            # call if the shape hasn't changed since last push.
-            vids, labels, class_codes = _battle_panel_enemy_payload(plugin)
-            enemies_key = (tuple(vids), tuple(labels), tuple(class_codes))
-            if enemies_key != self._sm_last_enemies:
-                try:
-                    fo.as_setEnemies(vids, labels, class_codes)
-                except Exception:
-                    _logger.exception('SpotMeter: as_setEnemies failed')
-                self._sm_last_enemies = enemies_key
-
-            # Selected (current pick) + computed VR
-            sel_vid, sel_name, sel_vr = _battle_panel_selected_payload(plugin)
-            sel_key = (sel_vid, sel_name, int(sel_vr) if sel_vr else 0)
-            if sel_key != self._sm_last_selected:
-                try:
-                    fo.as_setSelected(sel_vid, sel_name, sel_vr)
-                except Exception:
-                    _logger.exception('SpotMeter: as_setSelected failed')
-                self._sm_last_selected = sel_key
-
-            # Toggle states
-            tog_key = (
-                bool(_PICKER_TOGGLES.get('rations', True)),
-                bool(_PICKER_TOGGLES.get('BIA', True)),
-                bool(_PICKER_TOGGLES.get('reconSitAware', True)),
-                bool(_PICKER_TOGGLES.get('directives', False)),
-                bool(_PICKER_TOGGLES.get('fieldUpgrades', False)),
-            )
-            if tog_key != self._sm_last_toggles:
-                try:
-                    fo.as_setToggles(*tog_key)
-                except Exception:
-                    _logger.exception('SpotMeter: as_setToggles failed')
-                self._sm_last_toggles = tog_key
-
-            # Auto-pick state
-            ap = bool(_CFG.get('autoPickEnabled', False))
-            if ap != self._sm_last_autopick:
-                try:
-                    fo.as_setAutoPick(ap)
-                except Exception:
-                    _logger.exception('SpotMeter: as_setAutoPick failed')
-                self._sm_last_autopick = ap
-
-    _battle_view_class = SpotMeterBattleView
-    return _battle_view_class
-
-
-def _register_battle_view():
-    global _battle_view_registered
-    if _battle_view_registered:
-        return True
-    cls = _build_battle_view_class()
-    if cls is None:
-        return False
-    try:
-        from gui.Scaleform.framework import g_entitiesFactories, ViewSettings, ScopeTemplates
-        from frameworks.wulf import WindowLayer
-    except ImportError:
-        _logger.warning('SpotMeter: framework not importable, battle panel disabled')
-        return False
-    try:
-        settings = ViewSettings(
-            alias=SPOTMETER_BATTLE_ALIAS,
-            clazz=cls,
-            url=SPOTMETER_BATTLE_SWF_URL,
-            layer=WindowLayer.WINDOW,
-            scope=ScopeTemplates.GLOBAL_SCOPE,
-            canDrag=False,
-            canClose=False,
-            isModal=False,
-            isCentered=False,
-        )
-        g_entitiesFactories.addSettings(settings)
-        _battle_view_registered = True
-        _logger.warning('SpotMeter: battle panel view registered (alias=%s, url=%s)',
-                        SPOTMETER_BATTLE_ALIAS, SPOTMETER_BATTLE_SWF_URL)
-        return True
-    except Exception:
-        _logger.exception('SpotMeter: addSettings failed for battle view')
-        return False
-
-
-_GUIFLASH_HOOK_INSTALLED = False
 _BATTLE_PANEL_ACTIVE = False
 _BATTLE_PANEL_REFRESH_CB = None
-_BATTLE_PANEL_LAST = {}    # alias -> last rendered html (diff guard)
-_BATTLE_PANEL_ENEMY_VIDS = set()  # currently rendered enemy_* components
-SPOTMETER_PANEL_ROOT = 'spotmeter'
 SPOTMETER_PANEL_REFRESH_SEC = 0.5
 SPOTMETER_MAX_ENEMY_ROWS = 15
 
-# --- GUIFlash source resolution (v6.1.0 coexistence fix) --------------------
-# Our panels render through a GUIFlash view. We ship a private fork
-# (spotmeter_gf) whose SWF is a byte-identical copy of gambiter.guiflash - so
-# it declares the SAME AS3 classes (net.gambiter.*). When a real
-# gambiter.guiflash is ALSO installed (it is, in any modpack: RaJCeL's stats,
-# many others depend on it), two SWFs defining the same classes collide in
-# Scaleform and break the OTHER mod's saved window positions (confirmed by
-# Aslain, 2026-07-01: removing SpotMeter fixed RaJCeL's mod).
-# Fix: prefer the real shared library when present (one definition of
-# net.gambiter.*, no collision, it hosts our components on its shared canvas);
-# fall back to our bundled fork ONLY when gambiter is absent (then nothing else
-# defines net.gambiter.* either, so still no collision). Resolved once.
-_GF = None          # GUIFlash instance in use (gambiter's g_guiFlash or our g_smGuiFlash)
-_GF_EVENT = None    # its COMPONENT_EVENT class
-_GF_SOURCE = None   # 'gambiter' | 'spotmeter_gf' | None
-_GF_RESOLVED = False
 
-
-def _resolve_guiflash():
-    """Return the GUIFlash instance to use, resolving (once) with a preference
-    for a shared gambiter.guiflash over our bundled fork. Returns None if no
-    GUIFlash is available (panels disabled; circle + hotkeys still work)."""
-    global _GF, _GF_EVENT, _GF_SOURCE, _GF_RESOLVED
-    if _GF_RESOLVED:
-        return _GF
-    _GF_RESOLVED = True
-    # 1) Shared gambiter.guiflash - coexists with every other GUIFlash mod
-    #    because there is a single definition of net.gambiter.* .
-    try:
-        from gui.mods.gambiter import g_guiFlash as _inst
-        from gui.mods.gambiter.flash import COMPONENT_EVENT as _ev
-        _GF, _GF_EVENT, _GF_SOURCE = _inst, _ev, 'gambiter'
-        _logger.info('SpotMeter: using shared gambiter.guiflash for panels (coexistence-safe)')
-        return _GF
-    except Exception:
-        pass
-    # 2) Bundled fork - only when gambiter is absent, so nothing else defines
-    #    net.gambiter.* to collide with our byte-identical copy.
-    try:
-        from gui.mods.spotmeter_gf import g_smGuiFlash as _inst
-        from gui.mods.spotmeter_gf.flash import COMPONENT_EVENT as _ev
-        _GF, _GF_EVENT, _GF_SOURCE = _inst, _ev, 'spotmeter_gf'
-        _logger.info('SpotMeter: using bundled spotmeter_gf for panels (no gambiter.guiflash found)')
-        return _GF
-    except Exception:
-        _logger.warning('SpotMeter: no GUIFlash available - in-battle panel disabled '
-                        '(minimap circle + hotkeys still work)')
-        return None
 
 # v6.1.0: the v6.0 garage info panel is GONE - its settings (loadout defaults,
 # panel visibility, hotkey) moved into the mods-settings configurator and the
 # battle panel covers the in-battle state. The SpotMeter panel is battle-only.
 
-# Visual layout constants for the in-battle panel. Pixel offsets are
-# relative to the root Panel; the root is positioned via battlePanelX/Y
-# and the children inherit that translation. Update these if the panel
-# starts to feel cramped at lower resolutions.
-_LAYOUT = {
-    'title_y':       4,
-    'target_y':      24,
-    'auto_y':        46,
-    'toggles_row1_y': 72,
-    'toggles_row2_y': 94,
-    'toggles_row3_y': 116,
-    'enemies_y0':    142,
-    'enemies_step':  18,
-}
 
 # Toggle name -> (alias_suffix, hotkey_label, display_name). The
 # display_name is shown in the panel; alias_suffix is the click target
@@ -3851,266 +3064,231 @@ _PANEL_CELLS = [
 ]
 
 
-def _show_battle_view(force=False):
-    """Build the in-battle SpotMeter panel using our private forked
-    GUIFlash. Components are individually clickable:
-      - .auto              -> toggle auto-pick
-      - .tog_<name>        -> toggle the corresponding perk/equipment
-      - .enemy_<vid>       -> pick that enemy
+# --------------------------------------------------------------------------- #
+# v7.0 Gameface panel backend (net.openwg.gameface). When panelBackend ==
+# 'gameface', the three render entry points (_show_battle_view / _hide_battle_view
+# / _refresh_panel_state) delegate here instead of GUIFlash. The whole
+# calc/picker/grouping engine is reused; only the render target differs.
+# --------------------------------------------------------------------------- #
+_GFP = None
+_GF_SETUP_DONE = False
 
-    All clicks are routed through COMPONENT_EVENT.CLICKED, which our
-    forked Flash_UI fires whenever an AS3 component receives a
-    MouseEvent.CLICK. The same panel is also draggable via the
-    .drag=true prop on the root; drag-end persists battlePanelX/Y.
-    """
+
+
+
+def _gfp():
+    """The spotmeter_gfpanel render module, imported once (or None)."""
+    global _GFP
+    if _GFP is None:
+        try:
+            from gui.mods import spotmeter_gfpanel as _m
+            _GFP = _m
+        except Exception:
+            _logger.exception('SpotMeter: spotmeter_gfpanel import failed')
+            _GFP = False
+    return _GFP or None
+
+
+def _gf_ensure_setup():
+    """Wire handlers + resolve the layout once (triggers OpenWG + its one-time
+    restart). Called from init() when the Gameface backend is selected."""
+    global _GF_SETUP_DONE
+    if _GF_SETUP_DONE:
+        return
+    gfp = _gfp()
+    if gfp is None:
+        return
+    try:
+        gfp.set_handlers(on_pick=_battle_panel_on_pick, on_action=_gf_on_action,
+                         on_move=_gf_on_move, on_collapse=_gf_on_collapse)
+        gfp.resolve_layout()
+        _GF_SETUP_DONE = True
+        _logger.info('SpotMeter: Gameface panel backend initialised')
+    except Exception:
+        _logger.exception('SpotMeter: Gameface backend setup failed')
+
+
+def _gf_on_action(key):
+    """A cell / auto control was clicked in the Gameface panel -> reuse the same
+    handlers the numpad hotkeys use."""
+    try:
+        if key == 'auto':
+            _toggle_auto_pick()
+            return
+        for kind, (k, _suffix, _hotkey, _dispname) in _PANEL_CELLS:
+            if k == key:
+                if kind == 'toggle':
+                    _toggle_perk(key)
+                else:
+                    _cycle_level(key)
+                return
+    except Exception:
+        _logger.exception('SpotMeter: gf on_action(%s) failed', key)
+
+
+def _gf_on_move(x, y):
+    """Panel drag ended -> persist the new position to config (battlePanelX/Y)."""
+    try:
+        _CFG['battlePanelX'] = int(x)
+        _CFG['battlePanelY'] = int(y)
+        _write_config()
+    except Exception:
+        _logger.exception('SpotMeter: gf save position failed')
+
+
+def _gf_on_collapse(on):
+    """Collapse arrow toggled -> persist so the state survives battles/restart."""
+    try:
+        _CFG['battlePanelCollapsed'] = bool(on)
+        _write_config()
+    except Exception:
+        _logger.exception('SpotMeter: gf save collapse failed')
+
+
+def _gf_target_line(plugin):
+    eff_vid, src = _effective_picked_vid()
+    spot = _LAST_SPOT_RADIUS
+    spot_str = ('%.0fm' % spot) if spot else '--m'
+    if eff_vid is None or plugin is None:
+        own = (_own_vehicle_short_name(plugin)
+               if plugin is not None and _CFG.get('useOwnViewRange', True) else '')
+        if own:
+            return ('%s <b>%s</b> <span class="spot">spot=%s</span> '
+                    '<span class="ctx">(%s)</span>'
+                    % (_t('battle_target'), _html_escape(own), spot_str,
+                       _t('battle_target_own')))
+        return ('<span class="ctx">%s --  %s</span>'
+                % (_t('battle_target'), _t('battle_target_hint')))
+    name = ''
+    try:
+        arenaDP = plugin.sessionProvider.getArenaDP()
+        vinfo = arenaDP.getVehicleInfo(eff_vid) if arenaDP is not None else None
+        if vinfo is not None and vinfo.vehicleType is not None:
+            name = vinfo.vehicleType.shortName or ''
+    except Exception:
+        pass
+    ctx = ' <span class="ctx">(auto)</span>' if src == 'auto' else ''
+    return ('%s <b>%s</b> <span class="spot">spot=%s</span>%s'
+            % (_t('battle_target'), _html_escape(name), spot_str, ctx))
+
+
+def _gf_build_state(plugin):
+    """Produce the panel state dict the Gameface HTML renders (clean data, not
+    GUIFlash markup). Reuses the same engine the GUIFlash panel uses."""
+    auto_on = bool(_CFG.get('autoPickEnabled', False))
+    range_m = int(float(_CFG.get('autoPickRangeMeters', 445.0)))
+    cells = []
+    for kind, (key, _suffix, hotkey, _dispname) in _PANEL_CELLS:
+        if kind == 'toggle':
+            on = bool(_PICKER_TOGGLES.get(key, False))
+            label = ('+' if on else '') + _html_escape(_t('tl_' + key))
+        else:
+            lvl = int(_PICKER_LEVELS.get(key, 0))
+            lvl = max(0, min(lvl, len(_LEVEL_NAMES) - 1))
+            on = lvl > 0
+            label = '%s:%s' % (_html_escape(_t('tl_' + key)), _level_name_loc(lvl))
+        cells.append({'key': key, 'label': label, 'on': on,
+                      'hotkey': hotkey, 'kind': kind})
+    enemies = []
+    if plugin is not None:
+        eff_vid, _src = _effective_picked_vid()
+        picked_key = None
+        if eff_vid is not None:
+            try:
+                arenaDP = plugin.sessionProvider.getArenaDP()
+                ev = arenaDP.getVehicleInfo(eff_vid) if arenaDP is not None else None
+                if ev is not None:
+                    picked_key = _veh_type_key(ev.vehicleType)
+            except Exception:
+                picked_key = None
+        for vid, vinfo, count in _grouped_enemies(plugin)[:SPOTMETER_MAX_ENEMY_ROWS]:
+            vt = vinfo.vehicleType
+            vr = _picker_vr_for(plugin, vid)
+            is_picked = (vid == eff_vid) or (picked_key is not None
+                         and _veh_type_key(vt) == picked_key)
+            enemies.append({
+                'vid': int(vid),
+                'cls': _class_code_for(vt) or '??',
+                'name': _html_escape(vt.shortName or '?'),
+                'count': int(count),
+                'level': int(vt.level or 0),
+                'vr': int(vr) if vr else 0,
+                'picked': bool(is_picked),
+            })
+    return {
+        'collapsed': bool(_CFG.get('battlePanelCollapsed', False)),
+        'target': _gf_target_line(plugin),
+        'auto': {'on': auto_on, 'text': ('ON, %dm' % range_m) if auto_on else 'OFF'},
+        'cells': cells,
+        'enemies': enemies,
+    }
+
+
+def _gf_show(force):
     global _BATTLE_PANEL_ACTIVE
     if not force and not _CFG.get('battlePanelEnabled', True):
         return
     if not force and _PANEL_USER_HIDDEN:
-        return  # user hid it with PgDn - don't let invalidateMarkup revive it
+        return
     if _BATTLE_PANEL_ACTIVE:
         return
-
-    g_smGuiFlash = _resolve_guiflash()
-    if g_smGuiFlash is None:
-        _logger.warning(
-            'SpotMeter: no GUIFlash library - in-battle panel disabled '
-            '(minimap circle + hotkeys still work).')
+    gfp = _gfp()
+    if gfp is None:
         return
-
-    _install_guiflash_event_hook()
-
+    _gf_ensure_setup()
     x = float(_CFG.get('battlePanelX', 10))
     y = float(_CFG.get('battlePanelY', 400))
-    w = float(_CFG.get('battlePanelW', 320))
-    h = float(_CFG.get('battlePanelH', 400))
-
     try:
-        # Root draggable panel. limit=True clamps drag to stage bounds
-        # so the user can't yeet it off-screen.
-        g_smGuiFlash.createComponent(SPOTMETER_PANEL_ROOT, 'Panel', {
-            'x': x, 'y': y,
-            'width': w, 'height': h,
-            'drag': True, 'limit': True,
-        })
-        # Title is non-clickable, just identification.
-        g_smGuiFlash.createComponent(SPOTMETER_PANEL_ROOT + '.title', 'Label', {
-            'x': 8, 'y': _LAYOUT['title_y'],
-            'text': '<font size="14" color="#FFFFFF"><b>SpotMeter v%s</b></font> '
-                    '<font size="9" color="#888888">by %s</font>'
-                    % (MOD_VERSION_SHORT, MOD_AUTHOR),
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-        })
-        # Bottom hint: how to hide the panel (PageDown by default).
-        g_smGuiFlash.createComponent(SPOTMETER_PANEL_ROOT + '.hint', 'Label', {
-            'x': 8, 'y': _LAYOUT['enemies_y0'],
-            'text': '<font size="9" color="#666666"><i>%s</i></font>' % _t('battle_hide_hint'),
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-        })
-        # Target line is non-clickable info.
-        g_smGuiFlash.createComponent(SPOTMETER_PANEL_ROOT + '.target', 'Label', {
-            'x': 8, 'y': _LAYOUT['target_y'],
-            'text': '<font size="12" color="#FFCC66">Target: --</font>',
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-        })
-        # Auto-pick line is CLICKABLE - toggles auto-pick on/off.
-        g_smGuiFlash.createComponent(SPOTMETER_PANEL_ROOT + '.auto', 'Label', {
-            'x': 8, 'y': _LAYOUT['auto_y'],
-            'text': _fmt_auto_label(),
-            'isHtml': True, 'shadow': None,
-            'autoSize': True,
-            'customBackground': {
-                'color': 0x222B36, 'alpha': 0.6,
-                'border': True, 'borderColor': 0x4A5868,
-                'thickness': 1, 'margin': 3, 'ellipseWidth': 4,
-            },
-        })
-        # Seven cells (5 binary toggles + 2 multi-level controls) in a
-        # 3+3+1 grid. _PANEL_CELLS holds them in display order with a
-        # kind discriminator so we can format toggles vs levels in the
-        # same loop.
-        cells_per_row = 3
-        cell_w = (w - 16) / cells_per_row
-        # Row Y baseline: keep existing row1/row2 spacing, add row3.
-        row_y = [
-            _LAYOUT['toggles_row1_y'],
-            _LAYOUT['toggles_row2_y'],
-            _LAYOUT['toggles_row3_y'],
-        ]
-        for i, (kind, item) in enumerate(_PANEL_CELLS):
-            row = i // cells_per_row
-            col = i % cells_per_row
-            key, suffix, hotkey, dispname = item
-            cx = 8 + col * cell_w
-            cy = row_y[row] if row < len(row_y) else row_y[-1]
-            if kind == 'toggle':
-                text = _fmt_toggle_label(key, dispname, hotkey)
-            else:  # level
-                text = _fmt_level_label(key, dispname, hotkey)
-            g_smGuiFlash.createComponent(
-                SPOTMETER_PANEL_ROOT + '.' + suffix, 'Label', {
-                    'x': cx, 'y': cy,
-                    'text': text,
-                    'isHtml': True, 'shadow': None,
-                    'autoSize': True,
-                    'customBackground': {
-                        'color': 0x222B36, 'alpha': 0.5,
-                        'border': True, 'borderColor': 0x4A5868,
-                        'thickness': 1, 'margin': 3, 'ellipseWidth': 4,
-                    },
-                })
-        # Enemy rows are created dynamically on first refresh.
+        if gfp.show(x, y):
+            _BATTLE_PANEL_ACTIVE = True
+            _schedule_panel_refresh()
+            _logger.info('SpotMeter: Gameface panel shown at (%s,%s)', x, y)
     except Exception:
-        _logger.exception('SpotMeter: failed to create GUIFlash panel components')
-        return
-
-    _BATTLE_PANEL_ACTIVE = True
-    _BATTLE_PANEL_LAST.clear()
-    _BATTLE_PANEL_ENEMY_VIDS.clear()
-    _logger.warning('SpotMeter: GUIFlash battle panel created at (%s,%s)', x, y)
-    _schedule_panel_refresh()
+        _logger.exception('SpotMeter: Gameface panel show failed')
 
 
-def _hide_battle_view():
-    """Tear down the GUIFlash panel cleanly. Safe to call multiple times."""
+def _gf_hide():
     global _BATTLE_PANEL_ACTIVE, _BATTLE_PANEL_REFRESH_CB
-    if not _BATTLE_PANEL_ACTIVE:
-        return
     if _BATTLE_PANEL_REFRESH_CB is not None:
         try:
             BigWorld.cancelCallback(_BATTLE_PANEL_REFRESH_CB)
         except Exception:
             pass
         _BATTLE_PANEL_REFRESH_CB = None
-    try:
-        g_smGuiFlash = _resolve_guiflash()
-        if g_smGuiFlash is None:
-            raise RuntimeError('GUIFlash unavailable at teardown')
-        # Delete child enemy components first so the cache stays consistent.
-        for vid in list(_BATTLE_PANEL_ENEMY_VIDS):
-            try:
-                g_smGuiFlash.deleteComponent(
-                    SPOTMETER_PANEL_ROOT + '.enemy_' + str(vid))
-            except Exception:
-                pass
-        # Then the fixed children: title/target/auto + every cell in the
-        # panel grid (binary toggles + level cyclers).
-        fixed_suffixes = ['title', 'target', 'auto', 'hint']
-        for _kind, item in _PANEL_CELLS:
-            fixed_suffixes.append(item[1])  # item = (key, suffix, hotkey, dispname)
-        for suffix in fixed_suffixes:
-            try:
-                g_smGuiFlash.deleteComponent(SPOTMETER_PANEL_ROOT + '.' + suffix)
-            except Exception:
-                pass
-        g_smGuiFlash.deleteComponent(SPOTMETER_PANEL_ROOT)
-    except Exception:
-        _logger.exception('SpotMeter: failed to delete GUIFlash panel')
-    _BATTLE_PANEL_ACTIVE = False
-    _BATTLE_PANEL_LAST.clear()
-    _BATTLE_PANEL_ENEMY_VIDS.clear()
-    _logger.info('SpotMeter: GUIFlash battle panel destroyed')
-
-
-def _install_guiflash_event_hook():
-    """Subscribe to our forked GUIFlash's CLICKED + UPDATED events.
-    CLICKED routes to the appropriate picker handler by alias; UPDATED
-    persists drag-end coords."""
-    global _GUIFLASH_HOOK_INSTALLED
-    if _GUIFLASH_HOOK_INSTALLED:
-        return
-    _resolve_guiflash()
-    ev = _GF_EVENT
-    if ev is None:
-        _logger.warning('SpotMeter: GUIFlash COMPONENT_EVENT unavailable - drag/click events off')
-        return
-    try:
-        ev.UPDATED += _on_guiflash_component_updated
-        # CLICKED exists only on our fork; the real gambiter.guiflash has no
-        # click channel (and our byte-identical SWF never fired it anyway).
-        if hasattr(ev, 'CLICKED'):
-            ev.CLICKED += _on_guiflash_component_clicked
-        _GUIFLASH_HOOK_INSTALLED = True
-        _logger.info('SpotMeter: subscribed to %s COMPONENT_EVENT', _GF_SOURCE)
-    except Exception:
-        _logger.exception('SpotMeter: failed to subscribe to GUIFlash events')
-
-
-def _on_guiflash_component_clicked(alias):
-    """Dispatch click on any panel component to the right picker handler.
-    Aliases like 'spotmeter.tog_rations.label' also dispatch to the same
-    handler as the bare 'spotmeter.tog_rations' so clicks on inner text
-    work too (though our current layout has no inner children).
-
-    Coexistence: when we use a shared gambiter.guiflash, this fires for EVERY
-    GUIFlash mod's clicks. We ignore foreign aliases and wrap the whole body so
-    an error can never escape into the shared Event chain and break another
-    mod's handler."""
-    try:
-        if not alias or not alias.startswith(SPOTMETER_PANEL_ROOT + '.'):
-            return
-        leaf = alias[len(SPOTMETER_PANEL_ROOT) + 1:].split('.', 1)[0]
-        if leaf == 'auto':
-            _toggle_auto_pick()
-            return
-        for key, suffix, _hotkey, _disp in _TOGGLE_ROWS:
-            if leaf == suffix:
-                _toggle_perk(key)
-                return
-        for key, suffix, _hotkey, _disp in _LEVEL_ROWS:
-            if leaf == suffix:
-                _cycle_level(key)
-                return
-        if leaf.startswith('enemy_'):
-            try:
-                vid = int(leaf[len('enemy_'):])
-            except ValueError:
-                return
-            _battle_panel_on_pick(vid)
-            return
-        # Title / target are explicitly non-interactive (no handler).
-    except Exception:
-        _logger.exception('SpotMeter: error in GUIFlash CLICKED handler (swallowed)')
-
-
-def _on_guiflash_component_updated(alias, props):
-    """Called whenever any GUIFlash component changes. We persist drag-end
-    coords for our draggable battle panel; other updates are ignored.
-
-    Coexistence: on a shared gambiter.guiflash this fires for EVERY mod's
-    components (including their own draggable windows). We act only on our own
-    root alias and wrap the whole body so an error can never escape into the
-    shared Event chain and break another mod's position-save handler."""
-    try:
-        if not isinstance(props, dict):
-            return
-        if 'x' not in props and 'y' not in props:
-            return
-        # Only our battle panel is draggable (the garage panel is gone in v6.1.0).
-        if alias != SPOTMETER_PANEL_ROOT:
-            return
-        cfg_x_key, cfg_y_key, label = 'battlePanelX', 'battlePanelY', 'battle'
-        new_x = props.get('x', _CFG.get(cfg_x_key))
-        new_y = props.get('y', _CFG.get(cfg_y_key))
+    gfp = _gfp()
+    if gfp is not None:
         try:
-            cx = int(round(float(new_x)))
-            cy = int(round(float(new_y)))
-        except (TypeError, ValueError):
-            return
-        if cx == _CFG.get(cfg_x_key) and cy == _CFG.get(cfg_y_key):
-            return  # no actual change
-        _CFG[cfg_x_key] = cx
-        _CFG[cfg_y_key] = cy
-        _logger.info('SpotMeter: %s panel dragged to (%d, %d), saving config', label, cx, cy)
-        try:
-            _write_config()
+            gfp.hide()
         except Exception:
-            _logger.exception('SpotMeter: failed to persist %s panel position', label)
+            _logger.exception('SpotMeter: Gameface panel hide failed')
+    _BATTLE_PANEL_ACTIVE = False
+
+
+def _gf_refresh():
+    gfp = _gfp()
+    if gfp is None or not gfp.is_active():
+        return
+    plugin = _get_picker_plugin()
+    try:
+        gfp.push_state(_gf_build_state(plugin))
     except Exception:
-        _logger.exception('SpotMeter: error in GUIFlash UPDATED handler (swallowed)')
+        _logger.exception('SpotMeter: Gameface push_state failed')
+
+
+def _show_battle_view(force=False):
+    """Show the in-battle SpotMeter panel (Gameface backend)."""
+    _gf_show(force)
+
+
+def _hide_battle_view():
+    """Tear down the in-battle SpotMeter panel (Gameface backend)."""
+    _gf_hide()
+
+
+
+
+
+
 
 
 def _schedule_panel_refresh():
@@ -4126,11 +3304,8 @@ def _schedule_panel_refresh():
 
 
 def _battle_panel_tick():
-    """Periodic refresh of the panel content. Diff-guarded against
-    _BATTLE_PANEL_LAST so we only call updateComponent when text changes -
-    GUIFlash updates re-render the whole component, so flicker is real
-    if we push every tick blindly.
-    """
+    """Periodic refresh of the panel content (pushes a fresh state to the
+    Gameface view; push_state dedups identical states)."""
     global _BATTLE_PANEL_REFRESH_CB
     _BATTLE_PANEL_REFRESH_CB = None
     if not _BATTLE_PANEL_ACTIVE:
@@ -4143,134 +3318,14 @@ def _battle_panel_tick():
 
 
 def _refresh_panel_state():
-    """Compute current state text for each label and push only the ones
-    that actually changed. Also reconciles the dynamic enemy_<vid> rows
-    against the current enemy listing - creating new ones, deleting
-    dead ones, updating survivors."""
-    g_smGuiFlash = _resolve_guiflash()
-    if g_smGuiFlash is None:
-        return
-    plugin = _get_picker_plugin()
-
-    _maybe_update_label(g_smGuiFlash, SPOTMETER_PANEL_ROOT + '.target',
-                        _fmt_target_label(plugin))
-    _maybe_update_label(g_smGuiFlash, SPOTMETER_PANEL_ROOT + '.auto',
-                        _fmt_auto_label())
-    for kind, (key, suffix, hotkey, dispname) in _PANEL_CELLS:
-        if kind == 'toggle':
-            text = _fmt_toggle_label(key, dispname, hotkey)
-        else:
-            text = _fmt_level_label(key, dispname, hotkey)
-        _maybe_update_label(g_smGuiFlash, SPOTMETER_PANEL_ROOT + '.' + suffix, text)
-
-    _refresh_enemy_rows(g_smGuiFlash, plugin)
+    """Push the current panel state to the Gameface view."""
+    _gf_refresh()
 
 
-def _maybe_update_label(g_smGuiFlash, alias, html):
-    if _BATTLE_PANEL_LAST.get(alias) == html:
-        return
-    _BATTLE_PANEL_LAST[alias] = html
-    try:
-        g_smGuiFlash.updateComponent(alias, {'text': html})
-    except Exception:
-        _logger.exception('SpotMeter: updateComponent failed for %s', alias)
 
 
-def _refresh_enemy_rows(g_smGuiFlash, plugin):
-    """Reconcile per-enemy components against the live picker listing.
-    Each enemy gets its own clickable Label at spotmeter.enemy_<vid>.
-    Stacks vertically; row height fixed by _LAYOUT['enemies_step']."""
-    if plugin is None:
-        # No plugin -> remove anything stale
-        _purge_enemy_rows(g_smGuiFlash, keep=set())
-        return
-    groups = _grouped_enemies(plugin)
-    listing = groups[:SPOTMETER_MAX_ENEMY_ROWS]
-    desired_vids = set(rep_vid for rep_vid, _, _ in listing)
-    _purge_enemy_rows(g_smGuiFlash, keep=desired_vids)
-
-    eff_vid, src = _effective_picked_vid()
-    # Resolve the picked tank's TYPE so a group row still highlights when the
-    # picked vid is a non-representative member (e.g. an auto-picked instance).
-    picked_key = None
-    if eff_vid is not None:
-        try:
-            arenaDP = plugin.sessionProvider.getArenaDP()
-            ev = arenaDP.getVehicleInfo(eff_vid) if arenaDP is not None else None
-            if ev is not None:
-                picked_key = _veh_type_key(ev.vehicleType)
-        except Exception:
-            picked_key = None
-    y0 = _LAYOUT['enemies_y0']
-    step = _LAYOUT['enemies_step']
-    panel_w = float(_CFG.get('battlePanelW', 320))
-
-    for idx, (vid, vinfo, count) in enumerate(listing):
-        alias = SPOTMETER_PANEL_ROOT + '.enemy_' + str(vid)
-        is_picked = (vid == eff_vid) or (picked_key is not None
-                     and _veh_type_key(vinfo.vehicleType) == picked_key)
-        text = _fmt_enemy_row(plugin, vid, vinfo, is_picked, src, count)
-        if vid not in _BATTLE_PANEL_ENEMY_VIDS:
-            # Create a new clickable row.
-            try:
-                g_smGuiFlash.createComponent(alias, 'Label', {
-                    'x': 8, 'y': y0 + idx * step,
-                    'text': text,
-                    'isHtml': True, 'shadow': None,
-                    'autoSize': False,
-                    'width': panel_w - 16,
-                    'height': step,
-                    'customBackground': {
-                        'color': (0x4A6378 if is_picked else 0x1A2230),
-                        'alpha': (0.85 if is_picked else 0.40),
-                        'border': False,
-                        'thickness': 0,
-                        'margin': 1,
-                        'ellipseWidth': 3,
-                    },
-                })
-                _BATTLE_PANEL_ENEMY_VIDS.add(vid)
-                _BATTLE_PANEL_LAST[alias] = text
-            except Exception:
-                _logger.exception('SpotMeter: failed to create enemy row %s', alias)
-        else:
-            # Just update text + position (in case the list order shifted).
-            _maybe_update_label(g_smGuiFlash, alias, text)
-            try:
-                g_smGuiFlash.updateComponent(alias, {
-                    'y': y0 + idx * step,
-                    'customBackground': {
-                        'color': (0x4A6378 if is_picked else 0x1A2230),
-                        'alpha': (0.85 if is_picked else 0.40),
-                        'border': False,
-                        'thickness': 0,
-                        'margin': 1,
-                        'ellipseWidth': 3,
-                    },
-                })
-            except Exception:
-                _logger.exception('SpotMeter: failed to reposition enemy row %s', alias)
-
-    # Keep the "press PgDn to hide" hint right under the enemy list (adapts to
-    # the tank count) instead of pinned at the panel bottom.
-    try:
-        g_smGuiFlash.updateComponent(SPOTMETER_PANEL_ROOT + '.hint',
-                                     {'y': y0 + len(listing) * step + 6})
-    except Exception:
-        pass
 
 
-def _purge_enemy_rows(g_smGuiFlash, keep):
-    """Delete any enemy_<vid> components whose vid isn't in `keep`."""
-    stale = [vid for vid in _BATTLE_PANEL_ENEMY_VIDS if vid not in keep]
-    for vid in stale:
-        alias = SPOTMETER_PANEL_ROOT + '.enemy_' + str(vid)
-        try:
-            g_smGuiFlash.deleteComponent(alias)
-        except Exception:
-            _logger.exception('SpotMeter: failed to delete stale enemy row %s', alias)
-        _BATTLE_PANEL_ENEMY_VIDS.discard(vid)
-        _BATTLE_PANEL_LAST.pop(alias, None)
 
 
 # ----- label formatters -----
@@ -4292,96 +3347,14 @@ def _own_vehicle_short_name(plugin):
     return ''
 
 
-def _fmt_target_label(plugin):
-    eff_vid, src = _effective_picked_vid()
-    if eff_vid is None or plugin is None:
-        # Nothing picked + no auto -> the circle uses our OWN view range; show
-        # our own tank instead of just "--".
-        own_name = (_own_vehicle_short_name(plugin)
-                    if plugin is not None and _CFG.get('useOwnViewRange', True) else '')
-        if own_name:
-            spot = _LAST_SPOT_RADIUS
-            spot_str = ('%.0fm' % spot) if spot else '--m'
-            return ('<font size="12" color="#FFCC66">%s <b>%s</b>  '
-                    '<font color="#FFFFFF">spot=%s</font> '
-                    '<font color="#88AABB">(%s)</font></font>'
-                    % (_t('battle_target'), _html_escape(own_name), spot_str,
-                       _t('battle_target_own')))
-        return ('<font size="12" color="#888888">%s '
-                '<i>--  %s</i></font>'
-                % (_t('battle_target'), _t('battle_target_hint')))
-    name = ''
-    try:
-        arenaDP = plugin.sessionProvider.getArenaDP()
-        if arenaDP is not None:
-            vinfo = arenaDP.getVehicleInfo(eff_vid)
-            if vinfo is not None and vinfo.vehicleType is not None:
-                name = vinfo.vehicleType.shortName or ''
-    except Exception:
-        pass
-    # Show the distance from which THIS target spots us (the live spot-circle
-    # radius for the current state) instead of the raw enemy VR.
-    spot = _LAST_SPOT_RADIUS
-    spot_str = ('%.0fm' % spot) if spot else '--m'
-    src_str = ' <font color="#88AABB">(auto)</font>' if src == 'auto' else ''
-    return ('<font size="12" color="#FFCC66">%s <b>%s</b>  '
-            '<font color="#FFFFFF">spot=%s</font>%s</font>'
-            % (_t('battle_target'), _html_escape(name), spot_str, src_str))
 
 
-def _fmt_auto_label():
-    auto_on = bool(_CFG.get('autoPickEnabled', False))
-    range_m = int(float(_CFG.get('autoPickRangeMeters', 445.0)))
-    color = '#88FF88' if auto_on else '#AAAAAA'
-    label = 'ON, %dm' % range_m if auto_on else 'OFF'
-    return ('<font size="11" color="%s">[Auto-pick: %s]</font>'
-            '<font size="10" color="#555555"> %s</font>'
-            % (color, label, _t('battle_auto_hint')))
 
 
-def _fmt_toggle_label(key, dispname, hotkey):
-    on = bool(_PICKER_TOGGLES.get(key, False))
-    color = '#88FF88' if on else '#AAAAAA'
-    sym = '+' if on else '-'
-    return ('<font size="11" color="%s">[%s%s]</font>'
-            '<font size="9" color="#555555"> %s</font>'
-            % (color, sym, _html_escape(_t('tl_' + key)), hotkey))
 
 
-def _fmt_level_label(key, dispname, hotkey):
-    """Render a multi-level cell. Shows current level name (OFF/basic/
-    slot/bonds/deluxe). Color is dim when at level 0 (OFF), green when
-    at any positive level. Same cell shape as toggles so the 3-column
-    grid stays uniform."""
-    lvl = int(_PICKER_LEVELS.get(key, 0))
-    lvl = max(0, min(lvl, len(_LEVEL_NAMES) - 1))
-    name = _level_name_loc(lvl)
-    color = '#88FF88' if lvl > 0 else '#AAAAAA'
-    return ('<font size="11" color="%s">[%s:%s]</font>'
-            '<font size="9" color="#555555"> %s</font>'
-            % (color, _html_escape(_t('tl_' + key)), name, hotkey))
 
 
-def _fmt_enemy_row(plugin, vid, vinfo, is_picked, src, count=1):
-    vt = vinfo.vehicleType
-    if vt is None:
-        return ''
-    klass = _class_code_for(vt) or '??'
-    short = _html_escape(vt.shortName or '?')
-    count_str = (' x%d' % count) if count > 1 else ''
-    level = vt.level or 0
-    vr_val = _picker_vr_for(plugin, vid)
-    vr_str = 'VR=%dm' % int(vr_val) if vr_val else 'VR=?'
-    if is_picked:
-        line_color = '#FFCC66'
-        marker = '<font color="#FFCC66"><b>&#9654;</b></font> '
-        if src == 'auto':
-            marker = '<font color="#88AABB"><b>&#9675;</b></font> '
-    else:
-        line_color = '#CCCCCC'
-        marker = '<font color="#444444">&nbsp;&nbsp;</font>'
-    return ('<font size="10" color="%s">%s[%s] %s%s T%d  %s</font>'
-            % (line_color, marker, klass, short, count_str, level, vr_str))
 
 
 def _html_escape(s):
@@ -4396,10 +3369,10 @@ def _html_escape(s):
 
 
 # ============================================================================
-# v6.0.0 garage info panel. Read-only readout of current session state +
-# Numpad hotkey reference. No interactivity (clickless GUIFlash) - user
-# edits spotmeter.json to change defaults. Draggable, position persists
-# via the same COMPONENT_EVENT.UPDATED hook the battle panel uses.
+# Battle-panel control helpers (show / hide / refresh). The panel itself is a
+# Gameface overlay (spotmeter_gfpanel / the _gf_* backend); these are the thin
+# entry points the hotkeys and battle lifecycle call. No garage panel exists in
+# v7 - it was removed in v6.1 and its settings moved to the mods-settings menu.
 # ============================================================================
 
 def _toggle_panel():
@@ -4736,7 +3709,7 @@ def _install_reload_hotkey():
         _logger.exception('SpotMeter: failed to bind via InputHandler.g_instance.onKeyDown')
 
     names = ', '.join('%s=%s' % (label, name) for _, _, label, name in bindings)
-    _logger.warning('SpotMeter: hotkeys bound via [%s] - %d entries: %s',
+    _logger.info('SpotMeter: hotkeys bound via [%s] - %d entries: %s',
                     ' + '.join(bound) or 'NONE', len(bindings), names)
     if bound:
         _HOTKEYS_INSTALLED = True

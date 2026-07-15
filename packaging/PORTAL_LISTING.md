@@ -1,6 +1,6 @@
 <!--
 Release listing texts for SpotMeter, per distribution channel.
-Content in the code blocks is the CURRENT (v6.1.0) copy - paste it straight in.
+Content in the code blocks is the CURRENT (v7.0.0) copy - paste it straight in.
 
 Channels:
   1. WG Mods portal (wgmods.net) - ENGLISH. Three fields with HARD char limits.
@@ -18,38 +18,40 @@ Per release:
 
 ## Dependencies / wymagania (both channels)
 
-NONE - SpotMeter is fully self-contained in the single .wotmod:
-- bundles mod_spotmeter.pyc + a private GUIFlash fork (gui.mods.spotmeter_gf + its SWF)
-- does NOT require gambiter.guiflash, XVM, XFW or any shared library
-- GUIFlash coexistence: if a shared gambiter.guiflash IS installed (any modpack),
-  SpotMeter uses THAT for its panels instead of loading its bundled copy - so it
-  never duplicates the net.gambiter.* classes and never disturbs other GUIFlash
-  mods' saved window positions. The bundled fork is only used when gambiter is absent.
-- spotmeter.json config is optional (built-in defaults if absent)
+REQUIRES net.openwg.gameface (free, MIT; already shipped in common modpacks):
+- the in-battle panel is a Gameface (HTML/CSS/JS) overlay rendered through
+  net.openwg.gameface. Without it the minimap circle + numpad hotkeys still work,
+  but the panel does not appear.
+- v7.0.0 ships NO SWF - the old bundled GUIFlash fork is gone, so SpotMeter can
+  never duplicate the net.gambiter.* classes or disturb another GUIFlash mod's
+  saved window positions.
+- spotmeter.json config is optional (built-in defaults if absent), stored in AppData.
 - a mods-settings menu (Aslain's aslainMenu / izeberg's ModsSettingsAPI) is
-  OPTIONAL too - it only adds the in-garage settings page; the mod runs fully
-  without it (JSON config + hotkeys). Recommended for solo installs that want
-  in-game configuration.
-- requires WoT 2.3.0.1; no special load order
-- coexists with other mods: own namespace, replaces no WG UI files, every game
-  hook is a wrapper that calls the original, hotkeys are never consumed
+  OPTIONAL - it only adds the in-garage settings page; the mod runs on JSON config
+  + hotkeys without it.
+- requires WoT 2.3.1.0; no special load order.
+- coexists cleanly: own namespace, replaces no WG UI files, every game hook wraps
+  the original, hotkeys are never consumed.
 
 # WG Mods portal (wgmods.net) — English
 
 ## Version changes  (max 1000 characters)
 
 ```
-v6.1.0 - for WoT 2.3.0.1.
+v7.0.0 - for WoT 2.3.1.0.
 
-In-game settings + cleaner defaults:
-
-NEW
-- In-game configurator: with a mods-settings menu installed (Aslain's aslainMenu, or izeberg's ModsSettingsAPI - both optional, the mod works without either) SpotMeter gets a settings page: panel visibility, identical-tank grouping, auto-hide, panel hotkey (key combos supported), minimap circle on/off, circle opacity, language, the battle-start loadout, per-class auto-pick presets (class dropdown), and a full rebindable hotkey list. Changes apply live and save to spotmeter.json.
-- "Panel only" mode: showMinimapCircle turns the minimap circle off independently of the panel.
+Major update: the in-battle panel is rebuilt on Gameface (modern HTML/CSS/JS).
 
 CHANGED
-- The battle panel starts HIDDEN by default (PageDown shows it). The separate garage panel is gone - its settings live in the configurator now.
-- Config moved to AppData (survives modpack reinstalls); an old config is migrated automatically.
+- The panel is now a Gameface overlay instead of a Scaleform/GUIFlash SWF. SpotMeter ships NO SWF anymore, so it can never collide with another GUIFlash mod's saved window positions. The minimap circle and the whole spot-distance engine are unchanged.
+
+NEW
+- Requires net.openwg.gameface (free, in common modpacks). Without it the circle + hotkeys still work.
+- Modern look: transparent panel, white text, green for the enabled options.
+- Drag the panel by its header (position saved).
+- Collapse arrow: shrink it to just the picked vehicle + spot distance (state remembered).
+
+Cleaner log: benign status lines are INFO now (no more warning-looking noise).
 ```
 
 ## Mod description  (max 3000 characters)
@@ -69,16 +71,19 @@ Everything in your own tank's data: base view range, crew, optics, binoculars, c
 ENEMY PICKER
 Pick a specific enemy (click a row in the panel, or Numpad 2/8) and the circle switches to that tank's view range. Because the server no longer sends enemy equipment, you set the assumed optics / vents / CVS as quick cyclable levels (Numpad 6 / + / -) and toggle the likely crew perks (Rations, BIA, Recon + Situational Awareness). The estimate matches the in-game view-range formula.
 
-PANEL & SETTINGS
-- In-battle panel: every enemy with its view range; identical tanks grouped (e.g. "Dravec x5"); a target line with the spot-distance; the AUTO state. Click a row or Numpad 2/8 to pick. PageDown shows/hides it; hold TAB/N to peek the team panels.
+IN-BATTLE PANEL (v7 - Gameface)
+A modern HTML overlay: every enemy with its view range, identical tanks grouped (e.g. "Dravec x5"), a target line with the spot-distance, and the AUTO state. Click a row to pick a target; click the loadout cells to change the assumed optics/perks. Drag it by the header (position saved); a collapse arrow shrinks it to just the picked vehicle + spot distance. PageDown shows/hides it.
 - Auto-pick (Numpad /) tracks the nearest enemy, with per-class loadout presets.
-- In-game configurator: install a mods-settings menu (Aslain's aslainMenu or izeberg's ModsSettingsAPI - free, optional) and SpotMeter adds a settings page in the garage: panel options, the assumed loadout, auto-pick presets, language and a full rebindable hotkey list, applied live. Without a menu the mod auto-creates a commented spotmeter.json you can edit (its exact path is logged to python.log at startup).
+- Optional in-garage configurator via a mods-settings menu (aslainMenu / ModsSettingsAPI). Without a menu, edit the auto-created spotmeter.json (path logged at startup).
+
+REQUIRES
+net.openwg.gameface (free, MIT; already in common modpacks) for the panel. The minimap circle and the hotkeys work even without it.
 
 LANGUAGE
 English and Polish, auto-detected from your game client.
 
 FAIR PLAY
-SpotMeter only computes values the client already has and shows the result geometrically. It does NOT reveal hidden enemies, automate aiming or movement, or read server-private data - the same category as the view-range circles already built into the game and shipped in common modpacks.
+SpotMeter only computes values the client already has and shows the result geometrically. It does NOT reveal hidden enemies, automate aiming or movement, or read server-private data - the same category as the view-range circles already built into the game.
 
 Hotkeys are on the numpad and work with NumLock on or off; everything is configurable in spotmeter.json.
 ```
@@ -86,20 +91,20 @@ Hotkeys are on the numpad and work with NumLock on or off; everything is configu
 ## Installation  (max 1000 characters)
 
 ```
-1. Download spotmeter-v6.1.0.wotmod.
+1. Install net.openwg.gameface (free; already in most modpacks, or from the OpenWG project). SpotMeter's panel needs it.
 
-2. Copy it into:  <WoT>\mods\2.3.0.1\
-   Example:  D:\Games\World_of_Tanks_EU\mods\2.3.0.1\
+2. Download spotmeter-v7.0.0.wotmod.
+
+3. Copy it into:  <WoT>\mods\2.3.1.0\
+   Example:  D:\Games\World_of_Tanks_EU\mods\2.3.1.0\
    (create the folder if it does not exist)
 
-3. Launch the game. The minimap spot-distance circle works right away. The battle panel starts hidden - press PageDown in battle to show it.
+4. Launch the game. On first launch it briefly restarts once to register the panel (net.openwg.gameface rebuilds its resource map) - this is normal. The minimap circle works right away; in battle, PageDown shows/hides the panel and you drag it by the header.
 
-4. (Optional) Install a mods-settings menu (Aslain's aslainMenu or izeberg's ModsSettingsAPI) to configure everything in the garage, or edit the auto-created config at:
+5. (Optional) Install a mods-settings menu (aslainMenu / ModsSettingsAPI) to configure in the garage, or edit:
    %APPDATA%\Wargaming.net\WorldOfTanks\mods\spotmeter\spotmeter.json
 
-The game auto-loads every .wotmod in mods\<version>\ at startup.
-To uninstall: delete the .wotmod from mods\2.3.0.1\.
-Requires WoT 2.3.0.1. No other mods needed - the GUIFlash library is bundled.
+To uninstall: delete the .wotmod from mods\2.3.1.0\. Requires WoT 2.3.1.0 + net.openwg.gameface.
 ```
 
 # Aslain's modpack — Polish
@@ -110,21 +115,25 @@ limitu znakow - Aslain lubi zwiezle wpisy). Dwie formy do wyboru.
 ## Zmiany wersji — jedna linia (kompaktowy changelog Aslaina)
 
 ```
-SpotMeter zaktualizowany do v6.1.0 (WoT 2.3.0.1) — konfigurator w garażu (menu ustawień modów): widoczność panelu, założony loadout, presety auto-dobierania per klasa, pełna klawiszologia. Panel bitewny domyślnie ukryty (PageDown pokazuje), panel garażowy usunięty, config w AppData. (autor: ISEDR_Mikus)
+SpotMeter v7.0.0 (WoT 2.3.1.0) — panel bitewny przepisany na Gameface (nowoczesny HTML/CSS/JS) zamiast GUIFlash/SWF: mod nie wysyła już żadnego SWF-a, więc nie może kolidować z zapisanymi pozycjami okien innych modów GUIFlash. Nowości: przezroczysty styl, przeciąganie za nagłówek (zapis pozycji), strzałka zwijania. WYMAGA net.openwg.gameface. Czystszy log (statusy przez INFO). (autor: ISEDR_Mikus)
 ```
 
 ## Zmiany wersji — pełne
 
 ```
-SpotMeter v6.1.0 — pod WoT 2.3.0.1.
+SpotMeter v7.0.0 — pod WoT 2.3.1.0.
 
-Ustawienia w grze + czytelniejsze domyślne:
-
-NOWE
-- Konfigurator w garażu: z zainstalowanym menu ustawień modów (aslainMenu Aslaina albo ModsSettingsAPI izeberga — oba opcjonalne, bez nich mod też działa) SpotMeter dostaje stronę ustawień: widoczność panelu, grupowanie identycznych czołgów, auto-ukrywanie, klawisz panelu (z kombinacjami), okrąg na minimapie wł/wył, przezroczystość, język, założony loadout na start bitwy, presety auto-dobierania per klasa (dropdown klas) oraz pełna lista przypisywanych klawiszy. Zmiany działają na żywo i zapisują się do spotmeter.json.
-- Tryb „sam panel": showMinimapCircle wyłącza okrąg na minimapie niezależnie od panelu.
+Duża zmiana: panel bitewny przepisany na Gameface (nowoczesny HTML/CSS/JS).
 
 ZMIANY
-- Panel bitewny domyślnie ukryty (PageDown pokazuje). Osobny panel garażowy usunięty — jego ustawienia są teraz w konfiguratorze.
-- Config przeniesiony do AppData (przeżywa reinstalacje paczki); stary config migruje automatycznie.
+- Panel to teraz overlay Gameface zamiast SWF-a (GUIFlash/Scaleform). SpotMeter NIE wysyła już żadnego SWF-a — nie może kolidować z zapisanymi pozycjami okien innych modów GUIFlash (to był ten problem, który zgłaszał Aslain z modem RaJCeLa). Okrąg na minimapie i cały silnik spot-distance bez zmian.
+
+NOWE
+- WYMAGA net.openwg.gameface (darmowa, MIT; jest w typowych paczkach). Bez niej okrąg + klawisze działają, panelu nie ma.
+- Nowoczesny wygląd: przezroczyste tło, biały tekst, zielone włączone opcje.
+- Przeciąganie panelu za nagłówek (pozycja zapisywana).
+- Strzałka zwijania: panel kurczy się do samego wybranego pojazdu + spot distance (stan zapamiętany).
+
+POPRAWKI
+- Czystszy log: benign statusy idą teraz przez INFO (koniec warningów wyglądających jak błędy). „module loaded" leci przez INFO.
 ```

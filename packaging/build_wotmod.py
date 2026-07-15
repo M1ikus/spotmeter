@@ -1,14 +1,22 @@
-"""Build a .wotmod package for SpotMeter.
+"""Build the SpotMeter v7 .wotmod package (Gameface panel).
 
-A .wotmod file is a regular ZIP archive that World of Tanks reads from
-its mods/<version>/ directory. It must contain a meta.xml at the root
-plus any game-relative resources (e.g. scripts/client/...). This
-script also bundles a default config alongside the .wotmod for the
-user to optionally drop into mods/configs/.
+A .wotmod is a ZIP archive World of Tanks reads from mods/<version>/. It
+contains meta.xml at the root plus game-relative resources under res/.
 
-Run:
+v7.0.0: the panel is a Gameface (HTML/CSS/JS) overlay driven by
+spotmeter_gfpanel + net.openwg.gameface. The old GUIFlash SWF + the private
+spotmeter_gf fork are GONE (no more net.gambiter.* class collision). The mod
+now ships:
+  - mod_spotmeter.pyc              (the mod)
+  - spotmeter_gfpanel.pyc          (the Gameface render layer)
+  - gui/gameface/mods/spotmeter/SpotMeterPanel.html  (the panel UI)
+  - mods/configs/res_map/net.spotmeter.panel.json    (layout registration)
+
+Requires net.openwg.gameface installed at runtime (a shared dependency).
+
+Run (after compiling the .pyc to build/ - preflight.py does this):
     python packaging/build_wotmod.py
-The output goes to dist/.
+Output goes to dist/.
 """
 from __future__ import print_function
 import os
@@ -17,18 +25,14 @@ import sys
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_PYC = os.path.join(ROOT, 'build', 'mod_spotmeter.pyc')
-SRC_JSON = os.path.join(ROOT, 'src', 'spotmeter.json')
-SRC_SWF_BUTTON = os.path.join(ROOT, 'swf', 'spotmeter_button.swf')
-SRC_SWF_MENU   = os.path.join(ROOT, 'swf', 'spotmeter_menu.swf')
-SRC_SWF_BATTLE = os.path.join(ROOT, 'swf', 'spotmeter_battle.swf')
-SRC_SWF_GF     = os.path.join(ROOT, 'swf', 'spotmeter_guiflash.swf')
-SRC_GF_INIT    = os.path.join(ROOT, 'build', 'spotmeter_gf', '__init__.pyc')
-SRC_GF_FLASH   = os.path.join(ROOT, 'build', 'spotmeter_gf', 'flash.pyc')
-SRC_GF_UTILS   = os.path.join(ROOT, 'build', 'spotmeter_gf', 'utils.pyc')
-META_XML = os.path.join(ROOT, 'packaging', 'meta.xml')
+SRC_PYC     = os.path.join(ROOT, 'build', 'mod_spotmeter.pyc')
+SRC_GFPANEL = os.path.join(ROOT, 'build', 'spotmeter_gfpanel.pyc')
+SRC_HTML    = os.path.join(ROOT, 'src', 'gameface', 'SpotMeterPanel.html')
+SRC_RESMAP  = os.path.join(ROOT, 'src', 'res_map', 'net.spotmeter.panel.json')
+SRC_JSON    = os.path.join(ROOT, 'src', 'spotmeter.json')
+META_XML    = os.path.join(ROOT, 'packaging', 'meta.xml')
 INSTALL_TXT = os.path.join(ROOT, 'packaging', 'INSTALL.txt')
-DIST = os.path.join(ROOT, 'dist')
+DIST        = os.path.join(ROOT, 'dist')
 
 
 def read_version():
@@ -41,50 +45,23 @@ def read_version():
 
 
 def main():
-    if not os.path.exists(SRC_PYC):
-        print('error: %s does not exist - compile the mod first' % SRC_PYC, file=sys.stderr)
-        return 1
-    if not os.path.exists(META_XML):
-        print('error: %s does not exist' % META_XML, file=sys.stderr)
-        return 1
+    for p in (SRC_PYC, SRC_GFPANEL, SRC_HTML, SRC_RESMAP, META_XML):
+        if not os.path.exists(p):
+            print('error: missing %s (compile the .pyc to build/ first)' % p,
+                  file=sys.stderr)
+            return 1
     if not os.path.exists(DIST):
         os.makedirs(DIST)
 
     version = read_version()
     out_path = os.path.join(DIST, 'spotmeter-v%s.wotmod' % version)
 
-    # Two requirements for WoT 2.x .wotmod files (verified against
-    # working community mods like wot-public-mods/replays-manager):
-    #
-    #   1. ZIP_STORED (no compression). The engine mmaps entries
-    #      directly; ZIP_DEFLATED triggers 'compression not supported'
-    #      at load time on at least WoT 2.3.0.0.
-    #
-    #   2. Files live under a 'res/' prefix inside the archive AND
-    #      every intermediate directory must be present as its own
-    #      empty entry. paths.xml has
-    #         <Path mask="*.wotmod" mode="recursive" root="res">./mods/2.3.0.1</Path>
-    #      and the engine's resource manager only finds files inside
-    #      a 'res/' tree that it can walk top-down via real directory
-    #      entries. Without the directory entries the file is in the
-    #      archive but the gui mods loader's ResMgr.openSection() does
-    #      not see it - the .wotmod 'loads' but the python module is
-    #      never imported. (This is the bug v5.1.1 hit.)
-    # v6.0.0 MVP2: our LEGACY custom SWFs (button/menu/battle) are not
-    # shipped - they were rejected by WG's IView contract on WoT 2.x.
-    # We ship the forked GUIFlash (spotmeter_guiflash.swf) which IS a
-    # valid IView, plus its private Python wrapper at gui.mods.spotmeter_gf.
-    # The mod's own UI (mod_spotmeter.py) renders into the forked GUIFlash
-    # at runtime via g_smGuiFlash.createComponent.
-    gf_swf_present = os.path.exists(SRC_SWF_GF)
-    gf_py_present  = all(os.path.exists(p) for p in (SRC_GF_INIT, SRC_GF_FLASH, SRC_GF_UTILS))
-    if not gf_swf_present:
-        print('error: %s missing - run python swf/build.py first' % SRC_SWF_GF, file=sys.stderr)
-        return 1
-    if not gf_py_present:
-        print('error: build/spotmeter_gf/*.pyc missing - compile the wrapper first', file=sys.stderr)
-        return 1
-
+    # ZIP_STORED (the engine mmaps entries; DEFLATE fails to load on 2.x) and
+    # EVERY intermediate directory must be present as its own empty entry (the
+    # resource manager walks real dir entries top-down). res/ maps to VFS root:
+    #   res/scripts/client/gui/mods/*.pyc          -> auto-loaded Python
+    #   res/gui/gameface/mods/spotmeter/*.html      -> coui:// panel asset
+    #   res/mods/configs/res_map/*.json             -> OpenWG res_map config
     payload_entries = [
         ('res/', None),
         ('res/scripts/', None),
@@ -92,28 +69,28 @@ def main():
         ('res/scripts/client/gui/', None),
         ('res/scripts/client/gui/mods/', None),
         ('res/scripts/client/gui/mods/mod_spotmeter.pyc', SRC_PYC),
-        ('res/scripts/client/gui/mods/spotmeter_gf/', None),
-        ('res/scripts/client/gui/mods/spotmeter_gf/__init__.pyc', SRC_GF_INIT),
-        ('res/scripts/client/gui/mods/spotmeter_gf/flash.pyc',    SRC_GF_FLASH),
-        ('res/scripts/client/gui/mods/spotmeter_gf/utils.pyc',    SRC_GF_UTILS),
+        ('res/scripts/client/gui/mods/spotmeter_gfpanel.pyc', SRC_GFPANEL),
         ('res/gui/', None),
-        ('res/gui/flash/', None),
-        ('res/gui/flash/spotmeter_guiflash.swf', SRC_SWF_GF),
+        ('res/gui/gameface/', None),
+        ('res/gui/gameface/mods/', None),
+        ('res/gui/gameface/mods/spotmeter/', None),
+        ('res/gui/gameface/mods/spotmeter/SpotMeterPanel.html', SRC_HTML),
+        ('res/mods/', None),
+        ('res/mods/configs/', None),
+        ('res/mods/configs/res_map/', None),
+        ('res/mods/configs/res_map/net.spotmeter.panel.json', SRC_RESMAP),
     ]
     with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_STORED) as z:
         z.write(META_XML, 'meta.xml')
         for arcname, src in payload_entries:
             if src is None:
-                # Directory entry: zero-byte stored file with a name
-                # ending in '/' is how ZIP encodes a folder.
                 info = zipfile.ZipInfo(arcname)
                 info.compress_type = zipfile.ZIP_STORED
                 z.writestr(info, b'')
             else:
                 z.write(src, arcname)
 
-    # Also drop the default config and install instructions next to the
-    # .wotmod so the user has everything they need from one folder.
+    # default config + INSTALL next to the .wotmod, plus a one-link bundle zip
     shipped_config = os.path.join(DIST, 'spotmeter.json')
     shipped_install = os.path.join(DIST, 'INSTALL.txt')
     shutil.copy2(SRC_JSON, shipped_config)
@@ -122,8 +99,6 @@ def main():
     with open(shipped_install, 'wb') as fout:
         fout.write(install_text)
 
-    # Bundle ZIP for one-link sharing: contains the .wotmod, default
-    # config, and INSTALL.txt under a single versioned folder.
     bundle_path = os.path.join(DIST, 'spotmeter-v%s.zip' % version)
     bundle_root = 'spotmeter-v%s' % version
     with zipfile.ZipFile(bundle_path, 'w', zipfile.ZIP_DEFLATED) as z:
@@ -138,10 +113,6 @@ def main():
 
     print('\nwotmod contents:')
     with zipfile.ZipFile(out_path, 'r') as z:
-        for info in z.infolist():
-            print('  %8d  %s' % (info.file_size, info.filename))
-    print('\nbundle contents:')
-    with zipfile.ZipFile(bundle_path, 'r') as z:
         for info in z.infolist():
             print('  %8d  %s' % (info.file_size, info.filename))
     return 0

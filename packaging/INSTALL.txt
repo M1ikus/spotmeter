@@ -2,25 +2,32 @@ SpotMeter — instalacja
 =======================
 
 Wersja: {{VERSION}}
-Wersja gry WoT: 2.3.0.1  (sprawdz w ~/version.xml jesli inna)
+Wersja gry WoT: 2.3.1.0  (sprawdz w ~/version.xml jesli inna)
 Pythona w grze: 2.7  (Wargaming nadal trzyma sie tej wersji)
 
 Co potrzeba:
 - spotmeter-v{{VERSION}}.wotmod  (sam mod)
+- net.openwg.gameface            (WYMAGANA biblioteka - panel to overlay Gameface;
+                                  jest w typowych paczkach / projekt OpenWG)
 - spotmeter.json           (opcjonalny config z domyslnymi ustawieniami)
 
 
 KROK 1: Wrzuc .wotmod do gry
 -----------------------------
+Najpierw upewnij sie, ze masz net.openwg.gameface (panel jej wymaga; w
+wiekszosci paczek modow jest domyslnie).
+
 Skopiuj  spotmeter-v{{VERSION}}.wotmod
-Do       <katalog gry>\mods\2.3.0.1\
+Do       <katalog gry>\mods\2.3.1.0\
 
 Przyklad sciezki:
-   D:\Gry\World_of_Tanks_EU\mods\2.3.0.1\spotmeter-v{{VERSION}}.wotmod
+   D:\Gry\World_of_Tanks_EU\mods\2.3.1.0\spotmeter-v{{VERSION}}.wotmod
 
-Jesli folder mods\2.3.0.1 nie istnieje, gra go zrobi po pierwszym uruchomieniu.
+Jesli folder mods\2.3.1.0 nie istnieje, gra go zrobi po pierwszym uruchomieniu.
 
-Game auto-laduje wszystkie .wotmod z tego katalogu po starcie.
+Game auto-laduje wszystkie .wotmod z tego katalogu po starcie. Przy PIERWSZYM
+uruchomieniu gra raz sie zrestartuje, zeby zarejestrowac panel (net.openwg.gameface
+przebudowuje swoja mape zasobow) - to normalne.
 
 
 KROK 2 (opcjonalny): Konfiguracja
@@ -78,14 +85,16 @@ Hotkeys (numpad - dziala przy NumLock WL i WYL):
     .      - reload configu
     (Numpad9 / live mode usuniete - byly tylko na czacie.)
 
-  PANEL (v6.1):
-    PageDown - pokaz/ukryj panel bitewny. Panel jest TYLKO w bitwie i
-               domyslnie startuje UKRYTY - PageDown go przywoluje. Wybor
-               jest trwaly: raz ukryty PageDownem zostaje ukryty (tez w
-               nastepnej bitwie i po powrocie z garazu) az znow wcisniesz
-               PageDown. Chowa sie tez chwilowo na TAB/N w bitwie.
-    Panel garazowy zostal usuniety - jego ustawienia sa teraz w
-    konfiguratorze (menu ustawien modow, patrz nizej).
+  PANEL (v7 - Gameface):
+    PageDown  - pokaz/ukryj panel bitewny (TYLKO w bitwie).
+    Przeciaganie - chwyc panel za NAGLOWEK i przeciagnij; pozycja sie zapisuje
+                   (przezywa bitwy i restart klienta).
+    Zwijanie  - strzalka w prawym gornym rogu zwija panel do samego celu
+                (wybrany pojazd + spot distance); stan zapamietany.
+    Klik w wiersz wroga = wybor celu; klik w komorke loadoutu = przelacz/cykluj.
+    Panel to nowoczesny overlay HTML (Gameface) - przezroczyste tlo, biale
+    napisy, zielone wlaczone opcje. Zadnego SWF-a (koniec kolizji GUIFlash).
+    Ustawienia tez w konfiguratorze (menu ustawien modow, patrz nizej).
 
   JEZYK: pole "language" w configu - "auto" (jezyk klienta WoT, pl->PL,
   reszta->EN), albo wymus "pl" / "en".
@@ -145,7 +154,7 @@ WERYFIKACJA / DEBUG
 Logi: <katalog gry>\python.log
 
 Po starcie gry powinien byc tam wpis:
-   SpotMeter: initialised (version=6.1.0, ...)
+   SpotMeter: initialised (version=7.0.0, ...)
 
 Jesli nie ma — mod sie nie zaladowal. Najczestsze przyczyny:
 - zla wersja gry (sprawdz numer w sciezce mods\<wersja>\)
@@ -159,7 +168,7 @@ co tick — w logu beda linie:
 
 JAK ODINSTALOWAC
 -----------------
-Usun spotmeter-v{{VERSION}}.wotmod z mods\2.3.0.1\.
+Usun spotmeter-v{{VERSION}}.wotmod z mods\2.3.1.0\.
 (Config w %APPDATA%\Wargaming.net\WorldOfTanks\mods\spotmeter\ mozna
 zostawic albo skasowac.)
 
