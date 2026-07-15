@@ -1,6 +1,6 @@
 <root>
     <id>com.M1ikus.spotmeter</id>
-    <version>6.1.0</version>
+    <version>7.0.0</version>
     <name>SpotMeter</name>
-    <description>Dynamic minimap circle showing the distance from which your tank can currently be spotted, plus a draggable in-battle panel: enemy list with view ranges, manual or automatic target picking with per-class presets, English/Polish UI. Numpad hotkeys; PageDown shows/hides the panel. Configure it in the garage via a mods-settings menu (optional) or spotmeter.json.</description>
+    <description>Dynamic minimap circle showing the distance from which your tank can currently be spotted, plus a draggable, collapsible in-battle panel (modern Gameface UI): enemy list with view ranges, manual or automatic target picking with per-class presets, English/Polish. Numpad hotkeys; PageDown shows/hides the panel; drag it by the header. Requires the free net.openwg.gameface library. Configure in the garage via a mods-settings menu (optional) or spotmeter.json.</description>
 </root>

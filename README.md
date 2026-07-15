@@ -2,7 +2,7 @@
 
 Dodaje na minimapie dodatkowy okrąg pokazujący odległość, z jakiej Twój czołg może zostać zauważony przez przeciwnika. Dochodzi przeciągalny **panel bitewny** (lista przeciwników + picker celu; **PageDown** chowa/pokazuje), **auto-dobieranie** celu z presetami per klasa, pełne **PL/EN** UI oraz **konfigurator w garażu** przez menu ustawień modów (ModsSettingsAPI / aslainMenu — opcjonalne; bez niego działa config `spotmeter.json`).
 
-> Build pod **WoT 2.3.0.1** · wersja moda **6.1.0**.
+> Build pod **WoT 2.3.1.0** · wersja moda **7.0.0**.
 
 ## Co automatycznie / co ręcznie
 
@@ -24,13 +24,13 @@ Granica jest prosta: wszystko co jest w **descriptorze pojazdu** (transmitowanym
 
 W praktyce: po wybraniu enemy pickerem, jego VR od razu zawiera Coated Optics + Stereoscope (jeśli są na tym czołgu — odczytane z descriptora). Toggle perków / consumables / dyrektyw / field-upgradów nakładasz tylko gdy zakładasz że enemy je faktycznie ma.
 
-> **Weryfikacja własnych field upgrades:** naciśnij **NumpadEnter** (status snapshot) — w chacie pojawi się m.in. linia `myVR: base=410m * factor=1.103` i `myCamo: base(...) + add=0.025`. Jeśli `factor>1.0` lub `add>0.0`, ulepszenia polowe są naliczone w descriptorze.
+> **Weryfikacja własnych field upgrades:** naciśnij **NumpadEnter** (status snapshot) — w `python.log` pojawi się m.in. linia `myVR: base=410m * factor=1.103` i `myCamo: base(...) + add=0.025`. Jeśli `factor>1.0` lub `add>0.0`, ulepszenia polowe są naliczone w descriptorze. (Mod **nigdy nie pisze na czat** — diagnostyka idzie wyłącznie do `python.log`.)
 
-## Panel SpotMeter (v6.1)
+## Panel SpotMeter (v7)
 
-Przeciągalny **panel bitewny** renderowany przez GUIFlash. **PageDown** pokazuje/ukrywa go w bitwie (domyślnie startuje ukryty). Panel garażowy z v6.0 został usunięty — jego ustawienia są teraz w konfiguratorze (menu ustawień modów). Mod **nigdy nie pisze na czat**.
+Przeciągalny, zwijalny **panel bitewny** — nowoczesny overlay **Gameface** (HTML/CSS/JS): przezroczysty styl, białe napisy, zielone włączone opcje. **PageDown** pokazuje/ukrywa go w bitwie; przeciągasz za **nagłówek** (pozycja zapisywana), a **strzałka** zwija panel do samego celu (pojazd + spot distance). Klik w wiersz = wybór celu, klik w komórkę = zmiana loadoutu. Mod **nigdy nie pisze na czat**.
 
-**Koegzystencja GUIFlash (v6.1):** jeśli w grze jest współdzielony `gambiter.guiflash` (dowolna paczka), SpotMeter używa **jego** do paneli i **nie ładuje własnej kopii** — dzięki temu nie duplikuje klas `net.gambiter.*` i nie psuje zapisu pozycji innych modów na GUIFlash. Gdy `gambiter.guiflash` nie ma, używany jest wbudowany fork (`spotmeter_gf`) — wtedy nic innego tych klas nie deklaruje, więc też brak kolizji. Zero twardej zależności.
+**Zależność (v7):** panel to overlay Gameface renderowany przez **`net.openwg.gameface`** (darmowa, MIT; jest w typowych paczkach modów). To **wymagana** biblioteka dla panelu — bez niej okrąg na minimapie i klawisze działają, ale panel się nie pokaże. SpotMeter **nie wysyła już żadnego SWF-a** (stary fork GUIFlash `spotmeter_gf` usunięty), więc nie może duplikować klas `net.gambiter.*` ani psuć zapisu pozycji okien innych modów.
 
 ### Panel bitewny
 Stale widoczna lista przeciwników. Każdy wiersz: `[klasa] Nazwa xN  T<tier>  VR=XXXm`. Identyczne czołgi są grupowane w jeden wiersz (`battlePanelGroupSameTanks`, np. `Dravec x5`) — jeden przystanek w cyklu Numpad 2/8, bo ten sam model = ten sam VR = ten sam okrąg.
@@ -139,7 +139,7 @@ Server NIE wysyła `vehPostProgression` przeciwnika (jest to `MY_VEHICLE` scope)
 
 Pobierz `spotmeter-v<wersja>.zip` z [GitHub Releases](https://github.com/M1ikus/spotmeter/releases). W środku:
 
-- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.3.0.1/`
+- `spotmeter-v<wersja>.wotmod` → wrzuć do `<WoT>/mods/2.3.1.0/` (wymaga `net.openwg.gameface`)
 - `spotmeter.json` (opcjonalny) → wrzuć do `<WoT>/mods/configs/`
 - `INSTALL.txt` — szczegółowa instrukcja krok po kroku
 
@@ -292,9 +292,17 @@ W bitwie naciśnij `NumpadPeriod` (lub klawisz z `reloadKey`) — config wczytuj
    - liczy camo i radius spotu
    - wywołuje na Flashu `as_addDynamicViewRange` / `as_updateDynRange` z (color, alpha, radius)
 5. Sprząta entry i callbacki w `_hideMarkup`, `__onPostMortemSwitched`, `stop`.
-6. **Panele v6.0** renderuje przez forka GUIFlash (`gui.mods.spotmeter_gf` — własny namespace + SWF) jako niezależny overlay; **nie modyfikuje plików UI Wargamingu**. Patchuje dodatkowo `Avatar.shoot/shootDualGun` (kara za strzał) — **patche wrapperem wołającym oryginał** + try/except, więc komponują się z innymi modami (np. XVM) i nie crashują. (W v6.0.1 usunięto patch `PlayerFullNameFormatter` — marker przy nicku nigdy się porządnie nie renderował i był zbędny przy panelu; o jeden monkey-patch mniej = mniejsza powierzchnia konfliktu.)
+6. **Panel bitewny (v7)** renderuje jako overlay **Gameface** (HTML/CSS/JS) przez `net.openwg.gameface` — mod rejestruje własny layout w `res_map` i steruje nim jak niezależnym oknem; **nie modyfikuje plików UI Wargamingu** i **nie wysyła żadnego SWF-a** (koniec forka GUIFlash i całej klasy kolizji `net.gambiter.*`). Patchuje dodatkowo `Avatar.shoot/shootDualGun` (kara za strzał) — **patche wrapperem wołającym oryginał** + try/except, więc komponują się z innymi modami (np. XVM) i nie crashują.
 
 ## Roadmap
+
+### v7.0 — panel na Gameface (koniec GUIFlash) ✅
+
+- **Panel bitewny przepisany na Gameface** (nowoczesny HTML/CSS/JS) zamiast GUIFlash/Scaleform SWF — renderowany przez `net.openwg.gameface`. Mod **nie wysyła już żadnego SWF-a**, więc definitywnie znika klasa problemów z kolizją `net.gambiter.*` (v6.1 tylko ją łagodziła). Cały silnik (okrąg, obliczenia VR, picker, grupowanie, klawisze, config) bez zmian — wymieniona tylko warstwa renderu panelu.
+- **Nowa zależność:** `net.openwg.gameface` (darmowa, MIT; w typowych paczkach). Bez niej okrąg + klawisze działają, panelu nie ma.
+- **Nowoczesny wygląd** — przezroczyste tło, białe napisy, zielone włączone opcje; prawdziwy CSS zamiast `<font>`.
+- **Przeciąganie** za nagłówek (pozycja zapisywana) + **strzałka zwijania** (do samego celu; stan zapamiętany).
+- **Usunięty** fork GUIFlash `spotmeter_gf` + jego SWF; wyczyszczony log (benign statusy przez INFO — 0 warningów w normalnym przebiegu). Build pod **WoT 2.3.1.0**.
 
 ### v6.1 — konfigurator w garażu + ciszej ✅
 
@@ -390,7 +398,7 @@ Wersja jest czytana z `packaging/meta.xml` — zaktualizuj tam przed kolejnym bu
 ### Hot-test podczas devu
 
 ```sh
-cp build/mod_spotmeter.pyc "<WoT>/res_mods/2.3.0.0/scripts/client/gui/mods/"
+cp build/mod_spotmeter.pyc "<WoT>/res_mods/2.3.1.0/scripts/client/gui/mods/"
 cp src/spotmeter.json "<WoT>/mods/configs/"
 ```
 

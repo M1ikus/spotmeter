@@ -1,7 +1,53 @@
 # Changelog
 
 All notable changes to **SpotMeter**. Dates are ISO (YYYY-MM-DD). Full per-commit
-history is in the git tags (`v5.1.0` … `v6.1.0`).
+history is in the git tags (`v5.1.0` … `v7.0.0`).
+
+## [7.0.0] — 2026-07-15
+
+Major release: the in-battle panel is rebuilt on **Gameface** (modern HTML/CSS/JS),
+retiring GUIFlash/Scaleform entirely. Built for **WoT 2.3.1.0**.
+
+### Changed (headline: GUIFlash → Gameface)
+- **The in-battle panel is now a Gameface overlay** (HTML/CSS/JS) hosted in a Wulf
+  window, rendered through the `net.openwg.gameface` library instead of a
+  Scaleform SWF. This permanently removes the `net.gambiter.*` AS3 class-collision
+  class of bug (the v6.1.0 hybrid resolver only mitigated it): SpotMeter no longer
+  ships any SWF, so nothing can collide with another GUIFlash mod's saved window
+  positions. The whole spot-distance engine — minimap circle, view-range calc,
+  picker, identical-tank grouping, hotkeys, config — is unchanged; only the panel's
+  render layer was replaced.
+
+### Added
+- **New dependency: `net.openwg.gameface`** (free, MIT; already shipped in common
+  modpacks). Required for the panel; without it the minimap circle and the numpad
+  hotkeys still work.
+- **Modern panel look** — transparent "glass" style, white text with green for the
+  enabled loadout options, a subtle outline. Real CSS instead of GUIFlash `<font>`
+  markup.
+- **Drag the panel by its header**; the position is saved (survives battles and
+  restarts).
+- **Collapse arrow** — shrinks the panel to just the target line (picked vehicle +
+  spot distance); the collapsed/expanded state is remembered.
+- Clickable enemy rows (pick a target), loadout cells (toggle/cycle each), and the
+  Auto-pick line, all through the Gameface model-command bridge.
+
+### Removed
+- The GUIFlash panel, the bundled `spotmeter_gf` fork, and its byte-identical
+  `spotmeter_guiflash.swf`. No more shared `net.gambiter.*` classes ship at all.
+
+### Fixed
+- **Log noise** (reported by Aslain): benign status/lifecycle lines and the
+  on-demand diagnostic dumps were logged at WARNING and looked like errors — they
+  are now INFO. A normal session logs **zero WARNING/ERROR lines** from SpotMeter,
+  and `module loaded` comes through INFO.
+
+### Packaging / tooling
+- `build_wotmod.py` ships the Gameface payload (`spotmeter_gfpanel.pyc` +
+  `SpotMeterPanel.html` + the `res_map` JSON) — no SWF, no fork.
+- `preflight.py` audits the new payload and validates the res_map ↔ layout-key ↔
+  HTML consistency; the GUIFlash-resolver check is retired.
+- Built for **WoT 2.3.1.0**.
 
 ## [6.1.0] — 2026-07-08
 
