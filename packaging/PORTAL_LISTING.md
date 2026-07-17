@@ -79,6 +79,9 @@ A modern HTML overlay: every enemy with its view range, identical tanks grouped 
 REQUIRES
 net.openwg.gameface (free, MIT; already in common modpacks) for the panel. The minimap circle and the hotkeys work even without it.
 
+USING WITH XVM
+If you use XVM's minimap, XVM owns the view-range-circle layer and repaints SpotMeter's circle in its own colour (often a constant cyan; you may see two similar circles). SpotMeter's is the one that CHANGES SIZE with your camo state (your live spot distance); XVM's is your static view range. Recolour or hide the circles in XVM's minimap.xc; SpotMeter's own colours apply when the XVM minimap isn't repainting them. The spot-distance readout is unaffected either way.
+
 LANGUAGE
 English and Polish, auto-detected from your game client.
 

@@ -57,6 +57,21 @@ Stale widoczna lista przeciwników. Każdy wiersz: `[klasa] Nazwa xN  T<tier>  V
 - Czołgi lekkie / niektóre kołowe — w XML mają `invMoving == invStill`, więc okrąg po prostu nie zmienia rozmiaru. Bez specjalnego case'u.
 - Czołgi z trybem siege (CS-63, S-Conqueror, italian heavies) — silnik gry sam podmienia descriptor (`CompositeVehicleDescriptor`) na właściwy tryb, więc mod automatycznie używa odpowiedniego camo dla obecnego trybu.
 
+## SpotMeter + XVM (kolor okręgu)
+
+Jeśli używasz **minimapy z XVM**, okrąg SpotMetera może być **jednolicie cyjanowy/niebieski i nie zmieniać koloru** ze stanem — albo widzisz **dwa podobne okręgi**. To **nie błąd moda**: XVM przejmuje warstwę okręgów zasięgu na minimapie.
+
+SpotMeter rysuje swój okrąg jako **natywny wpis `VIEW_RANGE_CIRCLES`** (bez własnego SWF-a — to celowe, dla odporności na aktualizacje WG) i podaje mu kolor per-stan. Gdy XVM podmienia renderer minimapy, to **XVM maluje te okręgi swoim schematem** (cyjan to jego domyślny), ignorując nasz kolor i nasze aktualizacje ruch/postój/po-strzale. **Nie da się tego nadpisać z naszej strony** — XVM jest właścicielem tej warstwy (odzyskanie koloru wymagałoby rysowania okręgu własnym SWF-em, czyli dokładnie tej kruchości, od której v7 uciekło).
+
+**Który okrąg jest który?** Okrąg SpotMetera to ten, który **zmienia rozmiar** — to Twój żywy *spot distance* (z ilu metrów Cię widać): kurczy się w postoju (camo) i rośnie w ruchu / po strzale. Okrąg XVM to Twój *zasięg widzenia* i ma stały rozmiar.
+
+**Co możesz zrobić:**
+- **Zostaw tylko okrąg SpotMetera** — wyłącz własny okrąg zasięgu XVM w jego konfiguracji minimapy (`minimap.xc`).
+- **Zostaw tylko okrąg XVM** — ustaw `"showMinimapCircle": false` w `spotmeter.json` (albo odznacz okrąg w menu ustawień); stracisz jednak odczyt spot-distance, czyli sedno moda.
+- **Zmień kolor pod XVM** — tylko w konfiguracji minimapy XVM (`minimap.xc`), nie w SpotMeterze, bo to XVM maluje tę warstwę.
+
+**To wyłącznie kosmetyka koloru** — obliczenia spot-distance (i promień okręgu) działają poprawnie niezależnie od tego, kto maluje okrąg. Bez minimapy XVM kolory per-stan SpotMetera (`colorMoving` / `colorStill` / `colorAfterShot` / `colorCamoNet` w `spotmeter.json`) działają normalnie.
+
 ## Wzór camo (zgodny z `scripts/common/items/utils.py:getInvisibility`)
 
 ```
